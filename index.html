@@ -1,0 +1,1365 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Painel de Pendências · Galvanoplastia</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F1F2F5;
+    --surface:#FFFFFF;
+    --surface-warm:#FBFAF6;
+    --ink:#1B1F27;
+    --ink-soft:#6B7280;
+    --ink-faint:#9AA1AC;
+    --brass:#B08D57;
+    --brass-deep:#8A6D3F;
+    --brass-light:#EDE1CB;
+    --ok:#1F9D55;
+    --ok-bg:#E6F5EC;
+    --warn:#C98A00;
+    --warn-bg:#FCF1DC;
+    --crit:#C7414F;
+    --crit-bg:#FBE7E9;
+    --hairline:#E3E1DA;
+    --radius:14px;
+    --shadow: 0 1px 2px rgba(27,31,39,0.04), 0 8px 24px rgba(27,31,39,0.05);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--bg); color:var(--ink); font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased; min-height:100vh;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .display{font-family:'Space Grotesk',sans-serif;}
+
+  /* ---------- Top nav ---------- */
+  .topnav{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 28px; background:var(--surface); border-bottom:1px solid var(--hairline);
+    position:sticky; top:0; z-index:50;
+  }
+  .brand{display:flex; align-items:center; gap:12px;}
+  .brand-mark{
+    width:34px; height:34px; border-radius:8px;
+    background:linear-gradient(135deg, var(--brass) 0%, var(--brass-deep) 100%);
+    display:flex; align-items:center; justify-content:center;
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.35), 0 2px 6px rgba(138,109,63,0.35);
+  }
+  .brand-mark svg{width:18px;height:18px;}
+  .brand-text .eyebrow{font-size:11px; letter-spacing:.12em; color:var(--ink-faint); text-transform:uppercase; font-weight:600;}
+  .brand-text .title{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:16px; line-height:1.1;}
+  .tabs{display:flex; gap:4px; background:var(--bg); padding:4px; border-radius:10px;}
+  .tab-btn{
+    border:none; background:transparent; padding:8px 16px; border-radius:8px;
+    font-family:'Inter',sans-serif; font-weight:600; font-size:13px; color:var(--ink-soft);
+    cursor:pointer; transition:all .15s ease;
+  }
+  .tab-btn.active{background:var(--surface); color:var(--ink); box-shadow:var(--shadow);}
+  .tab-btn.tv-btn{color:var(--brass-deep);}
+  .tab-btn.tv-btn.active{background:var(--ink); color:#fff;}
+  .nav-clock{text-align:right;}
+  .nav-clock .time{font-family:'IBM Plex Mono',monospace; font-size:15px; font-weight:600;}
+  .nav-clock .date{font-size:11px; color:var(--ink-soft); text-transform:capitalize;}
+
+  main{max-width:1360px; margin:0 auto; padding:24px 28px 60px;}
+  .view{display:none;}
+  .view.active{display:block;}
+
+  h2.section-title{font-family:'Space Grotesk',sans-serif; font-size:17px; font-weight:600; margin:0 0 14px;}
+
+  /* ---------- Andon strip (resumo geral) ---------- */
+  .andon-strip{
+    display:flex; align-items:center; gap:16px; padding:14px 20px; border-radius:var(--radius);
+    margin-bottom:20px; border:1px solid var(--hairline); background:var(--surface);
+  }
+  .andon-dot{width:14px; height:14px; border-radius:50%; flex:none; position:relative;}
+  .andon-dot::after{content:''; position:absolute; inset:-6px; border-radius:50%; opacity:.35; animation:pulse 2s ease-in-out infinite;}
+  .andon-dot.ok{background:var(--ok);} .andon-dot.ok::after{background:var(--ok);}
+  .andon-dot.warn{background:var(--warn);} .andon-dot.warn::after{background:var(--warn);}
+  .andon-dot.crit{background:var(--crit);} .andon-dot.crit::after{background:var(--crit);}
+  @keyframes pulse{0%,100%{transform:scale(1); opacity:.35;} 50%{transform:scale(1.6); opacity:0;}}
+  /* Pendências vencidas piscam sem parar até alguém agir — mais devagar, sem susto */
+  @keyframes blinkCrit{ 50%{ opacity:.25; } }
+  .row-crit, .badge.crit, .etapa-row-bg.crit, .etapa-timer.crit{
+    animation: blinkCrit 1.6s ease-in-out infinite;
+  }
+  /* Dentro do esquema (banhos/pílulas) o piscar é mais rápido — precisa chamar mais atenção */
+  .bath-timer.crit, .etapa-icon-timer.crit{
+    animation: blinkCrit .9s ease-in-out infinite;
+  }
+  .andon-label{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px;}
+  .andon-sub{color:var(--ink-soft); font-size:13px;}
+  .andon-strip .spacer{flex:1;}
+  .andon-period{font-size:12px; color:var(--ink-faint); text-align:right;}
+
+  /* ---------- Card genérico ---------- */
+  .card{background:var(--surface); border:1px solid var(--hairline); border-radius:var(--radius); padding:22px; box-shadow:var(--shadow);}
+  .plant-card{margin-bottom:20px; overflow-x:auto;}
+  .plant-card-head{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:6px;}
+  .plant-card-head h3{font-family:'Space Grotesk',sans-serif; font-size:15px; margin:0;}
+  .plant-card-head span{font-size:12px; color:var(--ink-soft);}
+  .plant-legend{display:flex; gap:16px; font-size:12px; color:var(--ink-soft); margin-top:14px; flex-wrap:wrap;}
+  .plant-legend span{display:flex; align-items:center; gap:6px;}
+  .legend-dot{width:9px; height:9px; border-radius:50%; display:inline-block;}
+
+  /* ---------- Esquema 2D da planta (SVG) — o coração do painel ---------- */
+  .plant-svg-wrap{min-width:700px;}
+  .tanque-rect{stroke:var(--hairline); stroke-width:1.5; fill:var(--surface-warm);}
+  .linha-label{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14px; fill:var(--ink);}
+  .apoio-label{font-family:'Inter',sans-serif; font-weight:600; font-size:11px; fill:var(--ink-soft);}
+  .farm-label{font-family:'Inter',sans-serif; font-weight:700; font-size:10px; fill:var(--ink-faint); letter-spacing:.06em;}
+  .sangria-icone{font-size:26px; animation: blinkCrit .9s ease-in-out infinite;}
+  .plant-dot{cursor:pointer;}
+  .plant-dot circle.pulse{animation:pulse 2s ease-in-out infinite; transform-box:fill-box; transform-origin:center;}
+  .bath-timer{font-family:'IBM Plex Mono',monospace; font-size:12px; fill:var(--ink-soft); font-weight:600;}
+  .bath-total-info{font-family:'IBM Plex Mono',monospace; font-size:10.5px; fill:var(--ink-faint); font-weight:600;}
+  .bath-timer.warn{fill:var(--warn);} .bath-timer.crit{fill:var(--crit);}
+  .etapa-label{font-family:'Inter',sans-serif; font-size:11px; fill:var(--ink-soft); font-weight:500;}
+  .etapa-timer{font-family:'IBM Plex Mono',monospace; font-size:11px; fill:var(--ink-soft); font-weight:600;}
+  .etapa-timer.ok{fill:var(--ok);} .etapa-timer.warn{fill:var(--warn);} .etapa-timer.crit{fill:var(--crit);} .etapa-timer.evento{fill:var(--ink-faint);}
+  .etapa-row-bg{fill:var(--surface); stroke:var(--hairline); stroke-width:1;}
+  .etapa-row-bg.warn{fill:var(--warn-bg);} .etapa-row-bg.crit{fill:var(--crit-bg);}
+  .etapa-icon-sm{font-size:15px;}
+  .etapa-icon-timer{font-family:'IBM Plex Mono',monospace; font-size:12.5px; fill:var(--ink-soft); font-weight:700;}
+  .etapa-icon-timer.ok{fill:var(--ok);} .etapa-icon-timer.warn{fill:var(--warn);} .etapa-icon-timer.crit{fill:var(--crit);}
+
+  /* Pílula (oblongo) — deixa claro que o ícone + cronômetro é clicável */
+  .item-pill{stroke-width:1.5;}
+  .item-pill.ok{fill:var(--surface); stroke:var(--hairline);}
+  .item-pill.warn{fill:var(--warn-bg); stroke:var(--warn);}
+  .item-pill.crit{fill:var(--crit-bg); stroke:var(--crit); animation: pillGlow .9s ease-in-out infinite;}
+  @keyframes pillGlow{
+    0%,100%{ stroke-width:1.5; stroke-opacity:1; }
+    50%{ stroke-width:3.5; stroke-opacity:.55; }
+  }
+
+  /* ---------- Equipamentos de apoio (faixa compacta) ---------- */
+  .apoio-strip{display:flex; gap:10px; flex-wrap:wrap; margin-top:18px; padding-top:16px; border-top:1px solid var(--hairline);}
+  .apoio-chip{
+    display:flex; align-items:center; gap:8px; padding:7px 12px; border:1px solid var(--hairline); border-radius:20px;
+    font-size:12.5px; font-weight:600; cursor:pointer; background:var(--surface-warm); transition:border-color .15s ease;
+  }
+  .apoio-chip:hover{border-color:var(--brass);}
+  .chip-dot{width:9px; height:9px; border-radius:50%; flex:none;}
+  .chip-dot.ok{background:var(--ok);} .chip-dot.warn{background:var(--warn);} .chip-dot.crit{background:var(--crit);}
+
+  /* ---------- Tabela de pendências ---------- */
+  .toolbar{display:flex; align-items:center; gap:10px; margin-bottom:16px; flex-wrap:wrap;}
+  .toolbar select{
+    padding:8px 12px; border-radius:8px; border:1px solid var(--hairline); font-family:'Inter'; font-size:13px;
+    background:var(--surface); color:var(--ink);
+  }
+  .toolbar select:focus{outline:2px solid var(--brass); border-color:var(--brass);}
+  .btn{
+    font-family:'Inter',sans-serif; font-weight:600; font-size:13px; border-radius:8px; border:1px solid var(--hairline);
+    background:var(--surface); color:var(--ink); padding:8px 14px; cursor:pointer; transition:all .15s ease;
+  }
+  .btn:hover{border-color:var(--brass); color:var(--brass-deep);}
+  .btn.primary{background:var(--ink); color:#fff; border-color:var(--ink);}
+  .btn.primary:hover{background:var(--brass-deep); border-color:var(--brass-deep); color:#fff;}
+  .btn.small{padding:5px 11px; font-size:12px;}
+
+  .data-table{width:100%; border-collapse:collapse; background:var(--surface); border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow);}
+  .data-table thead th{
+    text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-faint);
+    font-weight:600; padding:12px 16px; border-bottom:1px solid var(--hairline); background:var(--surface-warm);
+  }
+  .data-table tbody td{padding:11px 16px; border-bottom:1px solid var(--hairline); font-size:13px; vertical-align:middle;}
+  .data-table tbody tr:last-child td{border-bottom:none;}
+  .data-table tbody tr.row-warn{background:var(--warn-bg);}
+  .badge{display:inline-block; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600; white-space:nowrap;}
+  .badge.ok{background:var(--ok-bg); color:var(--ok);}
+  .badge.warn{background:var(--warn-bg); color:var(--warn);}
+  .badge.crit{background:var(--crit-bg); color:var(--crit);}
+  .badge.evento{background:var(--bg); color:var(--ink-soft);}
+  .table-note{font-size:12px; color:var(--ink-faint); margin-top:10px;}
+
+  /* ---------- Parametrização ---------- */
+  .param-note{font-size:13px; color:var(--ink-soft); line-height:1.5; margin-bottom:18px; max-width:760px;}
+  .param-global{margin-bottom:18px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
+  .param-global label{font-size:13px; font-weight:600;}
+  .param-global .hint{font-size:12px; color:var(--ink-soft);}
+  .param-card{margin-bottom:18px;}
+  .param-card-title{font-family:'Space Grotesk',sans-serif; font-size:16px; font-weight:600; margin:0 0 14px;}
+  .param-liga{font-size:12px; color:var(--ink-soft); font-weight:500; margin-left:8px;}
+  .param-subtitle{font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-faint); font-weight:700; margin:14px 0 8px;}
+  .param-input{width:72px; padding:6px 8px; border:1px solid var(--hairline); border-radius:6px; font-family:'IBM Plex Mono',monospace; font-size:13px; text-align:center;}
+  .param-input:focus{outline:2px solid var(--brass); border-color:var(--brass);}
+  .param-input:disabled{background:var(--bg); color:var(--ink-faint);}
+  .param-evento{display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-soft); margin-right:10px;}
+
+  /* ---------- Controle químico do banho ---------- */
+  .quimicos-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:16px;}
+  .quimico-card{padding:18px;}
+  .quimico-card .param-table td{padding:8px 10px;}
+  @media (max-width:900px){ .quimicos-grid{grid-template-columns:1fr;} }
+
+  /* ---------- Alertas ativos — em fluxo normal (nunca sobrepõe nada), formato pílula compacta ---------- */
+  /* (faixa de alertas removida — os próprios ícones dentro dos banhos já piscam e resolvem no clique) */
+
+  /* ---------- Modais: confirmação com RE + cofre de 3 senhas ---------- */
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(27,31,39,0.55); z-index:500;
+    display:none; align-items:center; justify-content:center; padding:20px;
+  }
+  .modal-box{
+    background:var(--surface); border-radius:var(--radius); padding:26px 28px; width:100%; max-width:380px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.3);
+  }
+  .modal-box h3{font-family:'Space Grotesk',sans-serif; font-size:17px; margin:0 0 6px;}
+  .modal-desc{font-size:13px; color:var(--ink-soft); margin:0 0 16px; line-height:1.4;}
+  .modal-box input{
+    width:100%; padding:10px 12px; border:1px solid var(--hairline); border-radius:8px;
+    font-family:'Inter',sans-serif; font-size:14px; margin-bottom:10px; background:var(--surface);
+  }
+  .modal-box input:focus{outline:2px solid var(--brass); border-color:var(--brass);}
+  .param-gate-row{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  .param-gate-row input{margin-bottom:12px;}
+  .modal-error{color:var(--crit); font-size:12.5px; min-height:18px; margin-bottom:4px;}
+  .modal-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:6px;}
+
+  /* ---------- MODO TV ---------- */
+  body.tv-active main{max-width:none; padding:0;}
+  body.tv-active .andon-strip, body.tv-active .plant-card, body.tv-active .pendencias-block{display:none;}
+  #view-tv{position:relative; height:calc(100vh - 63px); overflow:hidden; background:var(--surface);}
+  .tv-dots{position:absolute; bottom:16px; left:50%; transform:translateX(-50%); display:flex; gap:12px; z-index:10;}
+  .tv-dots span{width:12px; height:12px; border-radius:50%; background:var(--hairline); transition:background .2s; cursor:pointer;}
+  .tv-dots span.on{background:var(--brass);}
+  .tv-screen{padding:44px 60px 34px; display:flex; flex-direction:column; height:100%; overflow-y:auto;}
+  .tv-quimicos{margin-top:22px; flex:none;}
+  .tv-quimicos .quimico-card{padding:14px 16px;}
+  .tv-quimicos .param-card-title{font-size:15px;}
+  .tv-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;}
+  .tv-title{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:44px; line-height:1;}
+  .tv-title-sub{font-size:20px; color:var(--ink-soft); font-weight:500; margin-left:14px;}
+  .tv-andon{display:flex; align-items:center; gap:18px;}
+  .tv-andon-dot{width:26px; height:26px; border-radius:50%; position:relative; flex:none;}
+  .tv-andon-dot::after{content:''; position:absolute; inset:-9px; border-radius:50%; opacity:.35; animation:pulse 2s ease-in-out infinite;}
+  .tv-andon-dot.ok{background:var(--ok);} .tv-andon-dot.ok::after{background:var(--ok);}
+  .tv-andon-dot.warn{background:var(--warn);} .tv-andon-dot.warn::after{background:var(--warn);}
+  .tv-andon-dot.crit{background:var(--crit);} .tv-andon-dot.crit::after{background:var(--crit);}
+  .tv-andon-label{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px;}
+  .tv-planta-wrap{flex:1; display:flex; align-items:center; justify-content:center; min-height:0;}
+  .tv-planta-wrap svg{height:100%; width:auto; max-width:100%;}
+  .tv-footer{display:flex; justify-content:space-between; font-size:16px; color:var(--ink-faint); margin-top:18px;}
+
+  @media (max-width:640px){
+    .topnav{flex-wrap:wrap; gap:10px; padding:12px 16px; row-gap:12px;}
+    main{padding:16px;}
+    .tabs{order:3; width:100%; background:none; padding:0; display:grid; grid-template-columns:repeat(4,1fr); gap:8px;}
+    .tab-btn{background:var(--bg); padding:11px 4px; font-size:11.5px; border-radius:10px; text-align:center;}
+    .tab-btn.active{background:var(--ink); color:#fff; box-shadow:none;}
+    .tab-btn.tv-btn{grid-column:1 / -1; background:var(--brass); color:#241a0d; font-weight:700;}
+    .tab-btn.tv-btn.active{background:var(--ink); color:#fff;}
+    .tv-title{font-size:28px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="topnav">
+  <div class="brand">
+    <div class="brand-mark">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M4 17L12 4L20 17" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 17L12 10L16 17" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/></svg>
+    </div>
+    <div class="brand-text">
+      <div class="eyebrow">Galvanoplastia</div>
+      <div class="title">Painel de Pendências</div>
+    </div>
+  </div>
+  <div class="tabs">
+    <button class="tab-btn active" data-view="painel">Painel</button>
+    <button class="tab-btn" data-view="pendencias">Pendências</button>
+    <button class="tab-btn" data-view="parametros">Parâmetros</button>
+    <button class="tab-btn tv-btn" data-view="tv">▶ Modo TV</button>
+  </div>
+  <div class="nav-clock">
+    <div class="time mono" id="navTime">--:--:--</div>
+    <div class="date" id="navDate">-</div>
+  </div>
+</div>
+
+<main>
+
+  <!-- ============ VIEW: PAINEL ============ -->
+  <div class="view active" id="view-painel">
+
+    <div class="andon-strip">
+      <div class="andon-dot" id="geralDot"></div>
+      <div>
+        <div class="andon-label" id="geralLabel">—</div>
+        <div class="andon-sub" id="geralSub">—</div>
+      </div>
+      <div class="spacer"></div>
+      <div class="andon-period">Dados de exemplo (mock)<br>integração Supabase na próxima etapa</div>
+    </div>
+
+    <div class="card plant-card">
+      <div class="plant-card-head">
+        <h3>Linhas de galvanoplastia</h3>
+        <span>Clique num banho ou numa etapa pra ver o detalhe</span>
+      </div>
+      <div class="plant-svg-wrap" id="plantSvgWrap"></div>
+      <div class="plant-legend">
+        <span><i class="legend-dot" style="background:var(--ok)"></i>Em dia</span>
+        <span><i class="legend-dot" style="background:var(--warn)"></i>Próximo do limite</span>
+        <span><i class="legend-dot" style="background:var(--crit)"></i>Vencida</span>
+        <span style="margin-left:8px;">🧱 Granalha</span>
+        <span>⚡ Limpeza de contato</span>
+        <span>🧪 Retirada de amostra (dentro do banho)</span>
+      </div>
+      <div class="apoio-strip" id="apoioStrip"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <div class="plant-card-head">
+        <h3>Controle químico do banho</h3>
+        <span>Fora da faixa pisca até o valor voltar ao aceitável</span>
+      </div>
+      <div class="quimicos-grid" id="quimicosWrap"></div>
+    </div>
+
+    <div class="pendencias-block">
+      <h2 class="section-title">Pendências mais urgentes</h2>
+      <div class="table-scroll" style="max-height:420px; overflow-y:auto; border-radius:var(--radius); box-shadow:var(--shadow);">
+        <table class="data-table" id="urgentTable" style="box-shadow:none;">
+          <thead><tr><th>Linha</th><th>Banho</th><th>Item</th><th>Limite</th><th>Última troca</th><th>Cronômetro</th><th>Status</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ VIEW: PENDÊNCIAS ============ -->
+  <div class="view" id="view-pendencias">
+    <h2 class="section-title">Rotina de manutenção · todas as pendências</h2>
+    <div class="toolbar">
+      <select id="filterLinha">
+        <option value="todas">Todas as linhas</option>
+      </select>
+      <select id="filterBanho">
+        <option value="todos">Todos os banhos</option>
+        <option value="B3">B3</option>
+        <option value="B2">B2</option>
+        <option value="B1">B1</option>
+      </select>
+      <select id="filterStatus">
+        <option value="todos">Todos os status</option>
+        <option value="crit">Vencidas</option>
+        <option value="warn">Próximas do limite</option>
+        <option value="ok">Em dia</option>
+        <option value="evento">Por banho (evento)</option>
+      </select>
+      <div style="flex:1"></div>
+      <span class="table-note" style="margin:0;">"Zerar cronômetro" é só front-end por enquanto — vai virar gravação no Supabase.</span>
+    </div>
+    <table class="data-table" id="fullTable">
+      <thead><tr><th>Linha</th><th>Banho</th><th>Item</th><th>Limite</th><th>Última troca</th><th>Cronômetro</th><th>Status</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- ============ VIEW: PARÂMETROS ============ -->
+  <div class="view" id="view-parametros">
+    <h2 class="section-title">Parametrização dos processos</h2>
+    <div class="param-note">
+      Granalha e Limpeza de contato valem por banho (cada B3/B2/B1 tem o seu). Água (3 tanques), Potassa, Ácido e
+      Desengraxante são uma "fazenda de tanques" que atende a linha inteira, não um banho específico.
+      A retirada de amostra não é uma etapa aqui — é o cronômetro do banho, configurado no campo abaixo.
+      Mude o que precisar e o painel inteiro atualiza na hora. Por enquanto isso fica só nesta sessão do navegador;
+      quando ligarmos o Supabase, essa tela passa a ler e gravar os parâmetros de verdade.
+    </div>
+    <div class="card param-global">
+      <label for="paramLimiteBanho">Limite do banho até a coleta de amostra</label>
+      <input type="number" min="0" step="0.5" id="paramLimiteBanho" class="param-input" style="width:80px;">
+      <span class="hint">horas — vale pra todos os banhos (B1, B2, B3) de todas as linhas</span>
+    </div>
+    <div class="card param-global">
+      <label for="paramTanqueMae">Frequência de verificação do nível do Tanque Mãe</label>
+      <input type="number" min="0" step="0.5" id="paramTanqueMae" class="param-input" style="width:80px;">
+      <span class="hint">horas</span>
+    </div>
+    <div id="parametrosWrap"></div>
+
+    <h2 class="section-title" style="margin-top:32px;">Controle químico do banho (faixas aceitáveis)</h2>
+    <div class="param-note">
+      Baseado na folha "Parâmetros do banho de bronze" — assumi Permetal → Linha 1 e Europa → Linha 2 (as duas linhas
+      de bronze); me avise se a associação for outra. A Linha 3 é latão e essa folha não cobre isso, então os campos
+      dela ficam em branco (sem alerta) até você preencher com a referência certa. Deixe um campo vazio pra não
+      monitorar aquele limite (ex: Europa não tem faixa de temperatura).
+    </div>
+    <div id="paramQuimicosWrap"></div>
+  </div>
+
+  <!-- ============ VIEW: TV ============ -->
+  <div class="view" id="view-tv">
+    <div class="tv-dots" id="tvDots"></div>
+  </div>
+
+</main>
+
+<!-- Modal: confirmar pendência digitando o RE -->
+<div class="modal-overlay" id="reModalOverlay">
+  <div class="modal-box">
+    <h3>Confirmar ação</h3>
+    <p class="modal-desc" id="reModalDesc">—</p>
+    <input type="text" id="reModalInput" placeholder="Seu RE" autocomplete="off">
+    <div class="modal-error" id="reModalError"></div>
+    <div class="modal-actions">
+      <button class="btn" id="reModalCancel">Cancelar</button>
+      <button class="btn primary" id="reModalConfirm">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: cofre de 3 senhas pra liberar a aba Parâmetros -->
+<div class="modal-overlay" id="paramGateOverlay">
+  <div class="modal-box" style="max-width:440px;">
+    <h3>Acesso aos Parâmetros</h3>
+    <p class="modal-desc">Precisa das senhas dos 3 responsáveis, digitadas juntos agora.</p>
+    <div class="param-gate-row"><input type="text" id="pg_re1" placeholder="RE 1" autocomplete="off"><input type="password" id="pg_senha1" placeholder="Senha 1"></div>
+    <div class="param-gate-row"><input type="text" id="pg_re2" placeholder="RE 2" autocomplete="off"><input type="password" id="pg_senha2" placeholder="Senha 2"></div>
+    <div class="param-gate-row"><input type="text" id="pg_re3" placeholder="RE 3" autocomplete="off"><input type="password" id="pg_senha3" placeholder="Senha 3"></div>
+    <div class="modal-error" id="paramGateError"></div>
+    <div class="modal-actions">
+      <button class="btn" id="paramGateCancel">Cancelar</button>
+      <button class="btn primary" id="paramGateConfirm">Liberar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   SUPABASE — conexão real (só anon key; a secret key NUNCA fica aqui)
+   ========================================================================= */
+const SUPABASE_URL = 'https://bfiiqfbbsotxzjykkmey.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJmaWlxZmJic290eHpqeWtrbWV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk2MjI3OTQsImV4cCI6MjEwNTE5ODc5NH0.qMDpucaVVBSjlv2DEbVI51UFVBcy5ad0QSimqtXxgLw';
+const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+/* =========================================================================
+   MODAL — confirmar pendência digitando o RE (rastreabilidade)
+   ========================================================================= */
+let _reModalResolve = null;
+function pedirConfirmacaoRE(descricao){
+  return new Promise(resolve=>{
+    _reModalResolve = resolve;
+    document.getElementById('reModalDesc').textContent = descricao;
+    document.getElementById('reModalInput').value = '';
+    document.getElementById('reModalError').textContent = '';
+    document.getElementById('reModalOverlay').style.display = 'flex';
+    setTimeout(()=>document.getElementById('reModalInput').focus(), 50);
+  });
+}
+function fecharReModal(resultado){
+  document.getElementById('reModalOverlay').style.display = 'none';
+  if (_reModalResolve){ _reModalResolve(resultado); _reModalResolve = null; }
+}
+document.getElementById('reModalCancel').addEventListener('click', ()=>fecharReModal(null));
+document.getElementById('reModalConfirm').addEventListener('click', async ()=>{
+  const re = document.getElementById('reModalInput').value.trim();
+  const errEl = document.getElementById('reModalError');
+  if (!re){ errEl.textContent = 'Digite o RE.'; return; }
+  if (!sb){ fecharReModal({ re }); return; } // sem conexão Supabase, só segue com o RE digitado
+  errEl.textContent = 'Verificando…';
+  const { data, error } = await sb.from('colaboradores').select('re,nome').eq('re', re).eq('ativo', true).maybeSingle();
+  if (error || !data){ errEl.textContent = 'RE não encontrado ou inativo.'; return; }
+  fecharReModal(data);
+});
+document.getElementById('reModalInput').addEventListener('keydown', e=>{ if (e.key==='Enter') document.getElementById('reModalConfirm').click(); });
+
+async function registrarAcaoSupabase(re, tipoAcao, linhaId, banho, item, detalhe){
+  if (!sb) return;
+  try{
+    await sb.rpc('registrar_acao', {
+      p_re: re, p_tipo_acao: tipoAcao, p_linha_id: linhaId || null,
+      p_banho: banho || null, p_item: item || null, p_detalhe: detalhe || null
+    });
+  } catch(e){ console.error('Falha ao registrar ação no Supabase:', e); }
+}
+
+/* =========================================================================
+   MODAL — cofre de 3 senhas simultâneas pra liberar a aba Parâmetros
+   Libera até trocar de aba OU após 10 minutos (o que vier primeiro).
+   ========================================================================= */
+let parametrosDesbloqueado = false;
+let parametrosTimer = null;
+function bloquearParametros(){
+  parametrosDesbloqueado = false;
+  clearTimeout(parametrosTimer);
+}
+function liberarParametros(){
+  parametrosDesbloqueado = true;
+  clearTimeout(parametrosTimer);
+  parametrosTimer = setTimeout(()=>{
+    parametrosDesbloqueado = false;
+    if (document.getElementById('view-parametros').classList.contains('active')){
+      document.querySelector('[data-view="painel"]').click();
+    }
+  }, 10*60*1000);
+}
+let _paramGateResolve = null;
+function abrirGateParametros(){
+  return new Promise(resolve=>{
+    _paramGateResolve = resolve;
+    ['pg_re1','pg_senha1','pg_re2','pg_senha2','pg_re3','pg_senha3'].forEach(id=>document.getElementById(id).value = '');
+    document.getElementById('paramGateError').textContent = '';
+    document.getElementById('paramGateOverlay').style.display = 'flex';
+  });
+}
+function fecharParamGate(resultado){
+  document.getElementById('paramGateOverlay').style.display = 'none';
+  if (_paramGateResolve){ _paramGateResolve(resultado); _paramGateResolve = null; }
+}
+document.getElementById('paramGateCancel').addEventListener('click', ()=>fecharParamGate(false));
+document.getElementById('paramGateConfirm').addEventListener('click', async ()=>{
+  const re1=document.getElementById('pg_re1').value.trim(),   s1=document.getElementById('pg_senha1').value;
+  const re2=document.getElementById('pg_re2').value.trim(),   s2=document.getElementById('pg_senha2').value;
+  const re3=document.getElementById('pg_re3').value.trim(),   s3=document.getElementById('pg_senha3').value;
+  const errEl = document.getElementById('paramGateError');
+  if (!re1||!s1||!re2||!s2||!re3||!s3){ errEl.textContent = 'Preencha os 3 REs e senhas.'; return; }
+  if (!sb){ errEl.textContent = 'Sem conexão com o Supabase.'; return; }
+  errEl.textContent = 'Verificando…';
+  const { data, error } = await sb.rpc('validar_acesso_parametros', {
+    p_re1: re1, p_senha1: s1, p_re2: re2, p_senha2: s2, p_re3: re3, p_senha3: s3
+  });
+  if (error || data !== true){ errEl.textContent = 'Senhas inválidas — confira os 3 REs e senhas.'; return; }
+  fecharParamGate(true);
+});
+
+
+/* =========================================================================
+   MOCK DATA — estrutura pensada para bater 1:1 com futuras tabelas Supabase
+   Confirmado pela planilha do usuário (ESQUEMA_DESENV.xlsx):
+   - Granalha e Limpeza de contato: uma instância POR BANHO (B3, B2, B1)
+   - Água (3 tanques), Potassa, Ácido, Desengraxante: "fazenda de tanques"
+     que atende a linha inteira (não são por banho)
+   - Retirada de amostra: não é uma pendência separada — é o cronômetro do
+     próprio banho, que dispara um pop-up de coleta ao atingir o limite
+   ========================================================================= */
+
+const LINHAS = [
+  { id:'linha1', nome:'Linha 1', liga:'Bronze' },
+  { id:'linha2', nome:'Linha 2', liga:'Bronze' },
+  { id:'linha3', nome:'Linha 3', liga:'Latão' },
+];
+// Ordem visual no esquema 2D — igual ao esboço (Linha 03, 02, 01 da esquerda pra direita)
+const LAYOUT_ORDEM = ['linha3','linha2','linha1'];
+const BANHOS = ['B3','B2','B1']; // ordem visual de cima pra baixo, dentro de cada linha
+
+const EQUIPAMENTOS_APOIO = [
+  { id:'retificadores', nome:'Sala de Retificadores' },
+  { id:'chiller',       nome:'Chiller' },
+  { id:'tanque_mae',    nome:'Tanque Mãe' },
+  { id:'filtro',        nome:'Filtro' },
+  { id:'estanato',      nome:'Plataforma Estanato' },
+];
+
+function h(horasAtras){ const t=new Date(); t.setMinutes(t.getMinutes() - Math.round(horasAtras*60)); return t.toISOString(); }
+
+// Etapas que pertencem a UM BANHO específico (uma instância pra cada B3/B2/B1)
+const ETAPAS_POR_BANHO = [
+  { item:'Granalha',           tipo:'tempo', limiteHoras:24 }, // 1x/dia, de cada banho
+  { item:'Limpeza de contato', tipo:'tempo', limiteHoras:48 }, // a cada 2 dias
+];
+// Ícones grandes no lugar do texto (evita palavra vazando da caixinha do banho):
+// Granalha = pellets de cobre (13mm x 25mm) · Limpeza de contato = limpeza do contato elétrico
+const ICONE_ETAPA = { 'Granalha':'🧱', 'Limpeza de contato':'⚡' };
+
+// "Fazenda de tanques" da linha — sequência física real (do desenho técnico),
+// atende os 3 banhos, não é por banho. Todos têm rotina de troca (nenhum é
+// "por banho" como o antigo genérico "Água" era) — limites abaixo são
+// placeholder (48h) até você ajustar em Parâmetros com os valores reais.
+const TANQUE_FARM = [
+  { item:'Desengraxante',       tipo:'tempo', limiteHoras:48, qtd:1 },
+  { item:'Água Alcalina',       tipo:'tempo', limiteHoras:48, qtd:1 },
+  { item:'Ácido Sulfúrico',     tipo:'tempo', limiteHoras:48, qtd:1 },
+  { item:'Água Ácida',          tipo:'tempo', limiteHoras:48, qtd:3 },
+  { item:'Potassa (Neutro)',    tipo:'tempo', limiteHoras:48, qtd:1 },
+  { item:'Enxágue 1',           tipo:'tempo', limiteHoras:48, qtd:1 },
+  { item:'Enxágue 2',           tipo:'tempo', limiteHoras:48, qtd:1 },
+  { item:'Enxágue 3 (Selante)', tipo:'tempo', limiteHoras:48, qtd:1 },
+];
+
+// pendencias_rotina
+let PENDENCIAS = [];
+let _pid = 1;
+const FACTORES_MOCK = [0.15, 0.45, 0.65, 0.8, 0.95, 1.1, 1.3];
+LINHAS.forEach((linha, li)=>{
+  BANHOS.forEach((banho, bi)=>{
+    ETAPAS_POR_BANHO.forEach((etapa, ei)=>{
+      const f = FACTORES_MOCK[(li*3 + bi + ei) % FACTORES_MOCK.length];
+      const horasAtras = etapa.limiteHoras * f;
+      PENDENCIAS.push({ id:_pid++, escopo:linha.id, banho, item:etapa.item, tipo:etapa.tipo, limiteHoras:etapa.limiteHoras, ultima:h(horasAtras) });
+    });
+  });
+  TANQUE_FARM.forEach((etapa, ei)=>{
+    const qtd = etapa.qtd || 1;
+    for (let t=1; t<=qtd; t++){
+      const f = FACTORES_MOCK[(li + ei + t) % FACTORES_MOCK.length];
+      const horasAtras = etapa.tipo==='evento' ? (1 + (li+ei+t)%4) : etapa.limiteHoras * f;
+      PENDENCIAS.push({ id:_pid++, escopo:linha.id, banho:null, item:etapa.item, tanque: qtd>1 ? t : null, tipo:etapa.tipo, limiteHoras:etapa.limiteHoras, descricao:etapa.descricao, ultima:h(horasAtras) });
+    }
+  });
+});
+PENDENCIAS.push(
+  { id:_pid++, escopo:'chiller',    item:'Verificação do chiller',          tipo:'tempo', limiteHoras:24,  ultima:h(30)  },
+  { id:_pid++, escopo:'filtro',     item:'Limpeza / troca do filtro',       tipo:'tempo', limiteHoras:168, ultima:h(120) },
+  { id:_pid++, escopo:'tanque_mae', item:'Verificar nível do tanque mãe',    tipo:'tempo', limiteHoras:24,  ultima:h(20)  },
+  { id:_pid++, escopo:'estanato',   item:'Verificação plataforma estanato', tipo:'tempo', limiteHoras:168, ultima:h(96)  },
+);
+
+/* Início do banho corrente em cada tanque físico (B1/B2/B3) de cada linha —
+   é o cronômetro mostrado dentro de cada caixa do desenho, E é o que
+   dispara o pop-up de "coletar amostra" quando atinge o limite. Confirmar
+   a coleta reinicia esse cronômetro (novo ciclo de amostragem). */
+let LIMITE_BANHO_HORAS = 4;
+const BANHO_INICIO = {
+  linha1: { B3: h(1.2), B2: h(3.6), B1: h(0.4) },
+  linha2: { B3: h(2.5), B2: h(0.8), B1: h(4.3) },
+  linha3: { B3: h(0.2), B2: h(4.8), B1: h(2.1) },
+};
+
+/* Cronômetro do banho TOTAL — começa a contar no START e só zera quando o
+   START é apertado de novo (independente das retiradas de amostra). O
+   contador de amostras conta quantas vezes o 🧪 foi confirmado desde o
+   último START; o START zera o contador, mas NÃO conta como uma amostra. */
+const BANHO_TOTAL_INICIO = {
+  linha1: { B3: h(9.2),  B2: h(21.6), B1: h(6.4)  },
+  linha2: { B3: h(14.5), B2: h(4.8),  B1: h(28.3) },
+  linha3: { B3: h(2.2),  B2: h(31.8), B1: h(12.1) },
+};
+const BANHO_AMOSTRAS = {
+  linha1: { B3: 2, B2: 5, B1: 1 },
+  linha2: { B3: 3, B2: 1, B1: 6 },
+  linha3: { B3: 0, B2: 7, B1: 2 },
+};
+
+const ESCOPOS = {};
+LINHAS.forEach(l => ESCOPOS[l.id] = l.nome);
+EQUIPAMENTOS_APOIO.forEach(e => ESCOPOS[e.id] = e.nome);
+
+/* =========================================================================
+   CONTROLE QUÍMICO DO BANHO — baseado na lousa (Cu, KCN, Sn/Zn, KOH, K2CO3,
+   PH, Temp), com faixa aceitável configurável em Parâmetros. Valor fora da
+   faixa pisca igual às outras pendências do painel.
+   ========================================================================= */
+const ELEMENTOS_QUIMICOS = {
+  linha1: ['Cu','KCN','Sn','KOH','K2CO3','PH','Temp'],
+  linha2: ['Cu','KCN','Sn','KOH','K2CO3','PH','Temp'],
+  linha3: ['Cu','KCN','Zn','KOH','K2CO3','PH','Temp'], // latão: Zn no lugar do Sn
+};
+
+/* Faixas aceitáveis — vieram da folha "Parâmetros do banho de bronze" que
+   você mandou (Permetal e Europa). ASSUMI Permetal → Linha 1 e Europa →
+   Linha 2, por serem as duas linhas de bronze — confirme se é essa a
+   associação certa. A Linha 3 é latão e a folha não cobre isso, então fica
+   em branco (sem alerta) até você preencher em Parâmetros. */
+let FAIXAS_QUIMICAS = {
+  linha1: { Cu:[15,24], KCN:[22,37], Sn:[10,14], KOH:[20,33], K2CO3:[null,300], PH:[13.7,14.2], Temp:[50,60] },
+  linha2: { Cu:[13,22], KCN:[11,30], Sn:[9,13],  KOH:[20,33], K2CO3:[220,300], PH:[13.7,14.2], Temp:[null,null] },
+  linha3: { Cu:[null,null], KCN:[null,null], Zn:[null,null], KOH:[null,null], K2CO3:[null,null], PH:[null,null], Temp:[null,null] },
+};
+
+// Leituras atuais (mock, semeadas com os últimos valores registrados na lousa)
+let LEITURAS_QUIMICAS = {
+  linha1: { Cu:5.00,  KCN:13.00, Sn:6.00,  KOH:8.90,  K2CO3:165, PH:13.90, Temp:54 },
+  linha2: { Cu:14.60, KCN:30.00, Sn:15.10, KOH:17.90, K2CO3:214, PH:14.40, Temp:44 },
+  linha3: { Cu:14.50, KCN:34.00, Zn:26.10, KOH:1.12,  K2CO3:158, PH:12.25, Temp:57 },
+};
+
+function statusQuimico(valor, faixa){
+  if (valor===null || valor===undefined || valor==='' || isNaN(valor)) return 'vazio';
+  const [min,max] = faixa || [null,null];
+  if (min==null && max==null) return 'na';
+  if (min!=null && valor<min) return 'crit';
+  if (max!=null && valor>max) return 'crit';
+  return 'ok';
+}
+function fmtFaixa(faixa){
+  const [min,max] = faixa || [null,null];
+  if (min==null && max==null) return '—';
+  if (min==null) return `< ${max}`;
+  if (max==null) return `> ${min}`;
+  return `${min} – ${max}`;
+}
+
+/* Automação: quando o K2CO3 de QUALQUER linha fica abaixo do mínimo
+   parametrizado, acende o alerta de "sangrar" no Tanque Mãe (gota de sangue).
+   OBS: confirmar com o usuário se a condição real é "abaixo" mesmo, já que
+   sangria costuma ser pra excesso (K2CO3 alto), não pra falta. */
+function precisaSangrarTanque(){
+  return LINHAS.some(linha=>{
+    const valor = LEITURAS_QUIMICAS[linha.id].K2CO3;
+    const [min] = FAIXAS_QUIMICAS[linha.id].K2CO3 || [null,null];
+    return min!=null && valor!=null && !isNaN(valor) && valor < min;
+  });
+}
+
+const STATUS_HEX = { ok:'#1F9D55', warn:'#C98A00', crit:'#C7414F' };
+
+/* =========================================================================
+   CÁLCULO DE STATUS
+   ========================================================================= */
+function horasDesde(iso){ return (Date.now() - new Date(iso).getTime()) / 3600000; }
+
+function statusDe(p){
+  if (p.tipo === 'evento') return 'evento';
+  const ratio = horasDesde(p.ultima) / p.limiteHoras;
+  if (ratio >= 1) return 'crit';
+  if (ratio >= 0.75) return 'warn';
+  return 'ok';
+}
+function statusBanho(iso){
+  const ratio = horasDesde(iso) / LIMITE_BANHO_HORAS;
+  if (ratio >= 1) return 'crit';
+  if (ratio >= 0.75) return 'warn';
+  return 'ok';
+}
+function saldoHoras(p){ return p.tipo === 'evento' ? Infinity : p.limiteHoras - horasDesde(p.ultima); }
+function piorStatus(lista){
+  const relevantes = lista.filter(s=>s!=='evento');
+  if (relevantes.some(s=>s==='crit')) return 'crit';
+  if (relevantes.some(s=>s==='warn')) return 'warn';
+  return 'ok';
+}
+const STATUS_LABEL = { ok:'Em dia', warn:'Atenção', crit:'Vencida', evento:'Por banho' };
+
+function fmtCronometro(iso){
+  const totalMin = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  const dias = Math.floor(totalMin / 1440);
+  const horas = Math.floor((totalMin % 1440) / 60);
+  const min = totalMin % 60;
+  if (dias > 0) return `${dias}d ${horas}h ${String(min).padStart(2,'0')}min`;
+  return `${horas}h ${String(min).padStart(2,'0')}min`;
+}
+function fmtCronometroCurto(iso){
+  const totalMin = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  const horas = Math.floor(totalMin / 60);
+  const min = totalMin % 60;
+  return `${horas}h${String(min).padStart(2,'0')}`;
+}
+function fmtHoras(hh){
+  const horas = Math.floor(hh);
+  const min = Math.round((hh - horas) * 60);
+  if (horas >= 24) return `${Math.floor(horas/24)}d ${horas%24}h`;
+  return `${horas}h ${String(min).padStart(2,'0')}min`;
+}
+function fmtDataHoraBR(iso){
+  const dt = new Date(iso);
+  return dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+}
+
+function pendenciasDoEscopo(escopoId){ return PENDENCIAS.filter(p=>p.escopo===escopoId); }
+function pendenciaDoBanho(linhaId, banho, itemNome){ return PENDENCIAS.find(p=>p.escopo===linhaId && p.banho===banho && p.item===itemNome); }
+function pendenciaDaLinha(linhaId, itemNome, tanque){
+  return PENDENCIAS.find(p=>p.escopo===linhaId && !p.banho && p.item===itemNome && (tanque===undefined ? !p.tanque : p.tanque===tanque));
+}
+
+/* =========================================================================
+   RENDER — andon geral
+   ========================================================================= */
+function renderAndonGeral(){
+  const todosStatus = PENDENCIAS.map(statusDe);
+  const st = piorStatus(todosStatus);
+  const vencidas = todosStatus.filter(s=>s==='crit').length;
+  const atencao = todosStatus.filter(s=>s==='warn').length;
+  document.getElementById('geralDot').className = 'andon-dot '+st;
+  document.getElementById('geralLabel').textContent = st==='ok' ? 'Estabilizado' : st==='warn' ? 'Alerta' : 'Crítico';
+  document.getElementById('geralSub').textContent = `${vencidas} vencida${vencidas===1?'':'s'} · ${atencao} próxima${atencao===1?'':'s'} do limite · ${PENDENCIAS.length} itens monitorados`;
+}
+
+/* =========================================================================
+   RENDER — esquema 2D da planta (linhas × banhos × fazenda de tanques)
+   Reaproveitado tanto no Painel quanto no Modo TV.
+   ========================================================================= */
+function buildPlantaSVG(){
+  const colW = 272;                          // largura total de cada coluna de linha (inclui espaço do botão START)
+  const btnR = 15, btnAreaW = 40;            // botão START redondo, à esquerda de cada banho
+  const colGap = 30, startX = 24, startY = 60;
+  const bathH = 78, rowH = 24, banhoGap = 12; // mais respiro entre um banho e o próximo
+  const bathUnitH = bathH + banhoGap;
+  const bathsBlockH = BANHOS.length * bathUnitH - banhoGap;
+  const farmStartY = startY + bathsBlockH + 26;
+  const farmRows = TANQUE_FARM.reduce((acc,e)=>acc+(e.qtd||1),0);
+  const farmBlockH = farmRows * rowH;
+  const H = Math.max(farmStartY + farmBlockH + 10, startY + bathsBlockH + 40);
+  const tanqueMaeW = 132, tanqueMaeGap = 46;
+  const W = startX + LAYOUT_ORDEM.length*colW + (LAYOUT_ORDEM.length-1)*colGap + tanqueMaeGap + tanqueMaeW + startX;
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" xmlns="http://www.w3.org/2000/svg">`;
+
+  LAYOUT_ORDEM.forEach((linhaId, ci)=>{
+    const linha = LINHAS.find(l=>l.id===linhaId);
+    const x = startX + ci*(colW+colGap);
+    const stLinha = piorStatus(pendenciasDoEscopo(linhaId).map(statusDe));
+    const colorLinha = STATUS_HEX[stLinha];
+
+    // cabeçalho da coluna (só navega — não zera nada, é o resumo da linha inteira)
+    svg += `<g class="plant-dot" data-action="nav" data-escopo="${linhaId}">`;
+    svg += `<text class="linha-label" x="${x}" y="18" text-anchor="start">${linha.nome.toUpperCase()}</text>`;
+    svg += `<circle cx="${x+colW-9}" cy="13" r="7" fill="${colorLinha}" class="${stLinha!=='ok'?'pulse':''}"></circle>`;
+    svg += `<text class="apoio-label" x="${x}" y="34" text-anchor="start">${linha.liga}</text>`;
+    svg += `</g>`;
+
+    // banhos B3/B2/B1 — botão START à esquerda, caixa com pílulas de Água/Granalha/Limpeza
+    let y = startY;
+    BANHOS.forEach(banho=>{
+      const inicio = BANHO_INICIO[linhaId][banho];
+      const stBanho = statusBanho(inicio);
+      const pillH = 26;
+      const boxX = x + btnAreaW, boxW = colW - btnAreaW;
+
+      // botão START redondo — inicia um novo banho (zera o mesmo cronômetro da amostra)
+      const btnCx = x + btnAreaW/2, btnCy = y + bathH/2;
+      svg += `<g class="plant-dot" data-action="start-banho" data-linha="${linhaId}" data-banho="${banho}">`;
+      svg += `<circle cx="${btnCx}" cy="${btnCy}" r="${btnR}" fill="var(--ok)"></circle>`;
+      svg += `<text x="${btnCx}" y="${btnCy+4}" text-anchor="middle" style="font-size:13px; fill:#fff;">▶</text>`;
+      svg += `</g>`;
+
+      // caixa do banho (fundo) — nome do banho à esquerda
+      svg += `<rect class="tanque-rect" x="${boxX}" y="${y}" width="${boxW}" height="${bathH}" rx="8"></rect>`;
+      svg += `<text class="linha-label" x="${boxX+14}" y="${y+26}" text-anchor="start" style="font-size:16px;">${banho}</text>`;
+
+      // cronômetro do banho TOTAL (só zera no START) + quantas amostras já foram tiradas nesse banho
+      const totalInicio = BANHO_TOTAL_INICIO[linhaId][banho];
+      const qtdAmostras = BANHO_AMOSTRAS[linhaId][banho] || 0;
+      svg += `<text class="bath-total-info" x="${boxX+46}" y="${y+25}" text-anchor="start">⏱ ${fmtCronometroCurto(totalInicio)} · ${qtdAmostras}×</text>`;
+
+      // pílula da retirada de amostra — canto superior direito da caixa
+      const amostraW = 92, amostraX = boxX + boxW - amostraW - 10, amostraY = y + 9;
+      svg += `<g class="plant-dot" data-action="reset-banho" data-linha="${linhaId}" data-banho="${banho}">`;
+      svg += `<rect class="item-pill ${stBanho}" x="${amostraX}" y="${amostraY}" width="${amostraW}" height="${pillH}" rx="${pillH/2}"></rect>`;
+      svg += `<text class="etapa-icon-sm" x="${amostraX+18}" y="${amostraY+pillH/2+5}" text-anchor="middle" style="font-size:16px;">🧪</text>`;
+      svg += `<text class="bath-timer ${stBanho}" x="${amostraX+amostraW-10}" y="${amostraY+pillH/2+4}" text-anchor="end" style="font-size:13.5px;">${fmtCronometroCurto(inicio)}</text>`;
+      svg += `</g>`;
+
+      // pílulas de Granalha / Limpeza de contato — base da caixa, lado a lado
+      const pillMargin = 8, pillGap = 6;
+      const pillW = (boxW - pillMargin*2 - pillGap) / 2;
+      const py = y + bathH - pillH - 9;
+      ETAPAS_POR_BANHO.forEach((etapa, ei)=>{
+        const p = pendenciaDoBanho(linhaId, banho, etapa.item);
+        const st = statusDe(p);
+        const icone = ICONE_ETAPA[etapa.item] || '•';
+        const px = boxX + pillMargin + ei*(pillW+pillGap);
+        svg += `<g class="plant-dot" data-action="reset-pendencia" data-pid="${p.id}">`;
+        svg += `<rect class="item-pill ${st}" x="${px}" y="${py}" width="${pillW}" height="${pillH}" rx="${pillH/2}"></rect>`;
+        svg += `<text class="etapa-icon-sm" x="${px+18}" y="${py+pillH/2+5}" text-anchor="middle" style="font-size:15px;">${icone}</text>`;
+        svg += `<text class="etapa-icon-timer ${st}" x="${px+pillW-10}" y="${py+pillH/2+4}" text-anchor="end" style="font-size:12.5px;">${fmtCronometroCurto(p.ultima)}</text>`;
+        svg += `</g>`;
+      });
+
+      y += bathH + banhoGap;
+    });
+
+    // fazenda de tanques da linha (Água ×3, Potassa, Ácido, Desengraxante) — clicar já zera
+    svg += `<text class="farm-label" x="${x}" y="${farmStartY-10}">TANQUES DA LINHA</text>`;
+    let fy = farmStartY;
+    TANQUE_FARM.forEach(etapa=>{
+      const qtd = etapa.qtd || 1;
+      for (let t=1; t<=qtd; t++){
+        const p = pendenciaDaLinha(linhaId, etapa.item, qtd>1 ? t : undefined);
+        const st = statusDe(p);
+        const label = qtd>1 ? `${etapa.item} ${t}` : etapa.item;
+        svg += `<g class="plant-dot" data-action="reset-pendencia" data-pid="${p.id}">`;
+        svg += `<rect class="etapa-row-bg ${st==='crit'||st==='warn'?st:''}" x="${x}" y="${fy}" width="${colW}" height="${rowH}"></rect>`;
+        svg += `<text class="etapa-label" x="${x+8}" y="${fy+rowH/2+4}">${label}</text>`;
+        svg += `<text class="etapa-timer ${st}" x="${x+colW-8}" y="${fy+rowH/2+4}" text-anchor="end">${fmtCronometro(p.ultima)}</text>`;
+        svg += `</g>`;
+        fy += rowH;
+      }
+    });
+  });
+
+  // Tanque Mãe — à direita das 3 linhas, com verificação periódica (sem % de nível — sem boia pra medir isso)
+  {
+    const tmX = startX + LAYOUT_ORDEM.length*colW + (LAYOUT_ORDEM.length-1)*colGap + tanqueMaeGap;
+    const tmTop = startY, tmH = H - startY - 12, tmW = tanqueMaeW;
+    const pTanque = pendenciasDoEscopo('tanque_mae')[0];
+    const stTanque = statusDe(pTanque);
+    const statusBarH = 38;
+
+    svg += `<text class="farm-label" x="${tmX}" y="${tmTop-30}">TANQUE MÃE</text>`;
+    svg += `<rect class="tanque-rect" x="${tmX}" y="${tmTop}" width="${tmW}" height="${tmH}" rx="10"></rect>`;
+    svg += `<rect x="${tmX+4}" y="${tmTop+4}" width="${tmW-8}" height="${tmH-8}" rx="7" fill="#AFCBDA" opacity="0.55"></rect>`;
+    if (precisaSangrarTanque()){
+      svg += `<g class="plant-dot" data-action="nav" data-escopo="tanque_mae">`;
+      svg += `<text class="sangria-icone" x="${tmX+tmW/2}" y="${tmTop+tmH/2+14}" text-anchor="middle">🩸</text>`;
+      svg += `<text class="etapa-label" x="${tmX+tmW/2}" y="${tmTop+tmH/2+34}" text-anchor="middle" style="font-size:9.5px;">SANGRAR</text>`;
+      svg += `</g>`;
+    }
+    svg += `<g class="plant-dot" data-action="reset-tanque">`;
+    svg += `<rect class="etapa-row-bg ${stTanque==='crit'||stTanque==='warn'?stTanque:''}" x="${tmX}" y="${tmTop+tmH-statusBarH}" width="${tmW}" height="${statusBarH}"></rect>`;
+    svg += `<text class="etapa-label" x="${tmX+8}" y="${tmTop+tmH-statusBarH/2-2}" style="font-size:10px;">verificado há</text>`;
+    svg += `<text class="etapa-timer ${stTanque}" x="${tmX+8}" y="${tmTop+tmH-statusBarH/2+11}" style="font-size:10.5px;">${fmtCronometro(pTanque.ultima)}</text>`;
+    svg += `</g>`;
+  }
+
+  svg += `</svg>`;
+  return svg;
+}
+
+/* Clicar num item do esquema já resolve a pendência ali mesmo (com uma
+   confirmação simples antes de zerar) — não precisa mais ir até a aba
+   Pendências pra isso. A aba continua existindo como histórico/auditoria. */
+async function resetPendenciaPorId(id){
+  const p = PENDENCIAS.find(x=>x.id===id);
+  if (!p) return;
+  const rotulo = p.banho ? `${p.item} (${p.banho})` : p.item;
+  const col = await pedirConfirmacaoRE(`Confirmar "${rotulo}" feito agora — digite seu RE:`);
+  if (!col) return;
+  p.ultima = new Date().toISOString();
+  registrarAcaoSupabase(col.re, 'confirmar_pendencia', p.escopo, p.banho, p.item);
+  renderAll();
+}
+async function resetBanhoPorClique(linhaId, banho){
+  const nome = LINHAS.find(l=>l.id===linhaId)?.nome || linhaId;
+  const col = await pedirConfirmacaoRE(`Confirmar coleta de amostra do banho ${banho} (${nome}) — digite seu RE:`);
+  if (!col) return;
+  BANHO_INICIO[linhaId][banho] = new Date().toISOString();
+  BANHO_AMOSTRAS[linhaId][banho] = (BANHO_AMOSTRAS[linhaId][banho] || 0) + 1;
+  registrarAcaoSupabase(col.re, 'coleta_amostra', linhaId, banho, null);
+  renderAll();
+}
+async function iniciarBanhoPorClique(linhaId, banho){
+  const nome = LINHAS.find(l=>l.id===linhaId)?.nome || linhaId;
+  const col = await pedirConfirmacaoRE(`Iniciar um novo banho em ${banho} (${nome}) — digite seu RE:`);
+  if (!col) return;
+  const agora = new Date().toISOString();
+  BANHO_INICIO[linhaId][banho] = agora;
+  BANHO_TOTAL_INICIO[linhaId][banho] = agora;
+  BANHO_AMOSTRAS[linhaId][banho] = 0;
+  registrarAcaoSupabase(col.re, 'start_banho', linhaId, banho, null);
+  renderAll();
+}
+async function resetTanqueMaePorClique(){
+  const p = pendenciasDoEscopo('tanque_mae')[0];
+  const col = await pedirConfirmacaoRE('Confirmar verificação do nível do Tanque Mãe — digite seu RE:');
+  if (!col) return;
+  p.ultima = new Date().toISOString();
+  registrarAcaoSupabase(col.re, 'verificacao_tanque_mae', 'tanque_mae', null, p.item);
+  renderAll();
+}
+
+function attachPlantClickHandlers(container){
+  container.querySelectorAll('.plant-dot').forEach(g=>{
+    g.style.cursor = 'pointer';
+    g.addEventListener('click', ()=>{
+      const action = g.dataset.action;
+      if (action === 'reset-pendencia') resetPendenciaPorId(Number(g.dataset.pid));
+      else if (action === 'reset-banho') resetBanhoPorClique(g.dataset.linha, g.dataset.banho);
+      else if (action === 'start-banho') iniciarBanhoPorClique(g.dataset.linha, g.dataset.banho);
+      else if (action === 'reset-tanque') resetTanqueMaePorClique();
+      else {
+        document.querySelector('[data-view="pendencias"]').click();
+        document.getElementById('filterLinha').value = g.dataset.escopo;
+        document.getElementById('filterBanho').value = g.dataset.banho || 'todos';
+        renderFullTable();
+      }
+    });
+  });
+}
+
+function renderPlantSvg(){
+  const wrap = document.getElementById('plantSvgWrap');
+  wrap.innerHTML = buildPlantaSVG();
+  attachPlantClickHandlers(wrap);
+}
+
+/* =========================================================================
+   RENDER — faixa de equipamentos de apoio (compacta)
+   ========================================================================= */
+function renderApoioStrip(){
+  const wrap = document.getElementById('apoioStrip');
+  wrap.innerHTML = EQUIPAMENTOS_APOIO.map(eq=>{
+    const st = piorStatus(pendenciasDoEscopo(eq.id).map(statusDe));
+    return `<div class="apoio-chip" data-escopo="${eq.id}"><span class="chip-dot ${st}"></span><span>${eq.nome}</span></div>`;
+  }).join('');
+  wrap.querySelectorAll('.apoio-chip').forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      document.querySelector('[data-view="pendencias"]').click();
+      document.getElementById('filterLinha').value = chip.dataset.escopo;
+      document.getElementById('filterBanho').value = 'todos';
+      renderFullTable();
+    });
+  });
+}
+
+/* =========================================================================
+   RENDER — controle químico do banho (Cu/KCN/Sn.../PH/Temp), reaproveitado
+   no Painel e no Modo TV. Digitar um valor fora da faixa faz a linha piscar.
+   ========================================================================= */
+function buildQuimicosHTML(){
+  return LINHAS.map(linha=>{
+    const elementos = ELEMENTOS_QUIMICOS[linha.id];
+    const linhasHTML = elementos.map(el=>{
+      const valor = LEITURAS_QUIMICAS[linha.id][el];
+      const faixa = FAIXAS_QUIMICAS[linha.id][el];
+      const st = statusQuimico(valor, faixa);
+      const rowClass = st==='crit' ? 'row-crit' : '';
+      const badge = st==='crit' ? '<span class="badge crit">Fora da faixa</span>'
+                  : st==='na'   ? '<span class="badge evento">Sem referência</span>'
+                  : st==='vazio'? '<span class="badge evento">—</span>'
+                  : '<span class="badge ok">OK</span>';
+      return `
+        <tr class="${rowClass}">
+          <td>${el}</td>
+          <td><input type="number" step="0.01" class="param-input quimico-input" data-linha="${linha.id}" data-elemento="${el}" value="${valor ?? ''}" style="width:78px;"></td>
+          <td class="mono">${fmtFaixa(faixa)}</td>
+          <td>${badge}</td>
+        </tr>`;
+    }).join('');
+    return `
+      <div class="card quimico-card">
+        <h3 class="param-card-title">${linha.nome}<span class="param-liga">${linha.liga}</span></h3>
+        <table class="data-table param-table">
+          <thead><tr><th>Elemento</th><th>Valor</th><th>Faixa</th><th>Status</th></tr></thead>
+          <tbody>${linhasHTML}</tbody>
+        </table>
+      </div>`;
+  }).join('');
+}
+
+function attachQuimicoHandlers(container){
+  container.querySelectorAll('.quimico-input').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      const v = parseFloat(inp.value);
+      LEITURAS_QUIMICAS[inp.dataset.linha][inp.dataset.elemento] = inp.value==='' ? null : v;
+      renderQuimicos();
+      if (document.body.classList.contains('tv-active')) renderTvScreens();
+    });
+  });
+}
+
+function renderQuimicos(){
+  const wrap = document.getElementById('quimicosWrap');
+  wrap.innerHTML = buildQuimicosHTML();
+  attachQuimicoHandlers(wrap);
+}
+
+/* =========================================================================
+   RENDER — tabela de pendências urgentes (Painel)
+   ========================================================================= */
+function renderUrgentTable(){
+  const linhas = PENDENCIAS
+    .map(p=>({...p, status:statusDe(p)}))
+    .filter(p=>p.status==='warn' || p.status==='crit')
+    .sort((a,b)=> saldoHoras(a) - saldoHoras(b))
+    .slice(0,8);
+
+  const tbody = document.querySelector('#urgentTable tbody');
+  if (!linhas.length){
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--ok); font-weight:600; padding:24px;">Nenhuma pendência em atraso ou próxima do limite.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = linhas.map(p=>`
+    <tr class="${p.status==='crit'?'row-crit':'row-warn'}">
+      <td>${ESCOPOS[p.escopo]}</td>
+      <td class="mono">${p.banho || '—'}</td>
+      <td>${p.item}</td>
+      <td class="mono">${p.tipo==='evento' ? p.descricao : fmtHoras(p.limiteHoras)}</td>
+      <td class="mono">${fmtDataHoraBR(p.ultima)}</td>
+      <td class="mono">${fmtCronometro(p.ultima)}</td>
+      <td><span class="badge ${p.status}">${STATUS_LABEL[p.status]}</span></td>
+    </tr>
+  `).join('');
+}
+
+/* =========================================================================
+   RENDER — tabela completa (Pendências)
+   ========================================================================= */
+function popularFiltroLinha(){
+  const sel = document.getElementById('filterLinha');
+  [...LINHAS, ...EQUIPAMENTOS_APOIO].forEach(item=>{
+    const opt = document.createElement('option');
+    opt.value = item.id; opt.textContent = item.nome;
+    sel.appendChild(opt);
+  });
+}
+
+function renderFullTable(){
+  const filtroLinha = document.getElementById('filterLinha').value;
+  const filtroBanho = document.getElementById('filterBanho').value;
+  const filtroStatus = document.getElementById('filterStatus').value;
+
+  let linhas = PENDENCIAS.map(p=>({...p, status:statusDe(p)}));
+  if (filtroLinha !== 'todas') linhas = linhas.filter(p=>p.escopo===filtroLinha);
+  if (filtroBanho !== 'todos') linhas = linhas.filter(p=>p.banho===filtroBanho);
+  if (filtroStatus !== 'todos') linhas = linhas.filter(p=>p.status===filtroStatus);
+  linhas.sort((a,b)=> saldoHoras(a) - saldoHoras(b));
+
+  const tbody = document.querySelector('#fullTable tbody');
+  if (!linhas.length){
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--ink-faint); padding:24px;">Nenhum item encontrado para esse filtro.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = linhas.map(p=>`
+    <tr class="${p.status==='crit'?'row-crit':(p.status==='warn'?'row-warn':'')}">
+      <td>${ESCOPOS[p.escopo]}</td>
+      <td class="mono">${p.banho || '—'}</td>
+      <td>${p.item}</td>
+      <td class="mono">${p.tipo==='evento' ? p.descricao : fmtHoras(p.limiteHoras)}</td>
+      <td class="mono">${fmtDataHoraBR(p.ultima)}</td>
+      <td class="mono">${fmtCronometro(p.ultima)}</td>
+      <td><span class="badge ${p.status}">${STATUS_LABEL[p.status]}</span></td>
+      <td><button class="btn small" data-registrar="${p.id}">Zerar cronômetro</button></td>
+    </tr>
+  `).join('');
+
+  tbody.querySelectorAll('[data-registrar]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = Number(btn.dataset.registrar);
+      const p = PENDENCIAS.find(x=>x.id===id);
+      p.ultima = new Date().toISOString();
+      renderAll();
+    });
+  });
+}
+
+/* =========================================================================
+   RENDER — Parametrização
+   ========================================================================= */
+function renderParametros(){
+  document.getElementById('paramLimiteBanho').value = LIMITE_BANHO_HORAS;
+  document.getElementById('paramTanqueMae').value = pendenciasDoEscopo('tanque_mae')[0].limiteHoras;
+
+  const wrap = document.getElementById('parametrosWrap');
+  wrap.innerHTML = LINHAS.map(linha=>{
+    // por banho: Granalha e Limpeza de contato, uma linha da tabela por banho
+    const linhasBanho = BANHOS.map(banho=>{
+      const campos = ETAPAS_POR_BANHO.map(etapa=>{
+        const p = pendenciaDoBanho(linha.id, banho, etapa.item);
+        return `<td>${etapa.item}: <input type="number" min="0" step="0.5" class="param-input" data-param data-linha="${linha.id}" data-banho="${banho}" data-item="${etapa.item}" data-kind="horas" value="${p.limiteHoras}"></td>`;
+      }).join('');
+      return `<tr><td>${banho}</td>${campos}</tr>`;
+    }).join('');
+
+    // fazenda de tanques da linha
+    const linhasFarm = TANQUE_FARM.map(etapa=>{
+      const qtd = etapa.qtd || 1;
+      let rows = '';
+      for (let t=1; t<=qtd; t++){
+        const p = pendenciaDaLinha(linha.id, etapa.item, qtd>1 ? t : undefined);
+        const label = qtd>1 ? `${etapa.item} ${t}` : etapa.item;
+        const campo = `<input type="number" min="0" step="0.5" class="param-input" data-param data-linha="${linha.id}" data-item="${etapa.item}" ${qtd>1?`data-tanque="${t}"`:''} data-kind="horas" value="${p.limiteHoras}">`;
+        rows += `<tr><td>${label}</td><td>${campo}</td></tr>`;
+      }
+      return rows;
+    }).join('');
+
+    return `
+      <div class="card param-card">
+        <h3 class="param-card-title">${linha.nome}<span class="param-liga">${linha.liga}</span></h3>
+        <div class="param-subtitle">Por banho</div>
+        <table class="data-table param-table">
+          <thead><tr><th>Banho</th><th>Granalha</th><th>Limpeza de contato</th></tr></thead>
+          <tbody>${linhasBanho}</tbody>
+        </table>
+        <div class="param-subtitle">Tanques da linha</div>
+        <table class="data-table param-table">
+          <thead><tr><th>Tanque</th><th>Limite</th></tr></thead>
+          <tbody>${linhasFarm}</tbody>
+        </table>
+      </div>`;
+  }).join('');
+
+  wrap.querySelectorAll('[data-param]').forEach(el=>{
+    el.addEventListener('change', onParamChange);
+  });
+}
+
+function onParamChange(e){
+  const el = e.target;
+  const { linha, item, kind } = el.dataset;
+  const banho = el.dataset.banho || undefined;
+  const tanque = el.dataset.tanque ? Number(el.dataset.tanque) : undefined;
+  const p = banho ? pendenciaDoBanho(linha, banho, item) : pendenciaDaLinha(linha, item, tanque);
+  if (!p) return;
+
+  if (kind === 'evento'){
+    p.tipo = el.checked ? 'evento' : 'tempo';
+    if (p.tipo === 'evento' && !p.descricao) p.descricao = 'troca a cada banho';
+    const irmao = el.closest('td').querySelector('[data-kind="horas"]');
+    if (irmao){
+      irmao.disabled = el.checked;
+      if (!el.checked && !p.limiteHoras){ p.limiteHoras = 48; irmao.value = 48; }
+    }
+  } else if (kind === 'horas'){
+    const v = parseFloat(el.value);
+    if (!isNaN(v) && v > 0) p.limiteHoras = v;
+  }
+  renderAll();
+}
+
+document.getElementById('paramLimiteBanho').addEventListener('change', (e)=>{
+  const v = parseFloat(e.target.value);
+  if (!isNaN(v) && v > 0){ LIMITE_BANHO_HORAS = v; renderAll(); }
+});
+document.getElementById('paramTanqueMae').addEventListener('change', (e)=>{
+  const v = parseFloat(e.target.value);
+  if (!isNaN(v) && v > 0){ pendenciasDoEscopo('tanque_mae')[0].limiteHoras = v; renderAll(); }
+});
+
+/* =========================================================================
+   RENDER — Parametrização das faixas químicas aceitáveis (Cu/KCN/Sn.../Temp)
+   ========================================================================= */
+function renderParamsQuimicos(){
+  const wrap = document.getElementById('paramQuimicosWrap');
+  wrap.innerHTML = LINHAS.map(linha=>{
+    const elementos = ELEMENTOS_QUIMICOS[linha.id];
+    const linhasHTML = elementos.map(el=>{
+      const faixa = FAIXAS_QUIMICAS[linha.id][el] || [null,null];
+      const [min,max] = faixa;
+      return `
+        <tr>
+          <td>${el}</td>
+          <td><input type="number" step="0.01" class="param-input" data-qparam data-linha="${linha.id}" data-elemento="${el}" data-kind="min" value="${min ?? ''}" placeholder="sem mín."></td>
+          <td><input type="number" step="0.01" class="param-input" data-qparam data-linha="${linha.id}" data-elemento="${el}" data-kind="max" value="${max ?? ''}" placeholder="sem máx."></td>
+        </tr>`;
+    }).join('');
+    return `
+      <div class="card param-card">
+        <h3 class="param-card-title">${linha.nome}<span class="param-liga">${linha.liga}</span></h3>
+        <table class="data-table param-table">
+          <thead><tr><th>Elemento</th><th>Mínimo</th><th>Máximo</th></tr></thead>
+          <tbody>${linhasHTML}</tbody>
+        </table>
+      </div>`;
+  }).join('');
+
+  wrap.querySelectorAll('[data-qparam]').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      const { linha, elemento, kind } = inp.dataset;
+      const v = inp.value === '' ? null : parseFloat(inp.value);
+      const faixa = FAIXAS_QUIMICAS[linha][elemento] || [null,null];
+      if (kind === 'min') faixa[0] = v; else faixa[1] = v;
+      FAIXAS_QUIMICAS[linha][elemento] = faixa;
+      renderQuimicos();
+      if (document.body.classList.contains('tv-active')) renderTvScreens();
+    });
+  });
+}
+
+/* =========================================================================
+   MODO TV — tela fixa única: o layout geral (linhas × banhos × etapas)
+   ========================================================================= */
+let tvIndex = 0;
+const TV_SLIDES = ['layout','quimicos'];
+
+function buildTvLayoutHTML(){
+  const todosStatus = PENDENCIAS.map(statusDe);
+  const vencidas = todosStatus.filter(s=>s==='crit').length;
+
+  return `
+    <div class="tv-header">
+      <div class="tv-title">Galvanoplastia <span class="tv-title-sub">visão geral</span></div>
+    </div>
+    <div class="tv-planta-wrap">${buildPlantaSVG()}</div>
+    <div class="tv-footer">
+      <span>${vencidas} pendência${vencidas===1?'':'s'} vencida${vencidas===1?'':'s'} no total</span>
+      <span>Atualizado ${new Date().toLocaleString('pt-BR')}</span>
+    </div>
+  `;
+}
+
+function buildTvQuimicosHTML(){
+  return `
+    <div class="tv-header">
+      <div class="tv-title">Controle químico <span class="tv-title-sub">do banho</span></div>
+    </div>
+    <div class="quimicos-grid tv-quimicos" style="flex:1;">${buildQuimicosHTML()}</div>
+    <div class="tv-footer">
+      <span>Fora da faixa pisca até corrigir</span>
+      <span>Atualizado ${new Date().toLocaleString('pt-BR')}</span>
+    </div>
+  `;
+}
+
+function renderTvScreens(){
+  const container = document.getElementById('view-tv');
+  container.querySelectorAll('.tv-screen').forEach(s=>s.remove());
+  const dotsWrap = document.getElementById('tvDots');
+  TV_SLIDES.forEach((id, i)=>{
+    const screen = document.createElement('div');
+    screen.className = 'tv-screen';
+    screen.style.display = i===tvIndex ? 'flex' : 'none';
+    screen.innerHTML = id==='layout' ? buildTvLayoutHTML() : buildTvQuimicosHTML();
+    container.insertBefore(screen, dotsWrap);
+    if (id==='layout') attachPlantClickHandlers(screen);
+    else attachQuimicoHandlers(screen);
+  });
+
+  dotsWrap.innerHTML = '';
+  TV_SLIDES.forEach((id, i)=>{
+    const dot = document.createElement('span');
+    dot.className = i===tvIndex ? 'on' : '';
+    dot.addEventListener('click', ()=>{ tvIndex = i; showTvSlide(); });
+    dotsWrap.appendChild(dot);
+  });
+}
+function showTvSlide(){
+  document.querySelectorAll('#view-tv .tv-screen').forEach((s,i)=> s.style.display = i===tvIndex ? 'flex' : 'none');
+  document.querySelectorAll('#tvDots span').forEach((s,i)=> s.classList.toggle('on', i===tvIndex));
+}
+
+/* =========================================================================
+   NAVEGAÇÃO ENTRE ABAS
+   ========================================================================= */
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', async ()=>{
+    const view = btn.dataset.view;
+
+    if (view === 'parametros' && !parametrosDesbloqueado){
+      const ok = await abrirGateParametros();
+      if (!ok) return; // cancelou ou errou as senhas — não troca de aba
+      liberarParametros();
+    }
+    if (view !== 'parametros') bloquearParametros();
+
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('view-'+view).classList.add('active');
+    document.body.classList.toggle('tv-active', view==='tv');
+    if (view==='tv') renderTvScreens();
+    if (view==='parametros'){ renderParametros(); renderParamsQuimicos(); }
+  });
+});
+
+document.getElementById('filterLinha').addEventListener('change', renderFullTable);
+document.getElementById('filterBanho').addEventListener('change', renderFullTable);
+document.getElementById('filterStatus').addEventListener('change', renderFullTable);
+
+/* =========================================================================
+   RELÓGIO
+   ========================================================================= */
+function tickClock(){
+  const now = new Date();
+  document.getElementById('navTime').textContent = now.toLocaleTimeString('pt-BR');
+  document.getElementById('navDate').textContent = now.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' });
+}
+setInterval(tickClock, 1000); tickClock();
+
+/* =========================================================================
+   INIT
+   ========================================================================= */
+function renderAll(){
+  renderAndonGeral();
+  renderPlantSvg();
+  renderApoioStrip();
+  renderUrgentTable();
+  renderFullTable();
+  if (document.body.classList.contains('tv-active')) renderTvScreens();
+}
+popularFiltroLinha();
+renderAll();
+renderQuimicos(); // controle químico do Painel — não entra no ciclo automático (evita atrapalhar quem está digitando)
+renderParametros(); // só na entrada — não entra no ciclo automático pra não atrapalhar quem estiver editando
+renderParamsQuimicos();
+setInterval(renderAll, 30000); // mantém os cronômetros correndo
+</script>
+</body>
+</html>
