@@ -108,7 +108,7 @@
   .legend-dot{width:9px; height:9px; border-radius:50%; display:inline-block;}
 
   /* ---------- Esquema 2D da planta (SVG) — o coração do painel ---------- */
-  .plant-svg-wrap{min-width:700px;}
+  .plant-svg-wrap{display:inline-block;}
   .tanque-rect{stroke:var(--hairline); stroke-width:1.5; fill:var(--surface-warm);}
   .linha-label{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14px; fill:var(--ink);}
   .apoio-label{font-family:'Inter',sans-serif; font-weight:600; font-size:11px; fill:var(--ink-soft);}
@@ -272,7 +272,7 @@
   .tv-andon-dot.warn{background:var(--warn);} .tv-andon-dot.warn::after{background:var(--warn);}
   .tv-andon-dot.crit{background:var(--crit);} .tv-andon-dot.crit::after{background:var(--crit);}
   .tv-andon-label{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px;}
-  .tv-planta-wrap{flex:1; display:flex; align-items:center; justify-content:center; min-height:0;}
+  .tv-planta-wrap{flex:1; display:flex; align-items:center; justify-content:center; min-height:0; overflow-x:auto; max-width:100%;}
   .tv-planta-wrap svg{height:100%; width:auto; max-width:100%;}
   .tv-footer{display:flex; justify-content:space-between; font-size:16px; color:var(--ink-faint); margin-top:18px;}
 
@@ -1048,7 +1048,7 @@ function buildPlantaSVG(){
   const tanqueMaeW = 132, tanqueMaeGap = 46;
   const W = startX + LAYOUT_ORDEM.length*colW + (LAYOUT_ORDEM.length-1)*colGap + tanqueMaeGap + tanqueMaeW + startX;
 
-  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" xmlns="http://www.w3.org/2000/svg">`;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
 
   LAYOUT_ORDEM.forEach((linhaId, ci)=>{
     const linha = LINHAS.find(l=>l.id===linhaId);
