@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Painel de Pendências · Galvanoplastia</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -87,7 +89,7 @@
     animation: blinkCrit 1.6s ease-in-out infinite;
   }
   /* Dentro do esquema (banhos/pílulas) o piscar é mais rápido — precisa chamar mais atenção */
-  .bath-timer.crit, .etapa-icon-timer.crit{
+  .bath-timer.crit, .etapa-icon-timer.crit, .banho-tag-timer.crit{
     animation: blinkCrit .9s ease-in-out infinite;
   }
   .andon-label{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px;}
@@ -116,6 +118,13 @@
   .plant-dot circle.pulse{animation:pulse 2s ease-in-out infinite; transform-box:fill-box; transform-origin:center;}
   .bath-timer{font-family:'IBM Plex Mono',monospace; font-size:12px; fill:var(--ink-soft); font-weight:600;}
   .bath-total-info{font-family:'IBM Plex Mono',monospace; font-size:10.5px; fill:var(--ink-faint); font-weight:600;}
+  .banho-saida{font-family:'Space Grotesk',sans-serif; font-size:12.5px; font-weight:700; fill:var(--brass-deep);}
+  .banho-saida.warn{fill:var(--warn); font-size:13.5px;}
+  .banho-saida.crit{fill:var(--crit); font-size:14px; font-weight:800; animation: blinkCrit .8s steps(1,end) infinite;}
+  .banho-saida-vazio{font-family:'Inter',sans-serif; font-size:10.5px; fill:var(--ink-faint);}
+  .banho-tag-label{font-family:'Inter',sans-serif; font-size:8.5px; font-weight:700; fill:var(--ink-faint); letter-spacing:.03em;}
+  .banho-tag-timer{font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:600; fill:var(--ink-soft);}
+  .banho-tag-timer.ok{fill:var(--ok);} .banho-tag-timer.warn{fill:var(--warn);} .banho-tag-timer.crit{fill:var(--crit);}
   .bath-timer.warn{fill:var(--warn);} .bath-timer.crit{fill:var(--crit);}
   .etapa-label{font-family:'Inter',sans-serif; font-size:11px; fill:var(--ink-soft); font-weight:500;}
   .etapa-timer{font-family:'IBM Plex Mono',monospace; font-size:11px; fill:var(--ink-soft); font-weight:600;}
@@ -194,6 +203,7 @@
   /* ---------- Controle químico do banho ---------- */
   .quimicos-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:16px;}
   .quimico-card{padding:18px;}
+  .quimico-save-msg{font-size:12px; color:var(--ok); margin-top:6px; text-align:center; min-height:16px;}
   .quimico-card .param-table td{padding:8px 10px;}
   @media (max-width:900px){ .quimicos-grid{grid-template-columns:1fr;} }
 
@@ -216,10 +226,26 @@
     font-family:'Inter',sans-serif; font-size:14px; margin-bottom:10px; background:var(--surface);
   }
   .modal-box input:focus{outline:2px solid var(--brass); border-color:var(--brass);}
-  .param-gate-row{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
-  .param-gate-row input{margin-bottom:12px;}
+  .param-gate-row{display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:start;}
+  .param-gate-row input{margin-bottom:4px;}
+  .param-gate-row > div{display:flex; flex-direction:column;}
+  .pg-nome{font-size:11px; min-height:14px; margin:-2px 0 8px 2px; color:var(--ok); font-weight:600;}
+  .pg-nome.erro{color:var(--crit);}
   .modal-error{color:var(--crit); font-size:12.5px; min-height:18px; margin-bottom:4px;}
   .modal-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:6px;}
+
+  /* ---------- Grade de camada (30 medições: 5 amostras x 6 tambores) ---------- */
+  .camada-titulo{font-size:11px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.04em; margin:4px 0 8px;}
+  .camada-grid-scroll{overflow-x:auto;}
+  .camada-grid{border-collapse:collapse; width:100%;}
+  .camada-grid th, .camada-grid td{padding:3px; text-align:center;}
+  .camada-grid th{font-size:10.5px; color:var(--ink-faint); font-weight:600;}
+  .camada-grid td:first-child{font-size:10.5px; color:var(--ink-soft); font-weight:600; text-align:left; white-space:nowrap; padding-right:6px;}
+  .camada-cell{width:52px; padding:5px 3px; border:1px solid var(--hairline); border-radius:6px; font-family:'IBM Plex Mono',monospace; font-size:12px; text-align:center;}
+  .camada-cell:focus{outline:2px solid var(--brass); border-color:var(--brass);}
+  .camada-media{margin-top:10px; font-size:13px; font-weight:700; text-align:right; color:var(--brass-deep);}
+  .camada-grid tfoot td{border-top:2px solid var(--hairline); padding-top:6px; font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:11px; color:var(--brass-deep);}
+  .camada-grid tfoot td:first-child{font-family:'Inter',sans-serif; font-weight:700; color:var(--ink-soft); font-size:10.5px;}
 
   /* ---------- MODO TV ---------- */
   body.tv-active main{max-width:none; padding:0;}
@@ -230,6 +256,10 @@
   .tv-dots span.on{background:var(--brass);}
   .tv-screen{padding:44px 60px 34px; display:flex; flex-direction:column; height:100%; overflow-y:auto;}
   .tv-quimicos{margin-top:22px; flex:none;}
+  .tv-graficos-grid{flex:1; display:grid; grid-template-columns:repeat(4,1fr); grid-template-rows:repeat(2,1fr); gap:12px; min-height:0; margin-top:10px;}
+  .tv-grafico-card{flex:1; min-height:0; display:flex; flex-direction:column; background:var(--surface-warm); border:1px solid var(--hairline); border-radius:14px; padding:12px 16px;}
+  .tv-grafico-titulo{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14px; margin-bottom:6px;}
+  .tv-grafico-canvas-wrap{flex:1; min-height:0; position:relative;}
   .tv-quimicos .quimico-card{padding:14px 16px;}
   .tv-quimicos .param-card-title{font-size:15px;}
   .tv-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;}
@@ -246,6 +276,8 @@
   .tv-planta-wrap svg{height:100%; width:auto; max-width:100%;}
   .tv-footer{display:flex; justify-content:space-between; font-size:16px; color:var(--ink-faint); margin-top:18px;}
 
+  .mobile-resumo{display:none;}
+
   @media (max-width:640px){
     .topnav{flex-wrap:wrap; gap:10px; padding:12px 16px; row-gap:12px;}
     main{padding:16px;}
@@ -255,6 +287,20 @@
     .tab-btn.tv-btn{grid-column:1 / -1; background:var(--brass); color:#241a0d; font-weight:700;}
     .tab-btn.tv-btn.active{background:var(--ink); color:#fff;}
     .tv-title{font-size:28px;}
+
+    .mobile-resumo{display:block; margin-bottom:20px;}
+    .mobile-resumo-card{background:var(--surface); border:1px solid var(--hairline); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden;}
+    .mobile-resumo-titulo{padding:12px 14px 8px; font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:13px; color:var(--ink-soft);}
+    .mobile-resumo-linha{
+      display:flex; align-items:center; gap:12px; padding:13px 14px; border-top:1px solid var(--hairline);
+      cursor:pointer; -webkit-tap-highlight-color:transparent;
+    }
+    .mobile-resumo-linha:active{background:var(--surface-warm);}
+    .mobile-resumo-linha-info{flex:1; min-width:0;}
+    .mobile-resumo-linha-nome{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14px;}
+    .mobile-resumo-linha-liga{font-size:11px; color:var(--ink-faint); font-weight:500; margin-left:6px;}
+    .mobile-resumo-linha-sub{font-size:12px; color:var(--ink-soft); margin-top:1px;}
+    .mobile-resumo-seta{color:var(--ink-faint); font-size:18px; flex:none;}
   }
 </style>
 </head>
@@ -296,6 +342,8 @@
       <div class="spacer"></div>
       <div class="andon-period">Dados de exemplo (mock)<br>integração Supabase na próxima etapa</div>
     </div>
+
+    <div class="mobile-resumo" id="mobileResumo"></div>
 
     <div class="card plant-card">
       <div class="plant-card-head">
@@ -403,10 +451,17 @@
 
 <!-- Modal: confirmar pendência digitando o RE -->
 <div class="modal-overlay" id="reModalOverlay">
-  <div class="modal-box">
+  <div class="modal-box" id="reModalBox">
     <h3>Confirmar ação</h3>
     <p class="modal-desc" id="reModalDesc">—</p>
-    <input type="text" id="reModalInput" placeholder="Seu RE" autocomplete="off">
+    <input type="text" id="reModalInput" placeholder="Seu RE (4 dígitos)" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off">
+    <div id="reModalCamadaWrap" style="display:none;">
+      <div class="camada-titulo">Camada em mícrons — 5 amostras × 6 tambores</div>
+      <div class="camada-grid-scroll">
+        <table class="camada-grid" id="camadaGrid"></table>
+      </div>
+      <div class="camada-media">Média: <span id="camadaMediaValor">—</span> µm</div>
+    </div>
     <div class="modal-error" id="reModalError"></div>
     <div class="modal-actions">
       <button class="btn" id="reModalCancel">Cancelar</button>
@@ -420,9 +475,18 @@
   <div class="modal-box" style="max-width:440px;">
     <h3>Acesso aos Parâmetros</h3>
     <p class="modal-desc">Precisa das senhas dos 3 responsáveis, digitadas juntos agora.</p>
-    <div class="param-gate-row"><input type="text" id="pg_re1" placeholder="RE 1" autocomplete="off"><input type="password" id="pg_senha1" placeholder="Senha 1"></div>
-    <div class="param-gate-row"><input type="text" id="pg_re2" placeholder="RE 2" autocomplete="off"><input type="password" id="pg_senha2" placeholder="Senha 2"></div>
-    <div class="param-gate-row"><input type="text" id="pg_re3" placeholder="RE 3" autocomplete="off"><input type="password" id="pg_senha3" placeholder="Senha 3"></div>
+    <div class="param-gate-row">
+      <div><input type="text" id="pg_re1" placeholder="RE 1 (4 dígitos)" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off"><div class="pg-nome" id="pg_nome1"></div></div>
+      <input type="password" id="pg_senha1" placeholder="Senha 1">
+    </div>
+    <div class="param-gate-row">
+      <div><input type="text" id="pg_re2" placeholder="RE 2 (4 dígitos)" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off"><div class="pg-nome" id="pg_nome2"></div></div>
+      <input type="password" id="pg_senha2" placeholder="Senha 2">
+    </div>
+    <div class="param-gate-row">
+      <div><input type="text" id="pg_re3" placeholder="RE 3 (4 dígitos)" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off"><div class="pg-nome" id="pg_nome3"></div></div>
+      <input type="password" id="pg_senha3" placeholder="Senha 3">
+    </div>
     <div class="modal-error" id="paramGateError"></div>
     <div class="modal-actions">
       <button class="btn" id="paramGateCancel">Cancelar</button>
@@ -440,15 +504,213 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
 /* =========================================================================
+   CARREGAMENTO INICIAL — popula PENDENCIAS, BANHO_INICIO/TOTAL/AMOSTRAS,
+   FAIXAS_QUIMICAS e LEITURAS_QUIMICAS a partir do Supabase.
+   ========================================================================= */
+async function carregarDadosIniciais(){
+  if (!sb) return; // sem Supabase configurado — mantém tudo vazio/default
+
+  const [pend, banho, faixas, leituras, config] = await Promise.all([
+    sb.from('pendencias_rotina').select('*'),
+    sb.from('banho_ciclos').select('*'),
+    sb.from('parametros_quimicos').select('*'),
+    sb.from('leituras_quimicas').select('*').order('criado_em', { ascending:false }),
+    sb.from('config_geral').select('*'),
+  ]);
+
+  PENDENCIAS = (pend.data || []).map(r => ({
+    id: r.id, escopo: r.escopo, banho: r.banho, item: r.item, tanque: r.tanque,
+    tipo: r.tipo, limiteHoras: r.limite_horas, descricao: r.descricao, ultima: r.ultima_troca,
+  }));
+
+  (banho.data || []).forEach(r => {
+    if (!BANHO_INICIO[r.linha_id]) BANHO_INICIO[r.linha_id] = {};
+    if (!BANHO_TOTAL_INICIO[r.linha_id]) BANHO_TOTAL_INICIO[r.linha_id] = {};
+    if (!BANHO_AMOSTRAS[r.linha_id]) BANHO_AMOSTRAS[r.linha_id] = {};
+    if (!BANHO_SAIDA_CALC[r.linha_id]) BANHO_SAIDA_CALC[r.linha_id] = {};
+    BANHO_INICIO[r.linha_id][r.banho] = r.amostra_inicio;
+    BANHO_TOTAL_INICIO[r.linha_id][r.banho] = r.total_inicio;
+    BANHO_AMOSTRAS[r.linha_id][r.banho] = r.amostras_contador;
+    BANHO_SAIDA_CALC[r.linha_id][r.banho] = r.saida_calculada || null;
+  });
+
+  (faixas.data || []).forEach(r => {
+    if (!FAIXAS_QUIMICAS[r.linha_id]) FAIXAS_QUIMICAS[r.linha_id] = {};
+    FAIXAS_QUIMICAS[r.linha_id][r.elemento] = [r.minimo, r.maximo];
+  });
+
+  // leituras vêm ordenadas da mais nova pra mais velha — a primeira de cada
+  // linha+elemento que encontrarmos é o "valor atual"; aproveitamos a mesma
+  // busca pra montar o histórico por dia (usado nos gráficos)
+  const vistos = new Set();
+  const historicoPorDia = {}; // chave "linha|elemento|AAAA-MM-DD" -> valor (fica com a última leitura do dia)
+  (leituras.data || []).forEach(r => {
+    const chave = r.linha_id + '|' + r.elemento;
+    if (!vistos.has(chave)){
+      vistos.add(chave);
+      if (!LEITURAS_QUIMICAS[r.linha_id]) LEITURAS_QUIMICAS[r.linha_id] = {};
+      LEITURAS_QUIMICAS[r.linha_id][r.elemento] = Number(r.valor);
+    }
+    const dia = r.criado_em.slice(0,10);
+    const chaveDia = chave + '|' + dia;
+    if (!(chaveDia in historicoPorDia)) historicoPorDia[chaveDia] = Number(r.valor); // primeira encontrada = mais recente do dia (veio desc)
+  });
+  Object.keys(historicoPorDia).forEach(chaveDia=>{
+    const [linhaId, elemento, dia] = chaveDia.split('|');
+    if (!HISTORICO_QUIMICO[linhaId]) HISTORICO_QUIMICO[linhaId] = {};
+    if (!HISTORICO_QUIMICO[linhaId][elemento]) HISTORICO_QUIMICO[linhaId][elemento] = [];
+    HISTORICO_QUIMICO[linhaId][elemento].push({ data: dia, valor: historicoPorDia[chaveDia] });
+  });
+  LINHAS.forEach(l=>{
+    Object.keys(HISTORICO_QUIMICO[l.id] || {}).forEach(el=>{
+      HISTORICO_QUIMICO[l.id][el].sort((a,b)=> a.data < b.data ? -1 : 1); // ascendente por data
+    });
+  });
+
+  (config.data || []).forEach(r => {
+    if (r.chave === 'limite_banho_horas') LIMITE_BANHO_HORAS = Number(r.valor);
+    if (r.chave.startsWith('especificacao_disco_')){
+      const linhaId = r.chave.replace('especificacao_disco_', '');
+      ESPECIFICACAO_DISCO[linhaId] = Number(r.valor);
+    }
+  });
+}
+
+/* =========================================================================
+   REALTIME — quando outra tela mexe em algo, esta atualiza sozinha
+   ========================================================================= */
+function configurarRealtime(){
+  if (!sb) return;
+
+  sb.channel('realtime-pendencias')
+    .on('postgres_changes', { event:'*', schema:'public', table:'pendencias_rotina' }, payload => {
+      const r = payload.new && Object.keys(payload.new).length ? payload.new : payload.old;
+      if (payload.eventType === 'DELETE'){
+        PENDENCIAS = PENDENCIAS.filter(p => p.id !== r.id);
+      } else {
+        const item = {
+          id:r.id, escopo:r.escopo, banho:r.banho, item:r.item, tanque:r.tanque,
+          tipo:r.tipo, limiteHoras:r.limite_horas, descricao:r.descricao, ultima:r.ultima_troca,
+        };
+        const idx = PENDENCIAS.findIndex(p => p.id === r.id);
+        if (idx >= 0) PENDENCIAS[idx] = item; else PENDENCIAS.push(item);
+      }
+      renderAll();
+    })
+    .subscribe();
+
+  sb.channel('realtime-banho-ciclos')
+    .on('postgres_changes', { event:'*', schema:'public', table:'banho_ciclos' }, payload => {
+      const r = payload.new;
+      if (!r) return;
+      if (!BANHO_INICIO[r.linha_id]) BANHO_INICIO[r.linha_id] = {};
+      if (!BANHO_TOTAL_INICIO[r.linha_id]) BANHO_TOTAL_INICIO[r.linha_id] = {};
+      if (!BANHO_AMOSTRAS[r.linha_id]) BANHO_AMOSTRAS[r.linha_id] = {};
+      if (!BANHO_SAIDA_CALC[r.linha_id]) BANHO_SAIDA_CALC[r.linha_id] = {};
+      BANHO_INICIO[r.linha_id][r.banho] = r.amostra_inicio;
+      BANHO_TOTAL_INICIO[r.linha_id][r.banho] = r.total_inicio;
+      BANHO_AMOSTRAS[r.linha_id][r.banho] = r.amostras_contador;
+      BANHO_SAIDA_CALC[r.linha_id][r.banho] = r.saida_calculada || null;
+      renderAll();
+    })
+    .subscribe();
+
+  sb.channel('realtime-parametros-quimicos')
+    .on('postgres_changes', { event:'*', schema:'public', table:'parametros_quimicos' }, payload => {
+      const r = payload.new;
+      if (!r) return;
+      if (!FAIXAS_QUIMICAS[r.linha_id]) FAIXAS_QUIMICAS[r.linha_id] = {};
+      FAIXAS_QUIMICAS[r.linha_id][r.elemento] = [r.minimo, r.maximo];
+      renderQuimicos();
+      if (document.getElementById('view-parametros').classList.contains('active')) renderParamsQuimicos();
+      if (document.body.classList.contains('tv-active')) renderTvScreens();
+    })
+    .subscribe();
+
+  sb.channel('realtime-leituras-quimicas')
+    .on('postgres_changes', { event:'INSERT', schema:'public', table:'leituras_quimicas' }, payload => {
+      const r = payload.new;
+      if (!r) return;
+      if (!LEITURAS_QUIMICAS[r.linha_id]) LEITURAS_QUIMICAS[r.linha_id] = {};
+      LEITURAS_QUIMICAS[r.linha_id][r.elemento] = Number(r.valor);
+      renderQuimicos();
+      if (document.body.classList.contains('tv-active')) renderTvScreens();
+    })
+    .subscribe();
+
+  sb.channel('realtime-config-geral')
+    .on('postgres_changes', { event:'*', schema:'public', table:'config_geral' }, payload => {
+      const r = payload.new;
+      if (!r) return;
+      if (r.chave === 'limite_banho_horas'){ LIMITE_BANHO_HORAS = Number(r.valor); renderAll(); }
+      else if (r.chave.startsWith('especificacao_disco_')){
+        ESPECIFICACAO_DISCO[r.chave.replace('especificacao_disco_','')] = Number(r.valor);
+      }
+    })
+    .subscribe();
+}
+
+/* =========================================================================
    MODAL — confirmar pendência digitando o RE (rastreabilidade)
    ========================================================================= */
+const CAMADA_TAMBORES = 6, CAMADA_AMOSTRAS = 5; // 5 amostras x 6 tambores = 30 medições
+(function construirGradeCamada(){
+  const grid = document.getElementById('camadaGrid');
+  let thead = '<thead><tr><th></th>';
+  for (let t=1; t<=CAMADA_TAMBORES; t++) thead += `<th>T${t}</th>`;
+  thead += '</tr></thead>';
+  let tbody = '<tbody>';
+  for (let a=1; a<=CAMADA_AMOSTRAS; a++){
+    tbody += `<tr><td>Amostra ${String(a).padStart(2,'0')}</td>`;
+    for (let t=1; t<=CAMADA_TAMBORES; t++){
+      tbody += `<td><input type="number" step="0.1" class="camada-cell" data-amostra="${a}" data-tambor="${t}"></td>`;
+    }
+    tbody += '</tr>';
+  }
+  tbody += '</tbody>';
+  let tfoot = '<tfoot><tr><td>Média</td>';
+  for (let t=1; t<=CAMADA_TAMBORES; t++) tfoot += `<td class="camada-media-tambor" id="camadaMediaT${t}">—</td>`;
+  tfoot += '</tr></tfoot>';
+  grid.innerHTML = thead + tbody + tfoot;
+  grid.querySelectorAll('.camada-cell').forEach(inp=>{
+    inp.addEventListener('input', atualizarMediaCamada);
+  });
+})();
+
+function atualizarMediaCamada(){
+  const inputs = Array.from(document.querySelectorAll('.camada-cell'));
+  const valores = inputs.map(i=>parseFloat(i.value)).filter(v=>!isNaN(v));
+  const media = valores.length ? valores.reduce((a,b)=>a+b,0) / valores.length : null;
+  document.getElementById('camadaMediaValor').textContent = media==null ? '—' : media.toFixed(2);
+
+  for (let t=1; t<=CAMADA_TAMBORES; t++){
+    const valoresTambor = inputs
+      .filter(i => Number(i.dataset.tambor) === t)
+      .map(i => parseFloat(i.value))
+      .filter(v => !isNaN(v));
+    const mediaTambor = valoresTambor.length ? valoresTambor.reduce((a,b)=>a+b,0) / valoresTambor.length : null;
+    const el = document.getElementById('camadaMediaT'+t);
+    if (el) el.textContent = mediaTambor==null ? '—' : mediaTambor.toFixed(2);
+  }
+
+  return { valores, media, completo: valores.length === CAMADA_TAMBORES*CAMADA_AMOSTRAS };
+}
+
 let _reModalResolve = null;
-function pedirConfirmacaoRE(descricao){
+function pedirConfirmacaoRE(descricao, opcoes){
+  opcoes = opcoes || {};
   return new Promise(resolve=>{
     _reModalResolve = resolve;
     document.getElementById('reModalDesc').textContent = descricao;
     document.getElementById('reModalInput').value = '';
     document.getElementById('reModalError').textContent = '';
+    const campoCamada = document.getElementById('reModalCamadaWrap');
+    campoCamada.style.display = opcoes.pedirCamada ? 'block' : 'none';
+    document.getElementById('reModalBox').style.maxWidth = opcoes.pedirCamada ? '560px' : '380px';
+    if (opcoes.pedirCamada){
+      document.querySelectorAll('.camada-cell').forEach(i=>i.value='');
+      atualizarMediaCamada();
+    }
     document.getElementById('reModalOverlay').style.display = 'flex';
     setTimeout(()=>document.getElementById('reModalInput').focus(), 50);
   });
@@ -461,14 +723,23 @@ document.getElementById('reModalCancel').addEventListener('click', ()=>fecharReM
 document.getElementById('reModalConfirm').addEventListener('click', async ()=>{
   const re = document.getElementById('reModalInput').value.trim();
   const errEl = document.getElementById('reModalError');
-  if (!re){ errEl.textContent = 'Digite o RE.'; return; }
-  if (!sb){ fecharReModal({ re }); return; } // sem conexão Supabase, só segue com o RE digitado
+  const pedeCamada = document.getElementById('reModalCamadaWrap').style.display !== 'none';
+  let camada = null, camadaValores = null;
+  if (pedeCamada){
+    const { valores, media, completo } = atualizarMediaCamada();
+    if (!completo){ errEl.textContent = `Preencha as 30 medições (faltam ${30 - valores.length}).`; return; }
+    camada = media;
+    camadaValores = valores;
+  }
+  if (!re || re.length !== 4){ errEl.textContent = 'Digite os 4 dígitos do seu RE.'; return; }
+  if (!sb){ fecharReModal({ re, camada, camadaValores }); return; } // sem conexão Supabase, só segue com o RE digitado
   errEl.textContent = 'Verificando…';
   const { data, error } = await sb.from('colaboradores').select('re,nome').eq('re', re).eq('ativo', true).maybeSingle();
   if (error || !data){ errEl.textContent = 'RE não encontrado ou inativo.'; return; }
-  fecharReModal(data);
+  fecharReModal({ ...data, camada, camadaValores });
 });
 document.getElementById('reModalInput').addEventListener('keydown', e=>{ if (e.key==='Enter') document.getElementById('reModalConfirm').click(); });
+document.getElementById('reModalInput').addEventListener('input', e=>{ e.target.value = e.target.value.replace(/\D/g,'').slice(0,4); });
 
 async function registrarAcaoSupabase(re, tipoAcao, linhaId, banho, item, detalhe){
   if (!sb) return;
@@ -505,6 +776,7 @@ function abrirGateParametros(){
   return new Promise(resolve=>{
     _paramGateResolve = resolve;
     ['pg_re1','pg_senha1','pg_re2','pg_senha2','pg_re3','pg_senha3'].forEach(id=>document.getElementById(id).value = '');
+    ['pg_nome1','pg_nome2','pg_nome3'].forEach(id=>{ const el=document.getElementById(id); el.textContent=''; el.classList.remove('erro'); });
     document.getElementById('paramGateError').textContent = '';
     document.getElementById('paramGateOverlay').style.display = 'flex';
   });
@@ -514,12 +786,28 @@ function fecharParamGate(resultado){
   if (_paramGateResolve){ _paramGateResolve(resultado); _paramGateResolve = null; }
 }
 document.getElementById('paramGateCancel').addEventListener('click', ()=>fecharParamGate(false));
+['1','2','3'].forEach(n=>{
+  const reInput = document.getElementById('pg_re'+n);
+  const nomeEl = document.getElementById('pg_nome'+n);
+  reInput.addEventListener('input', e=>{
+    e.target.value = e.target.value.replace(/\D/g,'').slice(0,4);
+    nomeEl.textContent = ''; nomeEl.classList.remove('erro');
+  });
+  reInput.addEventListener('blur', async ()=>{
+    const re = reInput.value.trim();
+    if (re.length !== 4 || !sb) return;
+    const { data } = await sb.from('colaboradores').select('nome').eq('re', re).eq('ativo', true).maybeSingle();
+    if (data){ nomeEl.textContent = data.nome; nomeEl.classList.remove('erro'); }
+    else { nomeEl.textContent = 'RE não encontrado'; nomeEl.classList.add('erro'); }
+  });
+});
 document.getElementById('paramGateConfirm').addEventListener('click', async ()=>{
   const re1=document.getElementById('pg_re1').value.trim(),   s1=document.getElementById('pg_senha1').value;
   const re2=document.getElementById('pg_re2').value.trim(),   s2=document.getElementById('pg_senha2').value;
   const re3=document.getElementById('pg_re3').value.trim(),   s3=document.getElementById('pg_senha3').value;
   const errEl = document.getElementById('paramGateError');
   if (!re1||!s1||!re2||!s2||!re3||!s3){ errEl.textContent = 'Preencha os 3 REs e senhas.'; return; }
+  if (re1.length!==4 || re2.length!==4 || re3.length!==4){ errEl.textContent = 'RE deve ter 4 dígitos.'; return; }
   if (!sb){ errEl.textContent = 'Sem conexão com o Supabase.'; return; }
   errEl.textContent = 'Verificando…';
   const { data, error } = await sb.rpc('validar_acesso_parametros', {
@@ -568,74 +856,49 @@ const ETAPAS_POR_BANHO = [
 // Granalha = pellets de cobre (13mm x 25mm) · Limpeza de contato = limpeza do contato elétrico
 const ICONE_ETAPA = { 'Granalha':'🧱', 'Limpeza de contato':'⚡' };
 
-// "Fazenda de tanques" da linha — sequência física real (do desenho técnico),
-// atende os 3 banhos, não é por banho. Todos têm rotina de troca (nenhum é
-// "por banho" como o antigo genérico "Água" era) — limites abaixo são
-// placeholder (48h) até você ajustar em Parâmetros com os valores reais.
+// "Fazenda de tanques" da linha — simplificada conforme reunião com a equipe:
+// Desengraxante e Ácido já vêm com as 2 águas de enxágue seguintes agrupadas
+// no mesmo tanque/etapa; depois Potassa; depois as 3 águas de saída finais.
 const TANQUE_FARM = [
-  { item:'Desengraxante',       tipo:'tempo', limiteHoras:48, qtd:1 },
-  { item:'Água Alcalina',       tipo:'tempo', limiteHoras:48, qtd:1 },
-  { item:'Ácido Sulfúrico',     tipo:'tempo', limiteHoras:48, qtd:1 },
-  { item:'Água Ácida',          tipo:'tempo', limiteHoras:48, qtd:3 },
-  { item:'Potassa (Neutro)',    tipo:'tempo', limiteHoras:48, qtd:1 },
-  { item:'Enxágue 1',           tipo:'tempo', limiteHoras:48, qtd:1 },
-  { item:'Enxágue 2',           tipo:'tempo', limiteHoras:48, qtd:1 },
-  { item:'Enxágue 3 (Selante)', tipo:'tempo', limiteHoras:48, qtd:1 },
+  { item:'Desengraxante + 2 Águas', tipo:'tempo', limiteHoras:48, qtd:1 },
+  { item:'Ácido + 2 Águas',         tipo:'tempo', limiteHoras:48, qtd:1 },
+  { item:'Potassa',                 tipo:'tempo', limiteHoras:48, qtd:1 },
+  { item:'3° Água de saída',        tipo:'tempo', limiteHoras:48, qtd:1 },
+  { item:'2° Água de saída',        tipo:'tempo', limiteHoras:48, qtd:1 },
+  { item:'1° Água de saída',        tipo:'tempo', limiteHoras:48, qtd:1 },
 ];
 
-// pendencias_rotina
+// pendencias_rotina, ciclos de banho e limite geral — populados a partir do
+// Supabase em carregarDadosIniciais(). Ficam vazios/default até lá.
 let PENDENCIAS = [];
-let _pid = 1;
-const FACTORES_MOCK = [0.15, 0.45, 0.65, 0.8, 0.95, 1.1, 1.3];
-LINHAS.forEach((linha, li)=>{
-  BANHOS.forEach((banho, bi)=>{
-    ETAPAS_POR_BANHO.forEach((etapa, ei)=>{
-      const f = FACTORES_MOCK[(li*3 + bi + ei) % FACTORES_MOCK.length];
-      const horasAtras = etapa.limiteHoras * f;
-      PENDENCIAS.push({ id:_pid++, escopo:linha.id, banho, item:etapa.item, tipo:etapa.tipo, limiteHoras:etapa.limiteHoras, ultima:h(horasAtras) });
-    });
-  });
-  TANQUE_FARM.forEach((etapa, ei)=>{
-    const qtd = etapa.qtd || 1;
-    for (let t=1; t<=qtd; t++){
-      const f = FACTORES_MOCK[(li + ei + t) % FACTORES_MOCK.length];
-      const horasAtras = etapa.tipo==='evento' ? (1 + (li+ei+t)%4) : etapa.limiteHoras * f;
-      PENDENCIAS.push({ id:_pid++, escopo:linha.id, banho:null, item:etapa.item, tanque: qtd>1 ? t : null, tipo:etapa.tipo, limiteHoras:etapa.limiteHoras, descricao:etapa.descricao, ultima:h(horasAtras) });
-    }
-  });
-});
-PENDENCIAS.push(
-  { id:_pid++, escopo:'chiller',    item:'Verificação do chiller',          tipo:'tempo', limiteHoras:24,  ultima:h(30)  },
-  { id:_pid++, escopo:'filtro',     item:'Limpeza / troca do filtro',       tipo:'tempo', limiteHoras:168, ultima:h(120) },
-  { id:_pid++, escopo:'tanque_mae', item:'Verificar nível do tanque mãe',    tipo:'tempo', limiteHoras:24,  ultima:h(20)  },
-  { id:_pid++, escopo:'estanato',   item:'Verificação plataforma estanato', tipo:'tempo', limiteHoras:168, ultima:h(96)  },
-);
-
-/* Início do banho corrente em cada tanque físico (B1/B2/B3) de cada linha —
-   é o cronômetro mostrado dentro de cada caixa do desenho, E é o que
-   dispara o pop-up de "coletar amostra" quando atinge o limite. Confirmar
-   a coleta reinicia esse cronômetro (novo ciclo de amostragem). */
 let LIMITE_BANHO_HORAS = 4;
-const BANHO_INICIO = {
-  linha1: { B3: h(1.2), B2: h(3.6), B1: h(0.4) },
-  linha2: { B3: h(2.5), B2: h(0.8), B1: h(4.3) },
-  linha3: { B3: h(0.2), B2: h(4.8), B1: h(2.1) },
-};
+let BANHO_INICIO = {};
+let BANHO_TOTAL_INICIO = {};
+let BANHO_AMOSTRAS = {};
+LINHAS.forEach(l=>{ BANHO_INICIO[l.id]={}; BANHO_TOTAL_INICIO[l.id]={}; BANHO_AMOSTRAS[l.id]={}; });
 
-/* Cronômetro do banho TOTAL — começa a contar no START e só zera quando o
-   START é apertado de novo (independente das retiradas de amostra). O
-   contador de amostras conta quantas vezes o 🧪 foi confirmado desde o
-   último START; o START zera o contador, mas NÃO conta como uma amostra. */
-const BANHO_TOTAL_INICIO = {
-  linha1: { B3: h(9.2),  B2: h(21.6), B1: h(6.4)  },
-  linha2: { B3: h(14.5), B2: h(4.8),  B1: h(28.3) },
-  linha3: { B3: h(2.2),  B2: h(31.8), B1: h(12.1) },
-};
-const BANHO_AMOSTRAS = {
-  linha1: { B3: 2, B2: 5, B1: 1 },
-  linha2: { B3: 3, B2: 1, B1: 6 },
-  linha3: { B3: 0, B2: 7, B1: 2 },
-};
+/* =========================================================================
+   CÁLCULO DE SAÍDA DO BANHO (MOCK — ainda só local, não grava no Supabase)
+   Fórmula validada com a equipe:
+     tempo_final (min) = (Especificação do disco × minutos até a 1ª amostra) / camada encontrada
+   A "1ª amostra" é identificada quando BANHO_AMOSTRAS ainda está em 0 no
+   momento do clique — ou seja, nenhuma amostra desde o último START.
+   ========================================================================= */
+let ESPECIFICACAO_DISCO = {}; // por linha — configurável em Parâmetros (µm)
+let BANHO_SAIDA_CALC = {};    // por linha+banho — horário calculado (ISO) ou null
+LINHAS.forEach(l=>{ ESPECIFICACAO_DISCO[l.id] = null; BANHO_SAIDA_CALC[l.id] = {}; BANHOS.forEach(b=>{ BANHO_SAIDA_CALC[l.id][b] = null; }); });
+
+function fmtHoraRelogio(iso){
+  return new Date(iso).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+}
+// Status da saída calculada: 'ok' até 30min antes, 'warn' nos 30min antes, 'crit' na hora ou depois
+function statusSaida(saidaIso){
+  const minutosParaSaida = (new Date(saidaIso).getTime() - Date.now()) / 60000;
+  if (minutosParaSaida <= 0) return 'crit';
+  if (minutosParaSaida <= 30) return 'warn';
+  return 'ok';
+}
+
 
 const ESCOPOS = {};
 LINHAS.forEach(l => ESCOPOS[l.id] = l.nome);
@@ -652,23 +915,13 @@ const ELEMENTOS_QUIMICOS = {
   linha3: ['Cu','KCN','Zn','KOH','K2CO3','PH','Temp'], // latão: Zn no lugar do Sn
 };
 
-/* Faixas aceitáveis — vieram da folha "Parâmetros do banho de bronze" que
-   você mandou (Permetal e Europa). ASSUMI Permetal → Linha 1 e Europa →
-   Linha 2, por serem as duas linhas de bronze — confirme se é essa a
-   associação certa. A Linha 3 é latão e a folha não cobre isso, então fica
-   em branco (sem alerta) até você preencher em Parâmetros. */
-let FAIXAS_QUIMICAS = {
-  linha1: { Cu:[15,24], KCN:[22,37], Sn:[10,14], KOH:[20,33], K2CO3:[null,300], PH:[13.7,14.2], Temp:[50,60] },
-  linha2: { Cu:[13,22], KCN:[11,30], Sn:[9,13],  KOH:[20,33], K2CO3:[220,300], PH:[13.7,14.2], Temp:[null,null] },
-  linha3: { Cu:[null,null], KCN:[null,null], Zn:[null,null], KOH:[null,null], K2CO3:[null,null], PH:[null,null], Temp:[null,null] },
-};
-
-// Leituras atuais (mock, semeadas com os últimos valores registrados na lousa)
-let LEITURAS_QUIMICAS = {
-  linha1: { Cu:5.00,  KCN:13.00, Sn:6.00,  KOH:8.90,  K2CO3:165, PH:13.90, Temp:54 },
-  linha2: { Cu:14.60, KCN:30.00, Sn:15.10, KOH:17.90, K2CO3:214, PH:14.40, Temp:44 },
-  linha3: { Cu:14.50, KCN:34.00, Zn:26.10, KOH:1.12,  K2CO3:158, PH:12.25, Temp:57 },
-};
+// Faixas e leituras — populadas a partir do Supabase (parametros_quimicos e
+// leituras_quimicas) em carregarDadosIniciais(). Ficam vazias até lá.
+let FAIXAS_QUIMICAS = {};
+let LEITURAS_QUIMICAS = {};
+// Histórico completo por dia — HISTORICO_QUIMICO[linha][elemento] = [{data:'AAAA-MM-DD', valor}, ...] ascendente
+let HISTORICO_QUIMICO = {};
+LINHAS.forEach(l=>{ FAIXAS_QUIMICAS[l.id]={}; LEITURAS_QUIMICAS[l.id]={}; HISTORICO_QUIMICO[l.id]={}; });
 
 function statusQuimico(valor, faixa){
   if (valor===null || valor===undefined || valor==='' || isNaN(valor)) return 'vazio';
@@ -706,6 +959,7 @@ const STATUS_HEX = { ok:'#1F9D55', warn:'#C98A00', crit:'#C7414F' };
 function horasDesde(iso){ return (Date.now() - new Date(iso).getTime()) / 3600000; }
 
 function statusDe(p){
+  if (!p) return 'ok'; // dado ainda não carregado (Supabase indisponível/lento) — não quebra a tela
   if (p.tipo === 'evento') return 'evento';
   const ratio = horasDesde(p.ultima) / p.limiteHoras;
   if (ratio >= 1) return 'crit';
@@ -776,8 +1030,13 @@ function renderAndonGeral(){
    Reaproveitado tanto no Painel quanto no Modo TV.
    ========================================================================= */
 function buildPlantaSVG(){
-  const colW = 272;                          // largura total de cada coluna de linha (inclui espaço do botão START)
-  const btnR = 15, btnAreaW = 40;            // botão START redondo, à esquerda de cada banho
+  if (!PENDENCIAS.length){
+    return `<div style="padding:40px; text-align:center; color:var(--ink-faint); font-size:13px;">
+      ${sb ? 'Carregando dados do Supabase…' : 'Sem conexão com o Supabase — verifique a internet e recarregue a página.'}
+    </div>`;
+  }
+  const colW = 300;                          // largura total de cada coluna de linha
+  const btnR = 12, btnAreaW = 68;            // faixa esquerda: só START + Saída calculada
   const colGap = 30, startX = 24, startY = 60;
   const bathH = 78, rowH = 24, banhoGap = 12; // mais respiro entre um banho e o próximo
   const bathUnitH = bathH + banhoGap;
@@ -804,22 +1063,32 @@ function buildPlantaSVG(){
     svg += `<text class="apoio-label" x="${x}" y="34" text-anchor="start">${linha.liga}</text>`;
     svg += `</g>`;
 
-    // banhos B3/B2/B1 — botão START à esquerda, caixa com pílulas de Água/Granalha/Limpeza
+    // banhos B3/B2/B1 — faixa esquerda com START + Saída calculada; Granalha/Limpeza
+    // voltam a ser ícones dentro da própria caixa (mesmo sistema de alerta/pisca)
     let y = startY;
     BANHOS.forEach(banho=>{
       const inicio = BANHO_INICIO[linhaId][banho];
       const stBanho = statusBanho(inicio);
-      const pillH = 26;
       const boxX = x + btnAreaW, boxW = colW - btnAreaW;
 
-      // botão START redondo — inicia um novo banho (zera o mesmo cronômetro da amostra)
-      const btnCx = x + btnAreaW/2, btnCy = y + bathH/2;
+      // botão START redondo — inicia um novo banho (zera cronômetro de amostra, total e contador)
+      const btnCx = x + 16, btnCy = y + bathH/2 - 10;
       svg += `<g class="plant-dot" data-action="start-banho" data-linha="${linhaId}" data-banho="${banho}">`;
       svg += `<circle cx="${btnCx}" cy="${btnCy}" r="${btnR}" fill="var(--ok)"></circle>`;
-      svg += `<text x="${btnCx}" y="${btnCy+4}" text-anchor="middle" style="font-size:13px; fill:#fff;">▶</text>`;
+      svg += `<text x="${btnCx}" y="${btnCy+4}" text-anchor="middle" style="font-size:11px; fill:#fff;">▶</text>`;
       svg += `</g>`;
 
-      // caixa do banho (fundo) — nome do banho à esquerda
+      // "Saída do banho" calculada — em evidência, abaixo do START, só aparece após a 1ª amostra do ciclo
+      const saidaIso = BANHO_SAIDA_CALC[linhaId] && BANHO_SAIDA_CALC[linhaId][banho];
+      if (saidaIso){
+        const stSaida = statusSaida(saidaIso);
+        svg += `<text class="banho-saida ${stSaida}" x="${x+btnAreaW/2}" y="${btnCy+26}" text-anchor="middle">${fmtHoraRelogio(saidaIso)}</text>`;
+      } else {
+        svg += `<text class="banho-saida-vazio" x="${x+btnAreaW/2}" y="${btnCy+26}" text-anchor="middle">—</text>`;
+      }
+
+      // caixa do banho — nome + cronômetro total/amostras + pílula de amostra
+      const pillH = 26;
       svg += `<rect class="tanque-rect" x="${boxX}" y="${y}" width="${boxW}" height="${bathH}" rx="8"></rect>`;
       svg += `<text class="linha-label" x="${boxX+14}" y="${y+26}" text-anchor="start" style="font-size:16px;">${banho}</text>`;
 
@@ -836,7 +1105,7 @@ function buildPlantaSVG(){
       svg += `<text class="bath-timer ${stBanho}" x="${amostraX+amostraW-10}" y="${amostraY+pillH/2+4}" text-anchor="end" style="font-size:13.5px;">${fmtCronometroCurto(inicio)}</text>`;
       svg += `</g>`;
 
-      // pílulas de Granalha / Limpeza de contato — base da caixa, lado a lado
+      // pílulas de Granalha / Limpeza de contato — de volta pra base da caixa, lado a lado
       const pillMargin = 8, pillGap = 6;
       const pillW = (boxW - pillMargin*2 - pillGap) / 2;
       const py = y + bathH - pillH - 9;
@@ -855,15 +1124,23 @@ function buildPlantaSVG(){
       y += bathH + banhoGap;
     });
 
-    // fazenda de tanques da linha (Água ×3, Potassa, Ácido, Desengraxante) — clicar já zera
+    // fazenda de tanques da linha — clicar já zera (itens ainda sem linha correspondente
+    // no Supabase aparecem neutros, sem clique, até o schema ser atualizado)
     svg += `<text class="farm-label" x="${x}" y="${farmStartY-10}">TANQUES DA LINHA</text>`;
     let fy = farmStartY;
     TANQUE_FARM.forEach(etapa=>{
       const qtd = etapa.qtd || 1;
       for (let t=1; t<=qtd; t++){
         const p = pendenciaDaLinha(linhaId, etapa.item, qtd>1 ? t : undefined);
-        const st = statusDe(p);
         const label = qtd>1 ? `${etapa.item} ${t}` : etapa.item;
+        if (!p){
+          svg += `<rect class="etapa-row-bg" x="${x}" y="${fy}" width="${colW}" height="${rowH}"></rect>`;
+          svg += `<text class="etapa-label" x="${x+8}" y="${fy+rowH/2+4}">${label}</text>`;
+          svg += `<text class="etapa-timer" x="${x+colW-8}" y="${fy+rowH/2+4}" text-anchor="end">—</text>`;
+          fy += rowH;
+          continue;
+        }
+        const st = statusDe(p);
         svg += `<g class="plant-dot" data-action="reset-pendencia" data-pid="${p.id}">`;
         svg += `<rect class="etapa-row-bg ${st==='crit'||st==='warn'?st:''}" x="${x}" y="${fy}" width="${colW}" height="${rowH}"></rect>`;
         svg += `<text class="etapa-label" x="${x+8}" y="${fy+rowH/2+4}">${label}</text>`;
@@ -911,17 +1188,38 @@ async function resetPendenciaPorId(id){
   const rotulo = p.banho ? `${p.item} (${p.banho})` : p.item;
   const col = await pedirConfirmacaoRE(`Confirmar "${rotulo}" feito agora — digite seu RE:`);
   if (!col) return;
-  p.ultima = new Date().toISOString();
+  const agora = new Date().toISOString();
+  p.ultima = agora;
+  if (sb) sb.from('pendencias_rotina').update({ ultima_troca: agora }).eq('id', id).then();
   registrarAcaoSupabase(col.re, 'confirmar_pendencia', p.escopo, p.banho, p.item);
   renderAll();
 }
 async function resetBanhoPorClique(linhaId, banho){
   const nome = LINHAS.find(l=>l.id===linhaId)?.nome || linhaId;
-  const col = await pedirConfirmacaoRE(`Confirmar coleta de amostra do banho ${banho} (${nome}) — digite seu RE:`);
+  const ehPrimeiraAmostra = (BANHO_AMOSTRAS[linhaId][banho] || 0) === 0;
+  const col = await pedirConfirmacaoRE(`Confirmar coleta de amostra do banho ${banho} (${nome}) — digite seu RE:`, { pedirCamada: true });
   if (!col) return;
-  BANHO_INICIO[linhaId][banho] = new Date().toISOString();
+  const agora = new Date().toISOString();
+
+  // Cálculo de saída do banho — só na 1ª amostra do ciclo (já validado, agora persiste no Supabase)
+  if (ehPrimeiraAmostra){
+    const minutosAtePrimeiraAmostra = horasDesde(BANHO_INICIO[linhaId][banho]) * 60;
+    const especificacao = ESPECIFICACAO_DISCO[linhaId];
+    if (especificacao && col.camada){
+      const tempoFinalMin = (especificacao * minutosAtePrimeiraAmostra) / col.camada;
+      const horaSaida = new Date(new Date(BANHO_TOTAL_INICIO[linhaId][banho]).getTime() + tempoFinalMin * 60000);
+      BANHO_SAIDA_CALC[linhaId][banho] = horaSaida.toISOString();
+    }
+  }
+
+  BANHO_INICIO[linhaId][banho] = agora;
   BANHO_AMOSTRAS[linhaId][banho] = (BANHO_AMOSTRAS[linhaId][banho] || 0) + 1;
-  registrarAcaoSupabase(col.re, 'coleta_amostra', linhaId, banho, null);
+  if (sb) sb.from('banho_ciclos').update({
+    amostra_inicio: agora,
+    amostras_contador: BANHO_AMOSTRAS[linhaId][banho],
+    saida_calculada: BANHO_SAIDA_CALC[linhaId][banho],
+  }).eq('linha_id', linhaId).eq('banho', banho).then();
+  registrarAcaoSupabase(col.re, 'coleta_amostra', linhaId, banho, null, col.camada ? { camada_media: col.camada, camada_valores: col.camadaValores, primeira_amostra: ehPrimeiraAmostra } : null);
   renderAll();
 }
 async function iniciarBanhoPorClique(linhaId, banho){
@@ -932,6 +1230,8 @@ async function iniciarBanhoPorClique(linhaId, banho){
   BANHO_INICIO[linhaId][banho] = agora;
   BANHO_TOTAL_INICIO[linhaId][banho] = agora;
   BANHO_AMOSTRAS[linhaId][banho] = 0;
+  BANHO_SAIDA_CALC[linhaId][banho] = null; // novo ciclo — apaga o cálculo do ciclo anterior
+  if (sb) sb.from('banho_ciclos').update({ amostra_inicio: agora, total_inicio: agora, amostras_contador: 0, saida_calculada: null }).eq('linha_id', linhaId).eq('banho', banho).then();
   registrarAcaoSupabase(col.re, 'start_banho', linhaId, banho, null);
   renderAll();
 }
@@ -939,7 +1239,9 @@ async function resetTanqueMaePorClique(){
   const p = pendenciasDoEscopo('tanque_mae')[0];
   const col = await pedirConfirmacaoRE('Confirmar verificação do nível do Tanque Mãe — digite seu RE:');
   if (!col) return;
-  p.ultima = new Date().toISOString();
+  const agora = new Date().toISOString();
+  p.ultima = agora;
+  if (sb) sb.from('pendencias_rotina').update({ ultima_troca: agora }).eq('id', p.id).then();
   registrarAcaoSupabase(col.re, 'verificacao_tanque_mae', 'tanque_mae', null, p.item);
   renderAll();
 }
@@ -972,6 +1274,61 @@ function renderPlantSvg(){
 /* =========================================================================
    RENDER — faixa de equipamentos de apoio (compacta)
    ========================================================================= */
+/* =========================================================================
+   RENDER — resumo mobile (só aparece em telas estreitas, via CSS).
+   Dá pra ver o status de cada linha e do Tanque Mãe sem abrir o esquema.
+   ========================================================================= */
+function renderMobileResumo(){
+  const wrap = document.getElementById('mobileResumo');
+
+  const linhaLinha = LINHAS.map(linha=>{
+    const itens = pendenciasDoEscopo(linha.id).map(statusDe);
+    const st = piorStatus(itens);
+    const vencidas = itens.filter(s=>s==='crit').length;
+    const proximas = itens.filter(s=>s==='warn').length;
+    const sub = vencidas ? `${vencidas} vencida${vencidas===1?'':'s'}` + (proximas?` · ${proximas} próxima${proximas===1?'':'s'}`:'')
+              : proximas ? `${proximas} próxima${proximas===1?'':'s'} do limite`
+              : 'Tudo em dia';
+    return `
+      <div class="mobile-resumo-linha" data-escopo="${linha.id}">
+        <span class="chip-dot ${st}"></span>
+        <div class="mobile-resumo-linha-info">
+          <div class="mobile-resumo-linha-nome">${linha.nome}<span class="mobile-resumo-linha-liga">${linha.liga}</span></div>
+          <div class="mobile-resumo-linha-sub">${sub}</div>
+        </div>
+        <span class="mobile-resumo-seta">›</span>
+      </div>`;
+  }).join('');
+
+  const pTanque = pendenciasDoEscopo('tanque_mae')[0];
+  const stTanque = statusDe(pTanque);
+  const subTanque = stTanque==='crit' ? 'Verificação vencida' : stTanque==='warn' ? 'Próxima do limite' : 'Em dia';
+  const tanqueHTML = `
+    <div class="mobile-resumo-linha" data-escopo="tanque_mae">
+      <span class="chip-dot ${stTanque}"></span>
+      <div class="mobile-resumo-linha-info">
+        <div class="mobile-resumo-linha-nome">Tanque Mãe</div>
+        <div class="mobile-resumo-linha-sub">${subTanque}</div>
+      </div>
+      <span class="mobile-resumo-seta">›</span>
+    </div>`;
+
+  wrap.innerHTML = `
+    <div class="mobile-resumo-card">
+      <div class="mobile-resumo-titulo">Status por linha</div>
+      ${linhaLinha}
+      ${tanqueHTML}
+    </div>`;
+
+  wrap.querySelectorAll('.mobile-resumo-linha').forEach(row=>{
+    row.addEventListener('click', ()=>{
+      document.querySelector('[data-view="pendencias"]').click();
+      document.getElementById('filterLinha').value = row.dataset.escopo;
+      renderFullTable();
+    });
+  });
+}
+
 function renderApoioStrip(){
   const wrap = document.getElementById('apoioStrip');
   wrap.innerHTML = EQUIPAMENTOS_APOIO.map(eq=>{
@@ -1019,15 +1376,51 @@ function buildQuimicosHTML(){
           <thead><tr><th>Elemento</th><th>Valor</th><th>Faixa</th><th>Status</th></tr></thead>
           <tbody>${linhasHTML}</tbody>
         </table>
+        <button class="btn primary small" data-salvar-quimico="${linha.id}" style="margin-top:12px; width:100%;">Salvar leituras de hoje</button>
+        <div class="quimico-save-msg" id="quimicoMsg-${linha.id}"></div>
       </div>`;
   }).join('');
 }
 
 function attachQuimicoHandlers(container){
-  container.querySelectorAll('.quimico-input').forEach(inp=>{
-    inp.addEventListener('change', ()=>{
-      const v = parseFloat(inp.value);
-      LEITURAS_QUIMICAS[inp.dataset.linha][inp.dataset.elemento] = inp.value==='' ? null : v;
+  container.querySelectorAll('[data-salvar-quimico]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const linhaId = btn.dataset.salvarQuimico;
+      const card = btn.closest('.quimico-card');
+      const inputs = card.querySelectorAll('.quimico-input');
+      const leituras = [];
+      inputs.forEach(inp=>{
+        const v = parseFloat(inp.value);
+        if (inp.value !== '' && !isNaN(v)) leituras.push({ elemento: inp.dataset.elemento, valor: v });
+      });
+      if (!leituras.length) return;
+
+      const col = await pedirConfirmacaoRE(`Salvar leituras químicas de ${ESCOPOS[linhaId]} — digite seu RE:`);
+      if (!col) return;
+
+      const msgEl = document.getElementById('quimicoMsg-'+linhaId);
+      const hoje = new Date().toISOString().slice(0,10);
+      leituras.forEach(l=>{
+        LEITURAS_QUIMICAS[linhaId][l.elemento] = l.valor;
+        if (!HISTORICO_QUIMICO[linhaId][l.elemento]) HISTORICO_QUIMICO[linhaId][l.elemento] = [];
+        const arr = HISTORICO_QUIMICO[linhaId][l.elemento];
+        const idxHoje = arr.findIndex(p=>p.data===hoje);
+        if (idxHoje>=0) arr[idxHoje].valor = l.valor; else arr.push({ data: hoje, valor: l.valor });
+      });
+
+      if (sb){
+        try {
+          await sb.from('leituras_quimicas').insert(
+            leituras.map(l => ({ linha_id: linhaId, elemento: l.elemento, valor: l.valor, colaborador_re: col.re }))
+          );
+          if (msgEl) msgEl.textContent = 'Salvo ✓';
+        } catch(e){
+          console.error('Falha ao gravar leituras químicas:', e);
+          if (msgEl) msgEl.textContent = 'Erro ao salvar — veja o console.';
+        }
+      } else if (msgEl) msgEl.textContent = 'Salvo (mock, sem Supabase conectado)';
+
+      registrarAcaoSupabase(col.re, 'leitura_quimica', linhaId, null, null, { leituras });
       renderQuimicos();
       if (document.body.classList.contains('tv-active')) renderTvScreens();
     });
@@ -1123,6 +1516,7 @@ function renderFullTable(){
    RENDER — Parametrização
    ========================================================================= */
 function renderParametros(){
+  if (!PENDENCIAS.length) return; // ainda carregando do Supabase
   document.getElementById('paramLimiteBanho').value = LIMITE_BANHO_HORAS;
   document.getElementById('paramTanqueMae').value = pendenciasDoEscopo('tanque_mae')[0].limiteHoras;
 
@@ -1144,6 +1538,7 @@ function renderParametros(){
       for (let t=1; t<=qtd; t++){
         const p = pendenciaDaLinha(linha.id, etapa.item, qtd>1 ? t : undefined);
         const label = qtd>1 ? `${etapa.item} ${t}` : etapa.item;
+        if (!p){ rows += `<tr><td>${label}</td><td><span class="hint">sem registro no Supabase ainda</span></td></tr>`; continue; }
         const campo = `<input type="number" min="0" step="0.5" class="param-input" data-param data-linha="${linha.id}" data-item="${etapa.item}" ${qtd>1?`data-tanque="${t}"`:''} data-kind="horas" value="${p.limiteHoras}">`;
         rows += `<tr><td>${label}</td><td>${campo}</td></tr>`;
       }
@@ -1153,6 +1548,12 @@ function renderParametros(){
     return `
       <div class="card param-card">
         <h3 class="param-card-title">${linha.nome}<span class="param-liga">${linha.liga}</span></h3>
+        <div class="param-subtitle">Especificação (usada no cálculo de saída do banho)</div>
+        <div style="margin-bottom:14px;">
+          <input type="number" min="0" step="0.1" class="param-input" data-espec-disco data-linha="${linha.id}"
+                 value="${ESPECIFICACAO_DISCO[linha.id] ?? ''}" placeholder="µm" style="width:90px;">
+          <span class="hint">Especificação do disco (µm)</span>
+        </div>
         <div class="param-subtitle">Por banho</div>
         <table class="data-table param-table">
           <thead><tr><th>Banho</th><th>Granalha</th><th>Limpeza de contato</th></tr></thead>
@@ -1168,6 +1569,16 @@ function renderParametros(){
 
   wrap.querySelectorAll('[data-param]').forEach(el=>{
     el.addEventListener('change', onParamChange);
+  });
+  wrap.querySelectorAll('[data-espec-disco]').forEach(el=>{
+    el.addEventListener('change', ()=>{
+      const v = parseFloat(el.value);
+      const linhaId = el.dataset.linha;
+      ESPECIFICACAO_DISCO[linhaId] = isNaN(v) ? null : v;
+      if (sb && !isNaN(v)){
+        sb.from('config_geral').upsert({ chave: 'especificacao_disco_'+linhaId, valor: String(v) }, { onConflict:'chave' }).then();
+      }
+    });
   });
 }
 
@@ -1187,20 +1598,33 @@ function onParamChange(e){
       irmao.disabled = el.checked;
       if (!el.checked && !p.limiteHoras){ p.limiteHoras = 48; irmao.value = 48; }
     }
+    if (sb) sb.from('pendencias_rotina').update({ tipo: p.tipo, descricao: p.descricao || null, limite_horas: p.limiteHoras || null }).eq('id', p.id).then();
   } else if (kind === 'horas'){
     const v = parseFloat(el.value);
-    if (!isNaN(v) && v > 0) p.limiteHoras = v;
+    if (!isNaN(v) && v > 0){
+      p.limiteHoras = v;
+      if (sb) sb.from('pendencias_rotina').update({ limite_horas: v }).eq('id', p.id).then();
+    }
   }
   renderAll();
 }
 
 document.getElementById('paramLimiteBanho').addEventListener('change', (e)=>{
   const v = parseFloat(e.target.value);
-  if (!isNaN(v) && v > 0){ LIMITE_BANHO_HORAS = v; renderAll(); }
+  if (!isNaN(v) && v > 0){
+    LIMITE_BANHO_HORAS = v;
+    if (sb) sb.from('config_geral').update({ valor: String(v) }).eq('chave', 'limite_banho_horas').then();
+    renderAll();
+  }
 });
 document.getElementById('paramTanqueMae').addEventListener('change', (e)=>{
   const v = parseFloat(e.target.value);
-  if (!isNaN(v) && v > 0){ pendenciasDoEscopo('tanque_mae')[0].limiteHoras = v; renderAll(); }
+  if (!isNaN(v) && v > 0){
+    const p = pendenciasDoEscopo('tanque_mae')[0];
+    p.limiteHoras = v;
+    if (sb) sb.from('pendencias_rotina').update({ limite_horas: v }).eq('id', p.id).then();
+    renderAll();
+  }
 });
 
 /* =========================================================================
@@ -1237,6 +1661,7 @@ function renderParamsQuimicos(){
       const faixa = FAIXAS_QUIMICAS[linha][elemento] || [null,null];
       if (kind === 'min') faixa[0] = v; else faixa[1] = v;
       FAIXAS_QUIMICAS[linha][elemento] = faixa;
+      if (sb) sb.from('parametros_quimicos').upsert({ linha_id: linha, elemento: elemento, minimo: faixa[0], maximo: faixa[1] }, { onConflict:'linha_id,elemento' }).then();
       renderQuimicos();
       if (document.body.classList.contains('tv-active')) renderTvScreens();
     });
@@ -1247,7 +1672,22 @@ function renderParamsQuimicos(){
    MODO TV — tela fixa única: o layout geral (linhas × banhos × etapas)
    ========================================================================= */
 let tvIndex = 0;
-const TV_SLIDES = ['layout','quimicos'];
+const TV_SLIDES = ['layout','quimicos','graficos'];
+
+const LINHA_COR = { linha1:'#B08D57', linha2:'#2AA9A0', linha3:'#8A5FBF' };
+const TODOS_ELEMENTOS_QUIMICOS = ['Cu','KCN','Sn','Zn','KOH','K2CO3','PH','Temp']; // união de tudo que aparece em alguma linha
+let TV_CHART_INSTANCES = [];
+function fmtDataCurtaBR(dataISO){ const [a,m,d] = dataISO.split('-'); return `${d}/${m}`; }
+function ultimosNDias(n){
+  const dias = [];
+  const hoje = new Date();
+  for (let i = n-1; i >= 0; i--){
+    const d = new Date(hoje);
+    d.setDate(d.getDate() - i);
+    dias.push(d.toISOString().slice(0,10));
+  }
+  return dias;
+}
 
 function buildTvLayoutHTML(){
   const todosStatus = PENDENCIAS.map(statusDe);
@@ -1278,6 +1718,122 @@ function buildTvQuimicosHTML(){
   `;
 }
 
+function buildTvGraficosHTML(){
+  return `
+    <div class="tv-header">
+      <div class="tv-title">Histórico químico <span class="tv-title-sub">por elemento</span></div>
+    </div>
+    <div class="tv-graficos-grid">
+      ${TODOS_ELEMENTOS_QUIMICOS.map(el=>`
+        <div class="tv-grafico-card">
+          <div class="tv-grafico-titulo">${el}</div>
+          <div class="tv-grafico-canvas-wrap"><canvas id="chart-el-${el}"></canvas></div>
+        </div>`).join('')}
+    </div>
+    <div class="tv-footer">
+      <span>Uma leitura por dia — salve em Painel ou Modo TV (Controle químico)</span>
+      <span>Atualizado ${new Date().toLocaleString('pt-BR')}</span>
+    </div>
+  `;
+}
+
+// Quando as linhas têm faixas diferentes pro mesmo elemento, usa a de maior amplitude (max-min)
+function faixaMaiorAmplitude(elemento){
+  let melhor = null, melhorAmp = -1;
+  LINHAS.forEach(l=>{
+    const faixa = (FAIXAS_QUIMICAS[l.id] || {})[elemento];
+    if (!faixa) return;
+    const [min, max] = faixa;
+    if (min == null || max == null) return; // precisa dos dois limites pra desenhar a banda
+    const amp = max - min;
+    if (amp > melhorAmp){ melhorAmp = amp; melhor = [min, max]; }
+  });
+  return melhor;
+}
+
+// Plugin próprio do Chart.js — pinta a banda de referência (faixa aceitável) atrás da linha
+const faixaBandPlugin = {
+  id: 'faixaBand',
+  beforeDraw(chart){
+    const opts = chart.options.plugins && chart.options.plugins.faixaBand;
+    if (!opts || opts.min == null || opts.max == null) return;
+    const { ctx, chartArea, scales } = chart;
+    const yTop = scales.y.getPixelForValue(opts.max);
+    const yBottom = scales.y.getPixelForValue(opts.min);
+    ctx.save();
+    ctx.fillStyle = 'rgba(31,157,85,0.12)';
+    ctx.fillRect(chartArea.left, yTop, chartArea.right - chartArea.left, yBottom - yTop);
+    ctx.strokeStyle = 'rgba(31,157,85,0.35)';
+    ctx.setLineDash([4,3]);
+    ctx.strokeRect(chartArea.left, yTop, chartArea.right - chartArea.left, yBottom - yTop);
+    ctx.restore();
+  }
+};
+
+function initGraficosCharts(){
+  if (typeof Chart === 'undefined') return; // biblioteca de gráfico não carregou (ex: sem internet)
+  if (typeof ChartDataLabels !== 'undefined' && !Chart.registry.plugins.get('datalabels')){
+    Chart.register(ChartDataLabels);
+  }
+  if (!Chart.registry.plugins.get('faixaBand')) Chart.register(faixaBandPlugin);
+  TV_CHART_INSTANCES.forEach(c=>c.destroy());
+  TV_CHART_INSTANCES = [];
+
+  const datas = ultimosNDias(10); // janela fixa, sempre terminando hoje
+
+  TODOS_ELEMENTOS_QUIMICOS.forEach(elemento=>{
+    const canvas = document.getElementById('chart-el-'+elemento);
+    if (!canvas) return;
+
+    // só entram as linhas que realmente têm esse elemento (Sn é só linha1/2, Zn só linha3, por ex.)
+    const linhasComEsseElemento = LINHAS.filter(l => (ELEMENTOS_QUIMICOS[l.id]||[]).includes(elemento));
+    const faixaRef = faixaMaiorAmplitude(elemento); // [min,max] ou null
+
+    const datasets = linhasComEsseElemento.map(linha=>{
+      const porData = {};
+      (HISTORICO_QUIMICO[linha.id]?.[elemento] || []).forEach(p=> porData[p.data]=p.valor);
+      return {
+        label: linha.nome,
+        data: datas.map(d => porData[d] ?? null), // sem leitura no dia = buraco no gráfico, não vira 0
+        borderColor: LINHA_COR[linha.id],
+        backgroundColor: LINHA_COR[linha.id],
+        spanGaps: true,
+        tension: 0.25,
+        pointRadius: 3,
+      };
+    });
+
+    // eixo Y precisa enxergar a faixa inteira, mesmo que os pontos fiquem todos dentro dela
+    let yMin, yMax;
+    if (faixaRef){
+      const folga = (faixaRef[1] - faixaRef[0]) * 0.15 || 1;
+      yMin = faixaRef[0] - folga; yMax = faixaRef[1] + folga;
+    }
+
+    TV_CHART_INSTANCES.push(new Chart(canvas.getContext('2d'), {
+      type: 'line',
+      data: { labels: datas.map(fmtDataCurtaBR), datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position:'bottom', labels:{ boxWidth:10, font:{size:9} } },
+          datalabels: {
+            align: 'top', anchor: 'end', font: { size: 8, weight:'600' },
+            color: ctx => ctx.dataset.borderColor,
+            formatter: v => v==null ? '' : v,
+          },
+          faixaBand: faixaRef ? { min: faixaRef[0], max: faixaRef[1] } : null,
+        },
+        scales: {
+          y: { beginAtZero:false, suggestedMin: yMin, suggestedMax: yMax, ticks:{ font:{size:9} } },
+          x: { ticks:{ font:{size:9} } },
+        },
+      },
+    }));
+  });
+}
+
 function renderTvScreens(){
   const container = document.getElementById('view-tv');
   container.querySelectorAll('.tv-screen').forEach(s=>s.remove());
@@ -1286,10 +1842,11 @@ function renderTvScreens(){
     const screen = document.createElement('div');
     screen.className = 'tv-screen';
     screen.style.display = i===tvIndex ? 'flex' : 'none';
-    screen.innerHTML = id==='layout' ? buildTvLayoutHTML() : buildTvQuimicosHTML();
+    screen.innerHTML = id==='layout' ? buildTvLayoutHTML() : id==='quimicos' ? buildTvQuimicosHTML() : buildTvGraficosHTML();
     container.insertBefore(screen, dotsWrap);
     if (id==='layout') attachPlantClickHandlers(screen);
-    else attachQuimicoHandlers(screen);
+    else if (id==='quimicos') attachQuimicoHandlers(screen);
+    else if (id==='graficos') initGraficosCharts();
   });
 
   dotsWrap.innerHTML = '';
@@ -1303,6 +1860,7 @@ function renderTvScreens(){
 function showTvSlide(){
   document.querySelectorAll('#view-tv .tv-screen').forEach((s,i)=> s.style.display = i===tvIndex ? 'flex' : 'none');
   document.querySelectorAll('#tvDots span').forEach((s,i)=> s.classList.toggle('on', i===tvIndex));
+  if (TV_SLIDES[tvIndex] === 'graficos') setTimeout(()=> TV_CHART_INSTANCES.forEach(c=>c.resize()), 50);
 }
 
 /* =========================================================================
@@ -1348,18 +1906,24 @@ setInterval(tickClock, 1000); tickClock();
    ========================================================================= */
 function renderAll(){
   renderAndonGeral();
+  renderMobileResumo();
   renderPlantSvg();
   renderApoioStrip();
   renderUrgentTable();
   renderFullTable();
   if (document.body.classList.contains('tv-active')) renderTvScreens();
 }
-popularFiltroLinha();
-renderAll();
-renderQuimicos(); // controle químico do Painel — não entra no ciclo automático (evita atrapalhar quem está digitando)
-renderParametros(); // só na entrada — não entra no ciclo automático pra não atrapalhar quem estiver editando
-renderParamsQuimicos();
-setInterval(renderAll, 30000); // mantém os cronômetros correndo
+async function iniciarApp(){
+  popularFiltroLinha();
+  await carregarDadosIniciais(); // busca PENDENCIAS, ciclos de banho e químico do Supabase (se conectado)
+  renderAll();
+  renderQuimicos();
+  renderParametros();
+  renderParamsQuimicos();
+  configurarRealtime(); // outras telas conectadas atualizam sozinhas a partir daqui
+  setInterval(renderAll, 30000); // mantém os cronômetros correndo
+}
+iniciarApp();
 </script>
 </body>
 </html>
