@@ -1738,34 +1738,41 @@ function buildTvGraficosHTML(){
 }
 
 // Quando as linhas têm faixas diferentes pro mesmo elemento, usa a de maior amplitude (max-min)
-function faixaMaiorAmplitude(elemento){
-  let melhor = null, melhorAmp = -1;
+function hexParaRgba(hex, alpha){
+  const h = hex.replace('#','');
+  const r = parseInt(h.substring(0,2),16), g = parseInt(h.substring(2,4),16), b = parseInt(h.substring(4,6),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// Uma banda por linha (cor da linha), pra ver onde as faixas coincidem e onde divergem
+function faixasPorLinha(elemento){
+  const bandas = [];
   LINHAS.forEach(l=>{
     const faixa = (FAIXAS_QUIMICAS[l.id] || {})[elemento];
     if (!faixa) return;
     const [min, max] = faixa;
-    if (min == null || max == null) return; // precisa dos dois limites pra desenhar a banda
-    const amp = max - min;
-    if (amp > melhorAmp){ melhorAmp = amp; melhor = [min, max]; }
+    if (min == null || max == null) return; // precisa dos dois limites pra desenhar
+    bandas.push({ linhaId: l.id, min, max, color: LINHA_COR[l.id] });
   });
-  return melhor;
+  return bandas;
 }
 
-// Plugin próprio do Chart.js — pinta a banda de referência (faixa aceitável) atrás da linha
+// Plugin próprio do Chart.js — pinta uma banda por linha atrás da linha do gráfico;
+// onde bandas de linhas diferentes se sobrepõem, as cores se misturam naturalmente
+// (transparência empilhada), mostrando visualmente onde as faixas coincidem ou não
 const faixaBandPlugin = {
   id: 'faixaBand',
   beforeDraw(chart){
     const opts = chart.options.plugins && chart.options.plugins.faixaBand;
-    if (!opts || opts.min == null || opts.max == null) return;
+    if (!opts || !opts.bandas || !opts.bandas.length) return;
     const { ctx, chartArea, scales } = chart;
-    const yTop = scales.y.getPixelForValue(opts.max);
-    const yBottom = scales.y.getPixelForValue(opts.min);
     ctx.save();
-    ctx.fillStyle = 'rgba(31,157,85,0.12)';
-    ctx.fillRect(chartArea.left, yTop, chartArea.right - chartArea.left, yBottom - yTop);
-    ctx.strokeStyle = 'rgba(31,157,85,0.35)';
-    ctx.setLineDash([4,3]);
-    ctx.strokeRect(chartArea.left, yTop, chartArea.right - chartArea.left, yBottom - yTop);
+    opts.bandas.forEach(b=>{
+      const yTop = scales.y.getPixelForValue(b.max);
+      const yBottom = scales.y.getPixelForValue(b.min);
+      ctx.fillStyle = hexParaRgba(b.color, 0.16);
+      ctx.fillRect(chartArea.left, yTop, chartArea.right - chartArea.left, yBottom - yTop);
+    });
     ctx.restore();
   }
 };
@@ -1787,7 +1794,7 @@ function initGraficosCharts(){
 
     // só entram as linhas que realmente têm esse elemento (Sn é só linha1/2, Zn só linha3, por ex.)
     const linhasComEsseElemento = LINHAS.filter(l => (ELEMENTOS_QUIMICOS[l.id]||[]).includes(elemento));
-    const faixaRef = faixaMaiorAmplitude(elemento); // [min,max] ou null
+    const bandas = faixasPorLinha(elemento);
 
     const datasets = linhasComEsseElemento.map(linha=>{
       const porData = {};
@@ -1803,11 +1810,13 @@ function initGraficosCharts(){
       };
     });
 
-    // eixo Y precisa enxergar a faixa inteira, mesmo que os pontos fiquem todos dentro dela
+    // eixo Y precisa enxergar todas as bandas inteiras, mesmo que os pontos fiquem dentro delas
     let yMin, yMax;
-    if (faixaRef){
-      const folga = (faixaRef[1] - faixaRef[0]) * 0.15 || 1;
-      yMin = faixaRef[0] - folga; yMax = faixaRef[1] + folga;
+    if (bandas.length){
+      const minGlobal = Math.min(...bandas.map(b=>b.min));
+      const maxGlobal = Math.max(...bandas.map(b=>b.max));
+      const folga = (maxGlobal - minGlobal) * 0.15 || 1;
+      yMin = minGlobal - folga; yMax = maxGlobal + folga;
     }
 
     TV_CHART_INSTANCES.push(new Chart(canvas.getContext('2d'), {
@@ -1823,7 +1832,7 @@ function initGraficosCharts(){
             color: ctx => ctx.dataset.borderColor,
             formatter: v => v==null ? '' : v,
           },
-          faixaBand: faixaRef ? { min: faixaRef[0], max: faixaRef[1] } : null,
+          faixaBand: { bandas },
         },
         scales: {
           y: { beginAtZero:false, suggestedMin: yMin, suggestedMax: yMax, ticks:{ font:{size:9} } },
