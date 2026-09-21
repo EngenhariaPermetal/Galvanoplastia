@@ -241,7 +241,10 @@
   .camada-grid th, .camada-grid td{padding:3px; text-align:center;}
   .camada-grid th{font-size:10.5px; color:var(--ink-faint); font-weight:600;}
   .camada-grid td:first-child{font-size:10.5px; color:var(--ink-soft); font-weight:600; text-align:left; white-space:nowrap; padding-right:6px;}
-  .camada-cell{width:52px; padding:5px 3px; border:1px solid var(--hairline); border-radius:6px; font-family:'IBM Plex Mono',monospace; font-size:12px; text-align:center;}
+  .camada-cell{width:64px; padding:4px 3px; border:1px solid var(--hairline); border-radius:6px; font-family:'IBM Plex Mono',monospace; font-size:11.5px; text-align:center;}
+  .camada-cell-pair{display:flex; flex-direction:column; gap:3px;}
+  .camada-cell-pair .liga-cell{width:64px; padding:4px 3px; border:1px solid var(--brass); border-radius:6px; font-family:'IBM Plex Mono',monospace; font-size:11.5px; text-align:center; background:rgba(176,141,87,0.06);}
+  .camada-cell-solo{margin:14px 0;}
   .camada-cell:focus{outline:2px solid var(--brass); border-color:var(--brass);}
   .camada-media{margin-top:10px; font-size:13px; font-weight:700; text-align:right; color:var(--brass-deep);}
   .camada-grid tfoot td{border-top:2px solid var(--hairline); padding-top:6px; font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:11px; color:var(--brass-deep);}
@@ -456,11 +459,11 @@
     <p class="modal-desc" id="reModalDesc">—</p>
     <input type="text" id="reModalInput" placeholder="Seu RE (4 dígitos)" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off">
     <div id="reModalCamadaWrap" style="display:none;">
-      <div class="camada-titulo">Camada em mícrons — 5 amostras × 6 tambores</div>
+      <div class="camada-titulo">Liga (%) nas 3 primeiras amostras + Camada (µm) nas 5 — 6 tambores</div>
       <div class="camada-grid-scroll">
         <table class="camada-grid" id="camadaGrid"></table>
       </div>
-      <div class="camada-media">Média: <span id="camadaMediaValor">—</span> µm</div>
+      <div class="camada-media">Média Liga: <span id="ligaMediaValor">—</span> % &nbsp;·&nbsp; Média Camada: <span id="camadaMediaValor">—</span> µm</div>
     </div>
     <div class="modal-error" id="reModalError"></div>
     <div class="modal-actions">
@@ -653,7 +656,7 @@ function configurarRealtime(){
 /* =========================================================================
    MODAL — confirmar pendência digitando o RE (rastreabilidade)
    ========================================================================= */
-const CAMADA_TAMBORES = 6, CAMADA_AMOSTRAS = 5; // 5 amostras x 6 tambores = 30 medições
+const CAMADA_TAMBORES = 6, CAMADA_AMOSTRAS = 5, LIGA_AMOSTRAS = 3; // liga só nas 3 primeiras amostras de cada tambor
 (function construirGradeCamada(){
   const grid = document.getElementById('camadaGrid');
   let thead = '<thead><tr><th></th>';
@@ -663,37 +666,60 @@ const CAMADA_TAMBORES = 6, CAMADA_AMOSTRAS = 5; // 5 amostras x 6 tambores = 30 
   for (let a=1; a<=CAMADA_AMOSTRAS; a++){
     tbody += `<tr><td>Amostra ${String(a).padStart(2,'0')}</td>`;
     for (let t=1; t<=CAMADA_TAMBORES; t++){
-      tbody += `<td><input type="number" step="0.1" class="camada-cell" data-amostra="${a}" data-tambor="${t}"></td>`;
+      if (a <= LIGA_AMOSTRAS){
+        tbody += `<td><div class="camada-cell-pair">
+          <input type="number" step="0.1" class="liga-cell" data-amostra="${a}" data-tambor="${t}" placeholder="Liga %">
+          <input type="number" step="0.1" class="camada-cell" data-amostra="${a}" data-tambor="${t}" placeholder="Camada µm">
+        </div></td>`;
+      } else {
+        tbody += `<td><input type="number" step="0.1" class="camada-cell camada-cell-solo" data-amostra="${a}" data-tambor="${t}" placeholder="Camada µm"></td>`;
+      }
     }
     tbody += '</tr>';
   }
   tbody += '</tbody>';
-  let tfoot = '<tfoot><tr><td>Média</td>';
+  let tfoot = '<tfoot>';
+  tfoot += '<tr><td>Média Liga</td>';
+  for (let t=1; t<=CAMADA_TAMBORES; t++) tfoot += `<td class="camada-media-tambor" id="ligaMediaT${t}">—</td>`;
+  tfoot += '</tr>';
+  tfoot += '<tr><td>Média Camada</td>';
   for (let t=1; t<=CAMADA_TAMBORES; t++) tfoot += `<td class="camada-media-tambor" id="camadaMediaT${t}">—</td>`;
-  tfoot += '</tr></tfoot>';
+  tfoot += '</tr>';
+  tfoot += '</tfoot>';
   grid.innerHTML = thead + tbody + tfoot;
-  grid.querySelectorAll('.camada-cell').forEach(inp=>{
+  grid.querySelectorAll('.camada-cell, .liga-cell').forEach(inp=>{
     inp.addEventListener('input', atualizarMediaCamada);
   });
 })();
 
 function atualizarMediaCamada(){
-  const inputs = Array.from(document.querySelectorAll('.camada-cell'));
-  const valores = inputs.map(i=>parseFloat(i.value)).filter(v=>!isNaN(v));
-  const media = valores.length ? valores.reduce((a,b)=>a+b,0) / valores.length : null;
-  document.getElementById('camadaMediaValor').textContent = media==null ? '—' : media.toFixed(2);
+  const camadaInputs = Array.from(document.querySelectorAll('.camada-cell'));
+  const ligaInputs = Array.from(document.querySelectorAll('.liga-cell'));
+
+  const valoresCamada = camadaInputs.map(i=>parseFloat(i.value)).filter(v=>!isNaN(v));
+  const mediaCamada = valoresCamada.length ? valoresCamada.reduce((a,b)=>a+b,0) / valoresCamada.length : null;
+  document.getElementById('camadaMediaValor').textContent = mediaCamada==null ? '—' : mediaCamada.toFixed(2);
+
+  const valoresLiga = ligaInputs.map(i=>parseFloat(i.value)).filter(v=>!isNaN(v));
+  const mediaLiga = valoresLiga.length ? valoresLiga.reduce((a,b)=>a+b,0) / valoresLiga.length : null;
+  document.getElementById('ligaMediaValor').textContent = mediaLiga==null ? '—' : mediaLiga.toFixed(2);
 
   for (let t=1; t<=CAMADA_TAMBORES; t++){
-    const valoresTambor = inputs
-      .filter(i => Number(i.dataset.tambor) === t)
-      .map(i => parseFloat(i.value))
-      .filter(v => !isNaN(v));
-    const mediaTambor = valoresTambor.length ? valoresTambor.reduce((a,b)=>a+b,0) / valoresTambor.length : null;
-    const el = document.getElementById('camadaMediaT'+t);
-    if (el) el.textContent = mediaTambor==null ? '—' : mediaTambor.toFixed(2);
+    const valoresTamborCamada = camadaInputs.filter(i => Number(i.dataset.tambor) === t).map(i => parseFloat(i.value)).filter(v => !isNaN(v));
+    const mediaTamborCamada = valoresTamborCamada.length ? valoresTamborCamada.reduce((a,b)=>a+b,0) / valoresTamborCamada.length : null;
+    const elC = document.getElementById('camadaMediaT'+t);
+    if (elC) elC.textContent = mediaTamborCamada==null ? '—' : mediaTamborCamada.toFixed(2);
+
+    const valoresTamborLiga = ligaInputs.filter(i => Number(i.dataset.tambor) === t).map(i => parseFloat(i.value)).filter(v => !isNaN(v));
+    const mediaTamborLiga = valoresTamborLiga.length ? valoresTamborLiga.reduce((a,b)=>a+b,0) / valoresTamborLiga.length : null;
+    const elL = document.getElementById('ligaMediaT'+t);
+    if (elL) elL.textContent = mediaTamborLiga==null ? '—' : mediaTamborLiga.toFixed(2);
   }
 
-  return { valores, media, completo: valores.length === CAMADA_TAMBORES*CAMADA_AMOSTRAS };
+  return {
+    valoresCamada, mediaCamada, completoCamada: valoresCamada.length === CAMADA_TAMBORES*CAMADA_AMOSTRAS,
+    valoresLiga, mediaLiga, completoLiga: valoresLiga.length === CAMADA_TAMBORES*LIGA_AMOSTRAS,
+  };
 }
 
 let _reModalResolve = null;
@@ -706,9 +732,9 @@ function pedirConfirmacaoRE(descricao, opcoes){
     document.getElementById('reModalError').textContent = '';
     const campoCamada = document.getElementById('reModalCamadaWrap');
     campoCamada.style.display = opcoes.pedirCamada ? 'block' : 'none';
-    document.getElementById('reModalBox').style.maxWidth = opcoes.pedirCamada ? '560px' : '380px';
+    document.getElementById('reModalBox').style.maxWidth = opcoes.pedirCamada ? '600px' : '380px';
     if (opcoes.pedirCamada){
-      document.querySelectorAll('.camada-cell').forEach(i=>i.value='');
+      document.querySelectorAll('.camada-cell, .liga-cell').forEach(i=>i.value='');
       atualizarMediaCamada();
     }
     document.getElementById('reModalOverlay').style.display = 'flex';
@@ -724,19 +750,20 @@ document.getElementById('reModalConfirm').addEventListener('click', async ()=>{
   const re = document.getElementById('reModalInput').value.trim();
   const errEl = document.getElementById('reModalError');
   const pedeCamada = document.getElementById('reModalCamadaWrap').style.display !== 'none';
-  let camada = null, camadaValores = null;
+  let camada = null, camadaValores = null, liga = null, ligaValores = null;
   if (pedeCamada){
-    const { valores, media, completo } = atualizarMediaCamada();
-    if (!completo){ errEl.textContent = `Preencha as 30 medições (faltam ${30 - valores.length}).`; return; }
-    camada = media;
-    camadaValores = valores;
+    const { valoresCamada, mediaCamada, completoCamada, valoresLiga, mediaLiga, completoLiga } = atualizarMediaCamada();
+    if (!completoLiga){ errEl.textContent = `Preencha as 18 medições de liga (faltam ${18 - valoresLiga.length}).`; return; }
+    if (!completoCamada){ errEl.textContent = `Preencha as 30 medições de camada (faltam ${30 - valoresCamada.length}).`; return; }
+    camada = mediaCamada; camadaValores = valoresCamada;
+    liga = mediaLiga; ligaValores = valoresLiga;
   }
   if (!re || re.length !== 4){ errEl.textContent = 'Digite os 4 dígitos do seu RE.'; return; }
-  if (!sb){ fecharReModal({ re, camada, camadaValores }); return; } // sem conexão Supabase, só segue com o RE digitado
+  if (!sb){ fecharReModal({ re, camada, camadaValores, liga, ligaValores }); return; } // sem conexão Supabase, só segue com o RE digitado
   errEl.textContent = 'Verificando…';
   const { data, error } = await sb.from('colaboradores').select('re,nome').eq('re', re).eq('ativo', true).maybeSingle();
   if (error || !data){ errEl.textContent = 'RE não encontrado ou inativo.'; return; }
-  fecharReModal({ ...data, camada, camadaValores });
+  fecharReModal({ ...data, camada, camadaValores, liga, ligaValores });
 });
 document.getElementById('reModalInput').addEventListener('keydown', e=>{ if (e.key==='Enter') document.getElementById('reModalConfirm').click(); });
 document.getElementById('reModalInput').addEventListener('input', e=>{ e.target.value = e.target.value.replace(/\D/g,'').slice(0,4); });
@@ -885,8 +912,14 @@ LINHAS.forEach(l=>{ BANHO_INICIO[l.id]={}; BANHO_TOTAL_INICIO[l.id]={}; BANHO_AM
    momento do clique — ou seja, nenhuma amostra desde o último START.
    ========================================================================= */
 let ESPECIFICACAO_DISCO = {}; // por linha — configurável em Parâmetros (µm)
+let ESPECIFICACAO_LIGA = {};  // por linha+banho — % da liga esperada no revestimento (mock, ainda não grava no Supabase)
 let BANHO_SAIDA_CALC = {};    // por linha+banho — horário calculado (ISO) ou null
-LINHAS.forEach(l=>{ ESPECIFICACAO_DISCO[l.id] = null; BANHO_SAIDA_CALC[l.id] = {}; BANHOS.forEach(b=>{ BANHO_SAIDA_CALC[l.id][b] = null; }); });
+LINHAS.forEach(l=>{
+  ESPECIFICACAO_DISCO[l.id] = null;
+  ESPECIFICACAO_LIGA[l.id] = {};
+  BANHO_SAIDA_CALC[l.id] = {};
+  BANHOS.forEach(b=>{ ESPECIFICACAO_LIGA[l.id][b] = null; BANHO_SAIDA_CALC[l.id][b] = null; });
+});
 
 function fmtHoraRelogio(iso){
   return new Date(iso).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
@@ -1219,7 +1252,7 @@ async function resetBanhoPorClique(linhaId, banho){
     amostras_contador: BANHO_AMOSTRAS[linhaId][banho],
     saida_calculada: BANHO_SAIDA_CALC[linhaId][banho],
   }).eq('linha_id', linhaId).eq('banho', banho).then();
-  registrarAcaoSupabase(col.re, 'coleta_amostra', linhaId, banho, null, col.camada ? { camada_media: col.camada, camada_valores: col.camadaValores, primeira_amostra: ehPrimeiraAmostra } : null);
+  registrarAcaoSupabase(col.re, 'coleta_amostra', linhaId, banho, null, col.camada ? { camada_media: col.camada, camada_valores: col.camadaValores, liga_media: col.liga, liga_valores: col.ligaValores, primeira_amostra: ehPrimeiraAmostra } : null);
   renderAll();
 }
 async function iniciarBanhoPorClique(linhaId, banho){
@@ -1528,7 +1561,8 @@ function renderParametros(){
         const p = pendenciaDoBanho(linha.id, banho, etapa.item);
         return `<td>${etapa.item}: <input type="number" min="0" step="0.5" class="param-input" data-param data-linha="${linha.id}" data-banho="${banho}" data-item="${etapa.item}" data-kind="horas" value="${p.limiteHoras}"></td>`;
       }).join('');
-      return `<tr><td>${banho}</td>${campos}</tr>`;
+      const campoLiga = `<td><input type="number" min="0" step="0.1" class="param-input" data-espec-liga data-linha="${linha.id}" data-banho="${banho}" value="${ESPECIFICACAO_LIGA[linha.id][banho] ?? ''}" placeholder="%" style="width:70px;"></td>`;
+      return `<tr><td>${banho}</td>${campos}${campoLiga}</tr>`;
     }).join('');
 
     // fazenda de tanques da linha
@@ -1556,7 +1590,7 @@ function renderParametros(){
         </div>
         <div class="param-subtitle">Por banho</div>
         <table class="data-table param-table">
-          <thead><tr><th>Banho</th><th>Granalha</th><th>Limpeza de contato</th></tr></thead>
+          <thead><tr><th>Banho</th><th>Granalha</th><th>Limpeza de contato</th><th>Especif. Liga (%)</th></tr></thead>
           <tbody>${linhasBanho}</tbody>
         </table>
         <div class="param-subtitle">Tanques da linha</div>
@@ -1578,6 +1612,13 @@ function renderParametros(){
       if (sb && !isNaN(v)){
         sb.from('config_geral').upsert({ chave: 'especificacao_disco_'+linhaId, valor: String(v) }, { onConflict:'chave' }).then();
       }
+    });
+  });
+  wrap.querySelectorAll('[data-espec-liga]').forEach(el=>{
+    el.addEventListener('change', ()=>{
+      const v = parseFloat(el.value);
+      ESPECIFICACAO_LIGA[el.dataset.linha][el.dataset.banho] = isNaN(v) ? null : v;
+      // mock por enquanto — mesma lógica que a especificação do disco tinha antes de validar
     });
   });
 }
