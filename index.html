@@ -204,6 +204,19 @@
   .quimicos-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:16px;}
   .quimico-card{padding:18px;}
   .quimico-save-msg{font-size:12px; color:var(--ok); margin-top:6px; text-align:center; min-height:16px;}
+  .interv-info{font-size:10.5px; color:var(--ink-soft); line-height:1.35; max-width:170px;}
+  .interv-porque{color:var(--ink-faint); font-style:italic;}
+  .interv-vazio{font-size:10.5px; color:var(--ink-faint); font-style:italic;}
+  .interv-btn{margin-top:4px; margin-right:4px; font-size:10.5px; font-weight:700; color:var(--brass-deep); background:none; border:1px solid var(--brass); border-radius:8px; padding:3px 8px; cursor:pointer;}
+  .interv-btn:hover{background:rgba(176,141,87,0.1);}
+  .interv-btn-secundario{color:var(--ink-soft); border-color:var(--hairline);}
+  .interv-btn-secundario:hover{background:var(--surface-warm);}
+  .relatorio-lista{max-height:50vh; overflow-y:auto; display:flex; flex-direction:column; gap:10px; margin:10px 0;}
+  .relatorio-item{border:1px solid var(--hairline); border-radius:10px; padding:10px 12px; background:var(--surface-warm);}
+  .relatorio-item-data{font-size:11.5px; font-weight:700; color:var(--brass-deep);}
+  .relatorio-item-acao{font-size:13px; margin:3px 0;}
+  .relatorio-item-porque{font-size:12px; color:var(--ink-soft); font-style:italic;}
+  .relatorio-vazio{font-size:13px; color:var(--ink-faint); text-align:center; padding:30px 0;}
   .quimico-card .param-table td{padding:8px 10px;}
   @media (max-width:900px){ .quimicos-grid{grid-template-columns:1fr;} }
 
@@ -247,6 +260,8 @@
   .camada-cell-solo{margin:14px 0;}
   .camada-cell:focus{outline:2px solid var(--brass); border-color:var(--brass);}
   .camada-media{margin-top:10px; font-size:13px; font-weight:700; text-align:right; color:var(--brass-deep);}
+  #reModalTexto{width:100%; font-family:'Inter',sans-serif; font-size:13px; padding:10px 12px; border:1px solid var(--hairline); border-radius:10px; resize:vertical; margin-top:2px;}
+  #reModalTexto:focus{outline:2px solid var(--brass); border-color:var(--brass);}
   .camada-grid tfoot td{border-top:2px solid var(--hairline); padding-top:6px; font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:11px; color:var(--brass-deep);}
   .camada-grid tfoot td:first-child{font-family:'Inter',sans-serif; font-weight:700; color:var(--ink-soft); font-size:10.5px;}
 
@@ -452,6 +467,19 @@
 
 </main>
 
+<!-- Modal: relatório de intervenções (histórico completo por linha+elemento) -->
+<div class="modal-overlay" id="relatorioModalOverlay">
+  <div class="modal-box" id="relatorioModalBox" style="max-width:560px;">
+    <h3 id="relatorioModalTitulo">Relatório</h3>
+    <p class="modal-desc" id="relatorioModalSub">—</p>
+    <div id="relatorioModalLista" class="relatorio-lista"></div>
+    <div class="modal-actions">
+      <button class="btn" id="relatorioModalFechar">Fechar</button>
+      <button class="btn primary" id="relatorioModalImprimir">Imprimir</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: confirmar pendência digitando o RE -->
 <div class="modal-overlay" id="reModalOverlay">
   <div class="modal-box" id="reModalBox">
@@ -464,6 +492,10 @@
         <table class="camada-grid" id="camadaGrid"></table>
       </div>
       <div class="camada-media">Média Liga: <span id="ligaMediaValor">—</span> % &nbsp;·&nbsp; Média Camada: <span id="camadaMediaValor">—</span> µm</div>
+    </div>
+    <div id="reModalTextoWrap" style="display:none;">
+      <label class="camada-titulo" for="reModalTexto">Ação tomada</label>
+      <textarea id="reModalTexto" rows="3" placeholder="Ex: Adicionado 50kg de Cu"></textarea>
     </div>
     <div class="modal-error" id="reModalError"></div>
     <div class="modal-actions">
@@ -513,12 +545,13 @@ const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE
 async function carregarDadosIniciais(){
   if (!sb) return; // sem Supabase configurado — mantém tudo vazio/default
 
-  const [pend, banho, faixas, leituras, config] = await Promise.all([
+  const [pend, banho, faixas, leituras, config, intervencoes] = await Promise.all([
     sb.from('pendencias_rotina').select('*'),
     sb.from('banho_ciclos').select('*'),
     sb.from('parametros_quimicos').select('*'),
     sb.from('leituras_quimicas').select('*').order('criado_em', { ascending:false }),
     sb.from('config_geral').select('*'),
+    sb.from('intervencoes_quimicas').select('*, colaboradores(nome)').order('criado_em', { ascending:false }),
   ]);
 
   PENDENCIAS = (pend.data || []).map(r => ({
@@ -576,6 +609,21 @@ async function carregarDadosIniciais(){
       const linhaId = r.chave.replace('especificacao_disco_', '');
       ESPECIFICACAO_DISCO[linhaId] = Number(r.valor);
     }
+  });
+
+  // intervenções vêm ordenadas da mais nova pra mais velha — a primeira de
+  // cada linha+elemento que encontrarmos é a "última correção"
+  const vistosInterv = new Set();
+  (intervencoes.data || []).forEach(r => {
+    const chave = r.linha_id + '|' + r.elemento;
+    if (vistosInterv.has(chave)) return;
+    vistosInterv.add(chave);
+    if (!ULTIMA_INTERVENCAO[r.linha_id]) ULTIMA_INTERVENCAO[r.linha_id] = {};
+    ULTIMA_INTERVENCAO[r.linha_id][r.elemento] = {
+      descricao: r.descricao, colaboradorRe: r.colaborador_re,
+      nome: r.colaboradores?.nome || r.colaborador_re, criadoEm: r.criado_em,
+      valorNoMomento: r.valor_no_momento, faixaMin: r.faixa_min, faixaMax: r.faixa_max,
+    };
   });
 }
 
@@ -636,6 +684,21 @@ function configurarRealtime(){
       if (!r) return;
       if (!LEITURAS_QUIMICAS[r.linha_id]) LEITURAS_QUIMICAS[r.linha_id] = {};
       LEITURAS_QUIMICAS[r.linha_id][r.elemento] = Number(r.valor);
+      renderQuimicos();
+      if (document.body.classList.contains('tv-active')) renderTvScreens();
+    })
+    .subscribe();
+
+  sb.channel('realtime-intervencoes-quimicas')
+    .on('postgres_changes', { event:'INSERT', schema:'public', table:'intervencoes_quimicas' }, payload => {
+      const r = payload.new;
+      if (!r) return;
+      if (!ULTIMA_INTERVENCAO[r.linha_id]) ULTIMA_INTERVENCAO[r.linha_id] = {};
+      ULTIMA_INTERVENCAO[r.linha_id][r.elemento] = {
+        descricao: r.descricao, colaboradorRe: r.colaborador_re,
+        nome: r.colaborador_re, criadoEm: r.criado_em,
+        valorNoMomento: r.valor_no_momento, faixaMin: r.faixa_min, faixaMax: r.faixa_max,
+      };
       renderQuimicos();
       if (document.body.classList.contains('tv-active')) renderTvScreens();
     })
@@ -732,7 +795,10 @@ function pedirConfirmacaoRE(descricao, opcoes){
     document.getElementById('reModalError').textContent = '';
     const campoCamada = document.getElementById('reModalCamadaWrap');
     campoCamada.style.display = opcoes.pedirCamada ? 'block' : 'none';
-    document.getElementById('reModalBox').style.maxWidth = opcoes.pedirCamada ? '600px' : '380px';
+    const campoTexto = document.getElementById('reModalTextoWrap');
+    campoTexto.style.display = opcoes.pedirTexto ? 'block' : 'none';
+    document.getElementById('reModalTexto').value = '';
+    document.getElementById('reModalBox').style.maxWidth = opcoes.pedirCamada ? '600px' : opcoes.pedirTexto ? '440px' : '380px';
     if (opcoes.pedirCamada){
       document.querySelectorAll('.camada-cell, .liga-cell').forEach(i=>i.value='');
       atualizarMediaCamada();
@@ -750,7 +816,8 @@ document.getElementById('reModalConfirm').addEventListener('click', async ()=>{
   const re = document.getElementById('reModalInput').value.trim();
   const errEl = document.getElementById('reModalError');
   const pedeCamada = document.getElementById('reModalCamadaWrap').style.display !== 'none';
-  let camada = null, camadaValores = null, liga = null, ligaValores = null;
+  const pedeTexto = document.getElementById('reModalTextoWrap').style.display !== 'none';
+  let camada = null, camadaValores = null, liga = null, ligaValores = null, texto = null;
   if (pedeCamada){
     const { valoresCamada, mediaCamada, completoCamada, valoresLiga, mediaLiga, completoLiga } = atualizarMediaCamada();
     if (!completoLiga){ errEl.textContent = `Preencha as 18 medições de liga (faltam ${18 - valoresLiga.length}).`; return; }
@@ -758,12 +825,16 @@ document.getElementById('reModalConfirm').addEventListener('click', async ()=>{
     camada = mediaCamada; camadaValores = valoresCamada;
     liga = mediaLiga; ligaValores = valoresLiga;
   }
+  if (pedeTexto){
+    texto = document.getElementById('reModalTexto').value.trim();
+    if (!texto){ errEl.textContent = 'Descreva a ação tomada.'; return; }
+  }
   if (!re || re.length !== 4){ errEl.textContent = 'Digite os 4 dígitos do seu RE.'; return; }
-  if (!sb){ fecharReModal({ re, camada, camadaValores, liga, ligaValores }); return; } // sem conexão Supabase, só segue com o RE digitado
+  if (!sb){ fecharReModal({ re, camada, camadaValores, liga, ligaValores, texto }); return; } // sem conexão Supabase, só segue com o RE digitado
   errEl.textContent = 'Verificando…';
   const { data, error } = await sb.from('colaboradores').select('re,nome').eq('re', re).eq('ativo', true).maybeSingle();
   if (error || !data){ errEl.textContent = 'RE não encontrado ou inativo.'; return; }
-  fecharReModal({ ...data, camada, camadaValores, liga, ligaValores });
+  fecharReModal({ ...data, camada, camadaValores, liga, ligaValores, texto });
 });
 document.getElementById('reModalInput').addEventListener('keydown', e=>{ if (e.key==='Enter') document.getElementById('reModalConfirm').click(); });
 document.getElementById('reModalInput').addEventListener('input', e=>{ e.target.value = e.target.value.replace(/\D/g,'').slice(0,4); });
@@ -954,7 +1025,9 @@ let FAIXAS_QUIMICAS = {};
 let LEITURAS_QUIMICAS = {};
 // Histórico completo por dia — HISTORICO_QUIMICO[linha][elemento] = [{data:'AAAA-MM-DD', valor}, ...] ascendente
 let HISTORICO_QUIMICO = {};
-LINHAS.forEach(l=>{ FAIXAS_QUIMICAS[l.id]={}; LEITURAS_QUIMICAS[l.id]={}; HISTORICO_QUIMICO[l.id]={}; });
+// Última correção registrada por linha+elemento — { descricao, colaborador_re, nome, criado_em } ou null
+let ULTIMA_INTERVENCAO = {};
+LINHAS.forEach(l=>{ FAIXAS_QUIMICAS[l.id]={}; LEITURAS_QUIMICAS[l.id]={}; HISTORICO_QUIMICO[l.id]={}; ULTIMA_INTERVENCAO[l.id]={}; });
 
 function statusQuimico(valor, faixa){
   if (valor===null || valor===undefined || valor==='' || isNaN(valor)) return 'vazio';
@@ -1382,6 +1455,20 @@ function renderApoioStrip(){
    RENDER — controle químico do banho (Cu/KCN/Sn.../PH/Temp), reaproveitado
    no Painel e no Modo TV. Digitar um valor fora da faixa faz a linha piscar.
    ========================================================================= */
+function fmtDataHoraCurtaBR(iso){
+  const d = new Date(iso);
+  return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) + ' ' + d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+}
+
+function fmtPorque(valorNoMomento, faixaMin, faixaMax){
+  const valorTxt = valorNoMomento!=null ? valorNoMomento : '—';
+  if (faixaMin==null && faixaMax==null) return `Sem faixa de referência definida no momento (estava ${valorTxt})`;
+  const faixaTxt = (faixaMin!=null && faixaMax!=null) ? `${faixaMin}–${faixaMax}`
+                  : faixaMax!=null ? `até ${faixaMax}`
+                  : `a partir de ${faixaMin}`;
+  return `Especificado ${faixaTxt}, estava ${valorTxt}`;
+}
+
 function buildQuimicosHTML(){
   return LINHAS.map(linha=>{
     const elementos = ELEMENTOS_QUIMICOS[linha.id];
@@ -1394,19 +1481,28 @@ function buildQuimicosHTML(){
                   : st==='na'   ? '<span class="badge evento">Sem referência</span>'
                   : st==='vazio'? '<span class="badge evento">—</span>'
                   : '<span class="badge ok">OK</span>';
+      const interv = ULTIMA_INTERVENCAO[linha.id]?.[el];
+      const intervHTML = interv
+        ? `<div class="interv-info" title="${interv.descricao.replace(/"/g,'&quot;')}">${fmtDataHoraCurtaBR(interv.criadoEm)} · ${interv.nome}<br>${interv.descricao}<br><span class="interv-porque">${fmtPorque(interv.valorNoMomento, interv.faixaMin, interv.faixaMax)}</span></div>`
+        : `<div class="interv-vazio">Nenhuma correção registrada</div>`;
       return `
         <tr class="${rowClass}">
           <td>${el}</td>
           <td><input type="number" step="0.01" class="param-input quimico-input" data-linha="${linha.id}" data-elemento="${el}" value="${valor ?? ''}" style="width:78px;"></td>
           <td class="mono">${fmtFaixa(faixa)}</td>
           <td>${badge}</td>
+          <td>
+            ${intervHTML}
+            <button class="interv-btn" data-registrar-intervencao data-linha="${linha.id}" data-elemento="${el}" title="Registrar correção">🛠 Registrar</button>
+            <button class="interv-btn interv-btn-secundario" data-relatorio-intervencao data-linha="${linha.id}" data-elemento="${el}" title="Ver histórico completo">📄 Relatório</button>
+          </td>
         </tr>`;
     }).join('');
     return `
       <div class="card quimico-card">
         <h3 class="param-card-title">${linha.nome}<span class="param-liga">${linha.liga}</span></h3>
         <table class="data-table param-table">
-          <thead><tr><th>Elemento</th><th>Valor</th><th>Faixa</th><th>Status</th></tr></thead>
+          <thead><tr><th>Elemento</th><th>Valor</th><th>Faixa</th><th>Status</th><th>Última correção</th></tr></thead>
           <tbody>${linhasHTML}</tbody>
         </table>
         <button class="btn primary small" data-salvar-quimico="${linha.id}" style="margin-top:12px; width:100%;">Salvar leituras de hoje</button>
@@ -1416,6 +1512,33 @@ function buildQuimicosHTML(){
 }
 
 function attachQuimicoHandlers(container){
+  container.querySelectorAll('[data-registrar-intervencao]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const linhaId = btn.dataset.linha, elemento = btn.dataset.elemento;
+      const nomeLinha = ESCOPOS[linhaId] || linhaId;
+      const col = await pedirConfirmacaoRE(`Registrar correção de ${elemento} — ${nomeLinha}. Digite seu RE:`, { pedirTexto: true });
+      if (!col) return;
+      const agora = new Date().toISOString();
+      // captura o "porquê" automaticamente — valor e faixa vigentes agora mesmo, sem precisar digitar de novo
+      const valorNoMomento = LEITURAS_QUIMICAS[linhaId]?.[elemento] ?? null;
+      const [faixaMin, faixaMax] = FAIXAS_QUIMICAS[linhaId]?.[elemento] || [null, null];
+      ULTIMA_INTERVENCAO[linhaId][elemento] = { descricao: col.texto, colaboradorRe: col.re, nome: col.nome || col.re, criadoEm: agora, valorNoMomento, faixaMin, faixaMax };
+      if (sb){
+        try {
+          await sb.from('intervencoes_quimicas').insert({
+            linha_id: linhaId, elemento, descricao: col.texto, colaborador_re: col.re,
+            valor_no_momento: valorNoMomento, faixa_min: faixaMin, faixa_max: faixaMax,
+          });
+        } catch(e){ console.error('Falha ao gravar intervenção química:', e); }
+      }
+      registrarAcaoSupabase(col.re, 'intervencao_quimica', linhaId, null, elemento, { descricao: col.texto, valor_no_momento: valorNoMomento, faixa_min: faixaMin, faixa_max: faixaMax });
+      renderQuimicos();
+      if (document.body.classList.contains('tv-active')) renderTvScreens();
+    });
+  });
+  container.querySelectorAll('[data-relatorio-intervencao]').forEach(btn=>{
+    btn.addEventListener('click', ()=> abrirRelatorioIntervencoes(btn.dataset.linha, btn.dataset.elemento));
+  });
   container.querySelectorAll('[data-salvar-quimico]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const linhaId = btn.dataset.salvarQuimico;
@@ -1458,6 +1581,66 @@ function attachQuimicoHandlers(container){
       if (document.body.classList.contains('tv-active')) renderTvScreens();
     });
   });
+}
+
+/* =========================================================================
+   RELATÓRIO DE INTERVENÇÕES — histórico completo de um elemento numa linha
+   ========================================================================= */
+async function abrirRelatorioIntervencoes(linhaId, elemento){
+  const nomeLinha = ESCOPOS[linhaId] || linhaId;
+  document.getElementById('relatorioModalTitulo').textContent = `Relatório — ${elemento}`;
+  document.getElementById('relatorioModalSub').textContent = `${nomeLinha} · histórico completo de correções`;
+  const lista = document.getElementById('relatorioModalLista');
+  lista.innerHTML = '<div class="relatorio-vazio">Carregando…</div>';
+  document.getElementById('relatorioModalOverlay').style.display = 'flex';
+
+  let itens = [];
+  if (sb){
+    const { data, error } = await sb.from('intervencoes_quimicas')
+      .select('*, colaboradores(nome)')
+      .eq('linha_id', linhaId).eq('elemento', elemento)
+      .order('criado_em', { ascending:false });
+    if (!error && data) itens = data.map(r => ({
+      descricao: r.descricao, nome: r.colaboradores?.nome || r.colaborador_re, criadoEm: r.criado_em,
+      valorNoMomento: r.valor_no_momento, faixaMin: r.faixa_min, faixaMax: r.faixa_max,
+    }));
+  } else {
+    const u = ULTIMA_INTERVENCAO[linhaId]?.[elemento];
+    if (u) itens = [u];
+  }
+
+  lista.innerHTML = itens.length ? itens.map(it => `
+    <div class="relatorio-item">
+      <div class="relatorio-item-data">${fmtDataHoraCurtaBR(it.criadoEm)} · ${it.nome}</div>
+      <div class="relatorio-item-acao">Ação: ${it.descricao}</div>
+      <div class="relatorio-item-porque">Porquê: ${fmtPorque(it.valorNoMomento, it.faixaMin, it.faixaMax)}</div>
+    </div>`).join('') : '<div class="relatorio-vazio">Nenhuma correção registrada ainda pra este elemento.</div>';
+
+  document.getElementById('relatorioModalImprimir').onclick = () => imprimirRelatorio(nomeLinha, elemento, itens);
+}
+document.getElementById('relatorioModalFechar').addEventListener('click', ()=>{
+  document.getElementById('relatorioModalOverlay').style.display = 'none';
+});
+
+function imprimirRelatorio(nomeLinha, elemento, itens){
+  const linhasHTML = itens.length ? itens.map(it => `
+    <div style="border:1px solid #ddd; border-radius:8px; padding:10px 14px; margin-bottom:10px;">
+      <div style="font-weight:700; color:#8a5a1f;">${fmtDataHoraCurtaBR(it.criadoEm)} · ${it.nome}</div>
+      <div style="margin:4px 0;">Ação: ${it.descricao}</div>
+      <div style="color:#555; font-style:italic;">Porquê: ${fmtPorque(it.valorNoMomento, it.faixaMin, it.faixaMax)}</div>
+    </div>`).join('') : '<p>Nenhuma correção registrada ainda pra este elemento.</p>';
+
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Relatório — ${elemento} · ${nomeLinha}</title>
+    <style>body{font-family:Arial,sans-serif; padding:30px; color:#222;} h1{font-size:20px;} h2{font-size:14px; color:#666; font-weight:normal; margin-top:-8px;}</style>
+    </head><body>
+    <h1>Relatório de correções — ${elemento}</h1>
+    <h2>${nomeLinha} · emitido em ${new Date().toLocaleString('pt-BR')}</h2>
+    ${linhasHTML}
+    </body></html>`);
+  win.document.close();
+  win.focus();
+  win.print();
 }
 
 function renderQuimicos(){
