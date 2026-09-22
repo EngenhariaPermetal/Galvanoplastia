@@ -217,6 +217,22 @@
   .relatorio-item-acao{font-size:13px; margin:3px 0;}
   .relatorio-item-porque{font-size:12px; color:var(--ink-soft); font-style:italic;}
   .relatorio-vazio{font-size:13px; color:var(--ink-faint); text-align:center; padding:30px 0;}
+  .periodo-form{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:6px;}
+  .periodo-form select, .periodo-form input{width:100%; padding:9px 10px; border:1px solid var(--hairline); border-radius:8px; font-family:'Inter',sans-serif; font-size:13px;}
+  .relatorio-elemento-bloco{border:1px solid var(--hairline); border-radius:10px; padding:12px 14px; margin-bottom:10px; background:var(--surface-warm);}
+  .relatorio-elemento-bloco.tem-alerta{border-left:3px solid var(--crit);}
+  .relatorio-elemento-titulo{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14px; display:flex; justify-content:space-between;}
+  .relatorio-elemento-titulo .faixa-ref{font-size:11px; color:var(--ink-faint); font-weight:500;}
+  .relatorio-resumo-linha{margin:6px 0 8px; display:flex; gap:6px; flex-wrap:wrap;}
+  .relatorio-resumo-chip{font-size:10px; font-weight:700; padding:2px 8px; border-radius:20px; background:var(--surface); border:1px solid var(--hairline); color:var(--ink-soft);}
+  .relatorio-resumo-chip.crit{background:rgba(179,49,44,0.08); border-color:rgba(179,49,44,0.3); color:var(--crit);}
+  .relatorio-resumo-chip.brass{background:rgba(176,141,87,0.1); border-color:rgba(176,141,87,0.4); color:var(--brass-deep);}
+  .relatorio-leitura-linha{font-size:12.5px; font-family:'IBM Plex Mono',monospace; margin:4px 0 0; display:flex; justify-content:space-between; align-items:baseline;}
+  .relatorio-leitura-linha.crit{color:var(--crit);}
+  .relatorio-leitura-linha.ok{color:var(--ink-soft);}
+  .relatorio-desvio{font-family:'Inter',sans-serif; font-size:10.5px; font-weight:700;}
+  .relatorio-correcao-linha{font-size:11.5px; color:var(--brass-deep); font-weight:600; margin:4px 0 6px; padding:5px 10px; background:rgba(176,141,87,0.08); border-radius:6px;}
+  .relatorio-sem-registro{font-size:11.5px; color:var(--ink-faint); font-style:italic; margin-top:4px;}
   .quimico-card .param-table td{padding:8px 10px;}
   @media (max-width:900px){ .quimicos-grid{grid-template-columns:1fr;} }
 
@@ -466,6 +482,34 @@
   </div>
 
 </main>
+
+<!-- Modal: relatório por período (linha inteira, todos os elementos, intervalo de datas) -->
+<div class="modal-overlay" id="periodoModalOverlay">
+  <div class="modal-box" id="periodoModalBox" style="max-width:640px;">
+    <h3>Relatório por período</h3>
+    <p class="modal-desc">Escolha a linha e o intervalo de datas — traz todas as leituras e correções registradas.</p>
+    <div class="periodo-form">
+      <div>
+        <label class="camada-titulo">Linha</label>
+        <select id="periodoLinha"></select>
+      </div>
+      <div>
+        <label class="camada-titulo">De</label>
+        <input type="date" id="periodoDataInicio">
+      </div>
+      <div>
+        <label class="camada-titulo">Até</label>
+        <input type="date" id="periodoDataFim">
+      </div>
+    </div>
+    <button class="btn primary" id="periodoGerar" style="width:100%; margin:12px 0;">Gerar relatório</button>
+    <div id="periodoResultado" class="relatorio-lista" style="max-height:45vh;"></div>
+    <div class="modal-actions">
+      <button class="btn" id="periodoModalFechar">Fechar</button>
+      <button class="btn primary" id="periodoModalImprimir" style="display:none;">Imprimir</button>
+    </div>
+  </div>
+</div>
 
 <!-- Modal: relatório de intervenções (histórico completo por linha+elemento) -->
 <div class="modal-overlay" id="relatorioModalOverlay">
@@ -1500,7 +1544,10 @@ function buildQuimicosHTML(){
     }).join('');
     return `
       <div class="card quimico-card">
-        <h3 class="param-card-title">${linha.nome}<span class="param-liga">${linha.liga}</span></h3>
+        <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap;">
+          <h3 class="param-card-title">${linha.nome}<span class="param-liga">${linha.liga}</span></h3>
+          <button class="interv-btn interv-btn-secundario" data-relatorio-periodo data-linha="${linha.id}" title="Relatório de leituras e correções por período">📅 Relatório do período</button>
+        </div>
         <table class="data-table param-table">
           <thead><tr><th>Elemento</th><th>Valor</th><th>Faixa</th><th>Status</th><th>Última correção</th></tr></thead>
           <tbody>${linhasHTML}</tbody>
@@ -1538,6 +1585,9 @@ function attachQuimicoHandlers(container){
   });
   container.querySelectorAll('[data-relatorio-intervencao]').forEach(btn=>{
     btn.addEventListener('click', ()=> abrirRelatorioIntervencoes(btn.dataset.linha, btn.dataset.elemento));
+  });
+  container.querySelectorAll('[data-relatorio-periodo]').forEach(btn=>{
+    btn.addEventListener('click', ()=> abrirRelatorioPeriodo(btn.dataset.linha));
   });
   container.querySelectorAll('[data-salvar-quimico]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
@@ -1586,6 +1636,192 @@ function attachQuimicoHandlers(container){
 /* =========================================================================
    RELATÓRIO DE INTERVENÇÕES — histórico completo de um elemento numa linha
    ========================================================================= */
+/* =========================================================================
+   RELATÓRIO POR PERÍODO — uma linha inteira, todos os elementos, num
+   intervalo de datas: leituras encontradas + correções feitas em cada uma.
+   ========================================================================= */
+document.getElementById('periodoLinha').innerHTML = LINHAS.map(l=>`<option value="${l.id}">${l.nome} · ${l.liga}</option>`).join('');
+
+function abrirRelatorioPeriodo(linhaId){
+  document.getElementById('periodoLinha').value = linhaId;
+  const hoje = new Date().toISOString().slice(0,10);
+  document.getElementById('periodoDataInicio').value = hoje;
+  document.getElementById('periodoDataFim').value = hoje;
+  document.getElementById('periodoResultado').innerHTML = '';
+  document.getElementById('periodoModalImprimir').style.display = 'none';
+  document.getElementById('periodoModalOverlay').style.display = 'flex';
+}
+document.getElementById('periodoModalFechar').addEventListener('click', ()=>{
+  document.getElementById('periodoModalOverlay').style.display = 'none';
+});
+
+async function montarRelatorioPeriodo(){
+  const linhaId = document.getElementById('periodoLinha').value;
+  const dataInicio = document.getElementById('periodoDataInicio').value;
+  const dataFim = document.getElementById('periodoDataFim').value;
+  const resultado = document.getElementById('periodoResultado');
+  if (!dataInicio || !dataFim){ resultado.innerHTML = '<div class="relatorio-vazio">Escolha as duas datas.</div>'; return null; }
+
+  resultado.innerHTML = '<div class="relatorio-vazio">Carregando…</div>';
+  const inicioISO = new Date(dataInicio+'T00:00:00').toISOString();
+  const fimISO = new Date(dataFim+'T23:59:59').toISOString();
+
+  let leituras = [], intervencoes = [];
+  if (sb){
+    const [{data:ldata}, {data:idata}] = await Promise.all([
+      sb.from('leituras_quimicas').select('*').eq('linha_id', linhaId).gte('criado_em', inicioISO).lte('criado_em', fimISO).order('criado_em', { ascending:true }),
+      sb.from('intervencoes_quimicas').select('*, colaboradores(nome)').eq('linha_id', linhaId).gte('criado_em', inicioISO).lte('criado_em', fimISO).order('criado_em', { ascending:true }),
+    ]);
+    leituras = ldata || [];
+    intervencoes = (idata||[]).map(r=>({ ...r, nome: r.colaboradores?.nome || r.colaborador_re }));
+  }
+
+  const linha = LINHAS.find(l=>l.id===linhaId);
+  const elementos = ELEMENTOS_QUIMICOS[linhaId];
+  const blocos = elementos.map(el=>{
+    const faixa = FAIXAS_QUIMICAS[linhaId][el];
+    const leiturasEl = leituras.filter(l=>l.elemento===el);
+    const intervEl = intervencoes.filter(i=>i.elemento===el);
+    return { elemento: el, faixa, leituras: leiturasEl, intervencoes: intervEl };
+  });
+
+  return { linha, dataInicio, dataFim, blocos };
+}
+
+// Calcula o quanto uma leitura está fora da faixa (null se estiver dentro/sem faixa)
+function calcDesvio(valor, faixa){
+  if (!faixa) return null;
+  const [min, max] = faixa;
+  if (min != null && valor < min) return { dir:'abaixo', delta: min - valor, limite: min };
+  if (max != null && valor > max) return { dir:'acima', delta: valor - max, limite: max };
+  return null;
+}
+function fmtDesvio(desvio){
+  if (!desvio) return '';
+  return `${desvio.delta.toFixed(2)} ${desvio.dir} do ${desvio.dir==='abaixo'?'mínimo':'máximo'} (${desvio.limite})`;
+}
+
+// Uma linha do tempo única por elemento: leituras e intervenções intercaladas
+// em ordem cronológica — assim a correção aparece naturalmente logo depois
+// da leitura fora da faixa que a motivou.
+function montarTimelineElemento(bloco){
+  const eventos = [];
+  bloco.leituras.forEach(l => eventos.push({ tipo:'leitura', ts:l.criado_em, valor:l.valor }));
+  bloco.intervencoes.forEach(i => eventos.push({ tipo:'intervencao', ts:i.criado_em, descricao:i.descricao, nome:i.nome }));
+  eventos.sort((a,b)=> new Date(a.ts) - new Date(b.ts));
+  return eventos;
+}
+function resumoBloco(bloco){
+  const foraDaFaixa = bloco.leituras.filter(l => statusQuimico(l.valor, bloco.faixa)==='crit').length;
+  return { total: bloco.leituras.length, foraDaFaixa, correcoes: bloco.intervencoes.length };
+}
+
+function renderBlocosRelatorioPeriodo(blocos, alvo){
+  alvo.innerHTML = blocos.map(b=>{
+    const faixaTxt = fmtFaixa(b.faixa);
+    const resumo = resumoBloco(b);
+    const timeline = montarTimelineElemento(b);
+
+    const linhasHTML = timeline.length ? timeline.map(ev=>{
+      if (ev.tipo === 'leitura'){
+        const desvio = calcDesvio(ev.valor, b.faixa);
+        if (desvio){
+          return `<div class="relatorio-leitura-linha crit">
+            <span>${fmtDataHoraCurtaBR(ev.ts)} — <strong>${ev.valor}</strong> 🔴</span>
+            <span class="relatorio-desvio">${fmtDesvio(desvio)}</span>
+          </div>`;
+        }
+        return `<div class="relatorio-leitura-linha ok"><span>${fmtDataHoraCurtaBR(ev.ts)} — ${ev.valor}</span><span>✅ OK</span></div>`;
+      }
+      return `<div class="relatorio-correcao-linha">↳ ${fmtDataHoraCurtaBR(ev.ts)} · ${ev.nome} — ${ev.descricao}</div>`;
+    }).join('') : '<div class="relatorio-sem-registro">Nenhuma leitura registrada no período</div>';
+
+    const resumoHTML = `<span class="relatorio-resumo-chip">${resumo.total} leitura${resumo.total===1?'':'s'}</span>` +
+      (resumo.foraDaFaixa ? `<span class="relatorio-resumo-chip crit">${resumo.foraDaFaixa} fora da faixa</span>` : '') +
+      (resumo.correcoes ? `<span class="relatorio-resumo-chip brass">${resumo.correcoes} correção${resumo.correcoes===1?'':'ões'}</span>` : '');
+
+    return `
+      <div class="relatorio-elemento-bloco ${resumo.foraDaFaixa ? 'tem-alerta' : ''}">
+        <div class="relatorio-elemento-titulo"><span>${b.elemento}</span><span class="faixa-ref">Faixa: ${faixaTxt}</span></div>
+        <div class="relatorio-resumo-linha">${resumoHTML}</div>
+        ${linhasHTML}
+      </div>`;
+  }).join('');
+}
+
+document.getElementById('periodoGerar').addEventListener('click', async ()=>{
+  const dados = await montarRelatorioPeriodo();
+  if (!dados) return;
+  renderBlocosRelatorioPeriodo(dados.blocos, document.getElementById('periodoResultado'));
+  document.getElementById('periodoModalImprimir').style.display = 'inline-block';
+  document.getElementById('periodoModalImprimir').onclick = () => imprimirRelatorioPeriodo(dados);
+});
+
+function imprimirRelatorioPeriodo(dados){
+  let totalLeituras = 0, totalFora = 0, totalCorrecoes = 0;
+
+  const blocosHTML = dados.blocos.map(b=>{
+    const resumo = resumoBloco(b);
+    totalLeituras += resumo.total; totalFora += resumo.foraDaFaixa; totalCorrecoes += resumo.correcoes;
+    const timeline = montarTimelineElemento(b);
+
+    const linhasHTML = timeline.length ? timeline.map(ev=>{
+      if (ev.tipo === 'leitura'){
+        const desvio = calcDesvio(ev.valor, b.faixa);
+        if (desvio){
+          return `<div style="display:flex; justify-content:space-between; font-family:'Courier New',monospace; font-size:12.5px; color:#b3312c; padding:3px 0;">
+            <span>🔴 ${fmtDataHoraCurtaBR(ev.ts)} — <strong>${ev.valor}</strong></span>
+            <span style="font-family:Arial,sans-serif; font-weight:700; font-size:11px;">${fmtDesvio(desvio)}</span>
+          </div>`;
+        }
+        return `<div style="display:flex; justify-content:space-between; font-family:'Courier New',monospace; font-size:12.5px; color:#555; padding:3px 0;">
+          <span>✅ ${fmtDataHoraCurtaBR(ev.ts)} — ${ev.valor}</span><span style="font-family:Arial,sans-serif; font-size:11px; color:#999;">OK</span>
+        </div>`;
+      }
+      return `<div style="font-size:11.5px; font-weight:700; color:#8a5a1f; background:#faf4ea; border-radius:6px; padding:5px 10px; margin:4px 0 6px;">↳ ${fmtDataHoraCurtaBR(ev.ts)} · ${ev.nome} — ${ev.descricao}</div>`;
+    }).join('') : '<div style="font-size:12px; color:#999; font-style:italic;">Nenhuma leitura registrada no período</div>';
+
+    const chips = `<span style="font-size:10px; font-weight:700; padding:2px 9px; border-radius:20px; background:#f2f2f2; color:#666; margin-right:5px;">${resumo.total} leitura${resumo.total===1?'':'s'}</span>` +
+      (resumo.foraDaFaixa ? `<span style="font-size:10px; font-weight:700; padding:2px 9px; border-radius:20px; background:#fbe9e8; color:#b3312c; margin-right:5px;">${resumo.foraDaFaixa} fora da faixa</span>` : '') +
+      (resumo.correcoes ? `<span style="font-size:10px; font-weight:700; padding:2px 9px; border-radius:20px; background:#f4ecdd; color:#8a5a1f;">${resumo.correcoes} correção${resumo.correcoes===1?'':'ões'}</span>` : '');
+
+    return `
+      <div style="border:1px solid #e2e2e2; ${resumo.foraDaFaixa?'border-left:3px solid #b3312c;':''} border-radius:10px; padding:14px 16px; margin-bottom:12px; page-break-inside:avoid;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+          <span style="font-size:15px; font-weight:700;">${b.elemento}</span>
+          <span style="font-size:11.5px; color:#888;">Faixa especificada: ${fmtFaixa(b.faixa)}</span>
+        </div>
+        <div style="margin:7px 0 9px;">${chips}</div>
+        ${linhasHTML}
+      </div>`;
+  }).join('');
+
+  const resumoGeralHTML = `
+    <div style="display:flex; gap:24px; margin:14px 0 22px; padding:14px 18px; background:#faf8f5; border-radius:10px; border:1px solid #eee;">
+      <div><div style="font-size:22px; font-weight:700;">${totalLeituras}</div><div style="font-size:11px; color:#888;">leituras no período</div></div>
+      <div><div style="font-size:22px; font-weight:700; color:#b3312c;">${totalFora}</div><div style="font-size:11px; color:#888;">fora da faixa</div></div>
+      <div><div style="font-size:22px; font-weight:700; color:#8a5a1f;">${totalCorrecoes}</div><div style="font-size:11px; color:#888;">correções registradas</div></div>
+    </div>`;
+
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Relatório — ${dados.linha.nome}</title>
+    <style>
+      body{font-family:Arial,sans-serif; padding:36px; color:#1a1a1a; max-width:860px; margin:0 auto;}
+      h1{font-size:21px; margin-bottom:2px;}
+      h2{font-size:13px; color:#888; font-weight:normal; margin-top:0;}
+      @media print{ body{padding:16px;} }
+    </style>
+    </head><body>
+    <h1>Relatório de controle químico — ${dados.linha.nome} <span style="font-weight:400; color:#999;">(${dados.linha.liga})</span></h1>
+    <h2>Período: ${dados.dataInicio} a ${dados.dataFim} · emitido em ${new Date().toLocaleString('pt-BR')}</h2>
+    ${resumoGeralHTML}
+    ${blocosHTML}
+    </body></html>`);
+  win.document.close();
+  win.focus();
+  win.print();
+}
+
 async function abrirRelatorioIntervencoes(linhaId, elemento){
   const nomeLinha = ESCOPOS[linhaId] || linhaId;
   document.getElementById('relatorioModalTitulo').textContent = `Relatório — ${elemento}`;
