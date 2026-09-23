@@ -274,6 +274,10 @@
   .camada-cell-pair{display:flex; flex-direction:column; gap:3px;}
   .camada-cell-pair .liga-cell{width:64px; padding:4px 3px; border:1px solid var(--brass); border-radius:6px; font-family:'IBM Plex Mono',monospace; font-size:11.5px; text-align:center; background:rgba(176,141,87,0.06);}
   .camada-cell-solo{margin:14px 0;}
+  .toggle-cabecalho{background:rgba(31,157,85,0.1); border:1px solid var(--ok); color:var(--ok); font-weight:700; font-size:10.5px; padding:4px 8px; border-radius:6px; cursor:pointer; white-space:nowrap;}
+  .toggle-cabecalho:hover{filter:brightness(0.95);}
+  .toggle-cabecalho.toggle-inativo{background:var(--surface-warm); border-color:var(--hairline); color:var(--ink-faint); text-decoration:line-through;}
+  .camada-cell:disabled, .liga-cell:disabled{background:var(--surface-warm); color:var(--ink-faint); cursor:not-allowed;}
   .camada-cell:focus{outline:2px solid var(--brass); border-color:var(--brass);}
   .camada-media{margin-top:10px; font-size:13px; font-weight:700; text-align:right; color:var(--brass-deep);}
   #reModalTexto{width:100%; font-family:'Inter',sans-serif; font-size:13px; padding:10px 12px; border:1px solid var(--hairline); border-radius:10px; resize:vertical; margin-top:2px;}
@@ -531,7 +535,7 @@
     <p class="modal-desc" id="reModalDesc">—</p>
     <input type="text" id="reModalInput" placeholder="Seu RE (4 dígitos)" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off">
     <div id="reModalCamadaWrap" style="display:none;">
-      <div class="camada-titulo">Liga (%) nas 3 primeiras amostras + Camada (µm) nas 5 — 6 tambores</div>
+      <div class="camada-titulo">Liga (%) nas 3 primeiras amostras + Camada (µm) nas 5 — 6 tambores. Clique em T1-T6 ou Amostra 01-05 pra desligar o que não for coletado.</div>
       <div class="camada-grid-scroll">
         <table class="camada-grid" id="camadaGrid"></table>
       </div>
@@ -764,14 +768,52 @@ function configurarRealtime(){
    MODAL — confirmar pendência digitando o RE (rastreabilidade)
    ========================================================================= */
 const CAMADA_TAMBORES = 6, CAMADA_AMOSTRAS = 5, LIGA_AMOSTRAS = 3; // liga só nas 3 primeiras amostras de cada tambor
+let TAMBORES_ATIVOS = new Set([1,2,3,4,5,6]);
+let AMOSTRAS_ATIVAS = new Set([1,2,3,4,5]);
+
+function toggleTamborAtivo(t){
+  if (TAMBORES_ATIVOS.has(t)) TAMBORES_ATIVOS.delete(t); else TAMBORES_ATIVOS.add(t);
+  aplicarEstadoAtivos();
+}
+function toggleAmostraAtiva(a){
+  if (AMOSTRAS_ATIVAS.has(a)) AMOSTRAS_ATIVAS.delete(a); else AMOSTRAS_ATIVAS.add(a);
+  aplicarEstadoAtivos();
+}
+// quantas células deveriam ser preenchidas, dado o que está habilitado agora
+function celulasEsperadas(){
+  let camada = 0, liga = 0;
+  AMOSTRAS_ATIVAS.forEach(a=>{
+    TAMBORES_ATIVOS.forEach(()=>{ camada++; if (a <= LIGA_AMOSTRAS) liga++; });
+  });
+  return { camada, liga };
+}
+// aplica visualmente quais tambores/amostras estão ativos: desabilita e limpa
+// as células desligadas, e recalcula as médias só com o que está ligado
+function aplicarEstadoAtivos(){
+  for (let t=1; t<=CAMADA_TAMBORES; t++){
+    const th = document.getElementById('tamborToggle'+t);
+    if (th) th.classList.toggle('toggle-inativo', !TAMBORES_ATIVOS.has(t));
+  }
+  for (let a=1; a<=CAMADA_AMOSTRAS; a++){
+    const lbl = document.getElementById('amostraToggle'+a);
+    if (lbl) lbl.classList.toggle('toggle-inativo', !AMOSTRAS_ATIVAS.has(a));
+  }
+  document.querySelectorAll('.camada-cell, .liga-cell').forEach(inp=>{
+    const ativo = TAMBORES_ATIVOS.has(Number(inp.dataset.tambor)) && AMOSTRAS_ATIVAS.has(Number(inp.dataset.amostra));
+    inp.disabled = !ativo;
+    if (!ativo) inp.value = '';
+  });
+  atualizarMediaCamada();
+}
+
 (function construirGradeCamada(){
   const grid = document.getElementById('camadaGrid');
   let thead = '<thead><tr><th></th>';
-  for (let t=1; t<=CAMADA_TAMBORES; t++) thead += `<th>T${t}</th>`;
+  for (let t=1; t<=CAMADA_TAMBORES; t++) thead += `<th><button type="button" class="toggle-cabecalho" id="tamborToggle${t}" data-toggle-tambor="${t}">T${t}</button></th>`;
   thead += '</tr></thead>';
   let tbody = '<tbody>';
   for (let a=1; a<=CAMADA_AMOSTRAS; a++){
-    tbody += `<tr><td>Amostra ${String(a).padStart(2,'0')}</td>`;
+    tbody += `<tr><td><button type="button" class="toggle-cabecalho" id="amostraToggle${a}" data-toggle-amostra="${a}">Amostra ${String(a).padStart(2,'0')}</button></td>`;
     for (let t=1; t<=CAMADA_TAMBORES; t++){
       if (a <= LIGA_AMOSTRAS){
         tbody += `<td><div class="camada-cell-pair">
@@ -797,11 +839,18 @@ const CAMADA_TAMBORES = 6, CAMADA_AMOSTRAS = 5, LIGA_AMOSTRAS = 3; // liga só n
   grid.querySelectorAll('.camada-cell, .liga-cell').forEach(inp=>{
     inp.addEventListener('input', atualizarMediaCamada);
   });
+  grid.querySelectorAll('[data-toggle-tambor]').forEach(btn=>{
+    btn.addEventListener('click', ()=> toggleTamborAtivo(Number(btn.dataset.toggleTambor)));
+  });
+  grid.querySelectorAll('[data-toggle-amostra]').forEach(btn=>{
+    btn.addEventListener('click', ()=> toggleAmostraAtiva(Number(btn.dataset.toggleAmostra)));
+  });
 })();
 
 function atualizarMediaCamada(){
-  const camadaInputs = Array.from(document.querySelectorAll('.camada-cell'));
-  const ligaInputs = Array.from(document.querySelectorAll('.liga-cell'));
+  const camadaInputs = Array.from(document.querySelectorAll('.camada-cell:not(:disabled)'));
+  const ligaInputs = Array.from(document.querySelectorAll('.liga-cell:not(:disabled)'));
+  const esperadas = celulasEsperadas();
 
   const valoresCamada = camadaInputs.map(i=>parseFloat(i.value)).filter(v=>!isNaN(v));
   const mediaCamada = valoresCamada.length ? valoresCamada.reduce((a,b)=>a+b,0) / valoresCamada.length : null;
@@ -812,20 +861,22 @@ function atualizarMediaCamada(){
   document.getElementById('ligaMediaValor').textContent = mediaLiga==null ? '—' : mediaLiga.toFixed(2);
 
   for (let t=1; t<=CAMADA_TAMBORES; t++){
+    const ativo = TAMBORES_ATIVOS.has(t);
     const valoresTamborCamada = camadaInputs.filter(i => Number(i.dataset.tambor) === t).map(i => parseFloat(i.value)).filter(v => !isNaN(v));
     const mediaTamborCamada = valoresTamborCamada.length ? valoresTamborCamada.reduce((a,b)=>a+b,0) / valoresTamborCamada.length : null;
     const elC = document.getElementById('camadaMediaT'+t);
-    if (elC) elC.textContent = mediaTamborCamada==null ? '—' : mediaTamborCamada.toFixed(2);
+    if (elC) elC.textContent = !ativo ? 'off' : (mediaTamborCamada==null ? '—' : mediaTamborCamada.toFixed(2));
 
     const valoresTamborLiga = ligaInputs.filter(i => Number(i.dataset.tambor) === t).map(i => parseFloat(i.value)).filter(v => !isNaN(v));
     const mediaTamborLiga = valoresTamborLiga.length ? valoresTamborLiga.reduce((a,b)=>a+b,0) / valoresTamborLiga.length : null;
     const elL = document.getElementById('ligaMediaT'+t);
-    if (elL) elL.textContent = mediaTamborLiga==null ? '—' : mediaTamborLiga.toFixed(2);
+    if (elL) elL.textContent = !ativo ? 'off' : (mediaTamborLiga==null ? '—' : mediaTamborLiga.toFixed(2));
   }
 
   return {
-    valoresCamada, mediaCamada, completoCamada: valoresCamada.length === CAMADA_TAMBORES*CAMADA_AMOSTRAS,
-    valoresLiga, mediaLiga, completoLiga: valoresLiga.length === CAMADA_TAMBORES*LIGA_AMOSTRAS,
+    valoresCamada, mediaCamada, completoCamada: valoresCamada.length === esperadas.camada && esperadas.camada > 0,
+    valoresLiga, mediaLiga, completoLiga: valoresLiga.length === esperadas.liga && esperadas.liga >= 0,
+    esperadas,
   };
 }
 
@@ -844,8 +895,9 @@ function pedirConfirmacaoRE(descricao, opcoes){
     document.getElementById('reModalTexto').value = '';
     document.getElementById('reModalBox').style.maxWidth = opcoes.pedirCamada ? '600px' : opcoes.pedirTexto ? '440px' : '380px';
     if (opcoes.pedirCamada){
-      document.querySelectorAll('.camada-cell, .liga-cell').forEach(i=>i.value='');
-      atualizarMediaCamada();
+      TAMBORES_ATIVOS = new Set([1,2,3,4,5,6]);
+      AMOSTRAS_ATIVAS = new Set([1,2,3,4,5]);
+      aplicarEstadoAtivos();
     }
     document.getElementById('reModalOverlay').style.display = 'flex';
     setTimeout(()=>document.getElementById('reModalInput').focus(), 50);
@@ -863,9 +915,10 @@ document.getElementById('reModalConfirm').addEventListener('click', async ()=>{
   const pedeTexto = document.getElementById('reModalTextoWrap').style.display !== 'none';
   let camada = null, camadaValores = null, liga = null, ligaValores = null, texto = null;
   if (pedeCamada){
-    const { valoresCamada, mediaCamada, completoCamada, valoresLiga, mediaLiga, completoLiga } = atualizarMediaCamada();
-    if (!completoLiga){ errEl.textContent = `Preencha as 18 medições de liga (faltam ${18 - valoresLiga.length}).`; return; }
-    if (!completoCamada){ errEl.textContent = `Preencha as 30 medições de camada (faltam ${30 - valoresCamada.length}).`; return; }
+    const { valoresCamada, mediaCamada, completoCamada, valoresLiga, mediaLiga, completoLiga, esperadas } = atualizarMediaCamada();
+    if (esperadas.camada === 0){ errEl.textContent = 'Selecione ao menos um tambor e uma amostra.'; return; }
+    if (!completoLiga){ errEl.textContent = `Preencha as ${esperadas.liga} medições de liga habilitadas (faltam ${esperadas.liga - valoresLiga.length}).`; return; }
+    if (!completoCamada){ errEl.textContent = `Preencha as ${esperadas.camada} medições de camada habilitadas (faltam ${esperadas.camada - valoresCamada.length}).`; return; }
     camada = mediaCamada; camadaValores = valoresCamada;
     liga = mediaLiga; ligaValores = valoresLiga;
   }
@@ -1116,8 +1169,28 @@ function statusDe(p){
   if (ratio >= 0.75) return 'warn';
   return 'ok';
 }
-function statusBanho(iso){
-  const ratio = horasDesde(iso) / LIMITE_BANHO_HORAS;
+// A linha que roda Latão pode mudar com o tempo — checa pela liga configurada
+// em LINHAS, nunca por id fixo (ex: "linha3")
+function ehLinhaLatao(linhaId){
+  const linha = LINHAS.find(l=>l.id===linhaId);
+  return !!(linha && linha.liga === 'Latão');
+}
+// Cronograma fixo de coleta do Latão: 1ª amostra em 5h corridas desde o START,
+// 2ª em 7h, 3ª em 9h — sem resetar o cronômetro entre uma e outra. Depois da
+// 3ª, sem mais alerta de amostra até o próximo START.
+const LATAO_HORAS_AMOSTRA = [5, 7, 9];
+
+function statusBanho(linhaId, banho){
+  if (ehLinhaLatao(linhaId)){
+    const amostrasFeitas = BANHO_AMOSTRAS[linhaId][banho] || 0;
+    const limiteHoras = LATAO_HORAS_AMOSTRA[amostrasFeitas];
+    if (limiteHoras == null) return 'ok'; // já coletou as 3 programadas neste ciclo
+    const horasDecorridas = horasDesde(BANHO_TOTAL_INICIO[linhaId][banho]);
+    if (horasDecorridas >= limiteHoras) return 'crit';
+    if (horasDecorridas >= limiteHoras - 0.5) return 'warn'; // 30min de antecedência
+    return 'ok';
+  }
+  const ratio = horasDesde(BANHO_INICIO[linhaId][banho]) / LIMITE_BANHO_HORAS;
   if (ratio >= 1) return 'crit';
   if (ratio >= 0.75) return 'warn';
   return 'ok';
@@ -1218,7 +1291,7 @@ function buildPlantaSVG(){
     let y = startY;
     BANHOS.forEach(banho=>{
       const inicio = BANHO_INICIO[linhaId][banho];
-      const stBanho = statusBanho(inicio);
+      const stBanho = statusBanho(linhaId, banho);
       const boxX = x + btnAreaW, boxW = colW - btnAreaW;
 
       // botão START redondo — inicia um novo banho (zera cronômetro de amostra, total e contador)
@@ -1346,26 +1419,32 @@ async function resetPendenciaPorId(id){
 }
 async function resetBanhoPorClique(linhaId, banho){
   const nome = LINHAS.find(l=>l.id===linhaId)?.nome || linhaId;
+  const latao = ehLinhaLatao(linhaId);
   const ehPrimeiraAmostra = (BANHO_AMOSTRAS[linhaId][banho] || 0) === 0;
   const col = await pedirConfirmacaoRE(`Confirmar coleta de amostra do banho ${banho} (${nome}) — digite seu RE:`, { pedirCamada: true });
   if (!col) return;
   const agora = new Date().toISOString();
 
-  // Cálculo de saída do banho — só na 1ª amostra do ciclo (já validado, agora persiste no Supabase)
-  if (ehPrimeiraAmostra){
-    const minutosAtePrimeiraAmostra = horasDesde(BANHO_INICIO[linhaId][banho]) * 60;
+  // Cálculo de saída do banho: no Latão recalcula (e sobrescreve) em TODA
+  // coleta, sempre a partir do tempo total desde o START (o cronômetro de
+  // amostra não reseta nessa linha); nas demais, só na 1ª amostra do ciclo,
+  // igual já era.
+  if (latao || ehPrimeiraAmostra){
+    const minutosDecorridos = latao
+      ? horasDesde(BANHO_TOTAL_INICIO[linhaId][banho]) * 60
+      : horasDesde(BANHO_INICIO[linhaId][banho]) * 60;
     const especificacao = ESPECIFICACAO_DISCO[linhaId];
     if (especificacao && col.camada){
-      const tempoFinalMin = (especificacao * minutosAtePrimeiraAmostra) / col.camada;
+      const tempoFinalMin = (especificacao * minutosDecorridos) / col.camada;
       const horaSaida = new Date(new Date(BANHO_TOTAL_INICIO[linhaId][banho]).getTime() + tempoFinalMin * 60000);
       BANHO_SAIDA_CALC[linhaId][banho] = horaSaida.toISOString();
     }
   }
 
-  BANHO_INICIO[linhaId][banho] = agora;
+  if (!latao) BANHO_INICIO[linhaId][banho] = agora; // Latão nunca reseta — cronômetro de amostra segue contando desde o START
   BANHO_AMOSTRAS[linhaId][banho] = (BANHO_AMOSTRAS[linhaId][banho] || 0) + 1;
   if (sb) sb.from('banho_ciclos').update({
-    amostra_inicio: agora,
+    amostra_inicio: latao ? BANHO_INICIO[linhaId][banho] : agora,
     amostras_contador: BANHO_AMOSTRAS[linhaId][banho],
     saida_calculada: BANHO_SAIDA_CALC[linhaId][banho],
   }).eq('linha_id', linhaId).eq('banho', banho).then();
