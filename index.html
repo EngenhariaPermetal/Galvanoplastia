@@ -123,6 +123,7 @@
   .banho-saida.warn{fill:var(--warn); font-size:13.5px;}
   .banho-saida.crit{fill:var(--crit); font-size:14px; font-weight:800; animation: blinkCrit .8s steps(1,end) infinite;}
   .banho-saida-vazio{font-family:'Inter',sans-serif; font-size:10.5px; fill:var(--ink-faint);}
+  .banho-pausado-selo{font-family:'Inter',sans-serif; font-size:9px; font-weight:700; fill:var(--brass-deep);}
   .banho-tag-label{font-family:'Inter',sans-serif; font-size:8.5px; font-weight:700; fill:var(--ink-faint); letter-spacing:.03em;}
   .banho-tag-timer{font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:600; fill:var(--ink-soft);}
   .banho-tag-timer.ok{fill:var(--ok);} .banho-tag-timer.warn{fill:var(--warn);} .banho-tag-timer.crit{fill:var(--crit);}
@@ -493,6 +494,18 @@
 
 </main>
 
+<!-- Modal: histórico de paradas de manutenção (atemporal — tudo que já foi registrado) -->
+<div class="modal-overlay" id="histManutencaoOverlay">
+  <div class="modal-box" id="histManutencaoBox" style="max-width:640px;">
+    <h3 id="histManutencaoTitulo">Histórico de manutenção</h3>
+    <p class="modal-desc">Todos os registros já feitos, sem filtro de data.</p>
+    <div id="histManutencaoConteudo" class="relatorio-lista" style="max-height:55vh;"></div>
+    <div class="modal-actions">
+      <button class="btn" id="histManutencaoFechar">Fechar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: histórico de amostras dos banhos correntes (esquece tudo no próximo START) -->
 <div class="modal-overlay" id="histAmostrasOverlay">
   <div class="modal-box" id="histAmostrasBox" style="max-width:600px;">
@@ -632,11 +645,13 @@ async function carregarDadosIniciais(){
     if (!BANHO_AMOSTRAS[r.linha_id]) BANHO_AMOSTRAS[r.linha_id] = {};
     if (!BANHO_SAIDA_CALC[r.linha_id]) BANHO_SAIDA_CALC[r.linha_id] = {};
     if (!BANHO_AMOSTRA_ATIVA[r.linha_id]) BANHO_AMOSTRA_ATIVA[r.linha_id] = {};
+    if (!BANHO_PAUSADO[r.linha_id]) BANHO_PAUSADO[r.linha_id] = {};
     BANHO_INICIO[r.linha_id][r.banho] = r.amostra_inicio;
     BANHO_TOTAL_INICIO[r.linha_id][r.banho] = r.total_inicio;
     BANHO_AMOSTRAS[r.linha_id][r.banho] = r.amostras_contador;
     BANHO_SAIDA_CALC[r.linha_id][r.banho] = r.saida_calculada || null;
     BANHO_AMOSTRA_ATIVA[r.linha_id][r.banho] = r.amostra_ativa !== false;
+    BANHO_PAUSADO[r.linha_id][r.banho] = r.pausado_desde ? { desde: r.pausado_desde, motivo: r.pausado_motivo } : null;
   });
 
   (faixas.data || []).forEach(r => {
@@ -729,11 +744,13 @@ function configurarRealtime(){
       if (!BANHO_AMOSTRAS[r.linha_id]) BANHO_AMOSTRAS[r.linha_id] = {};
       if (!BANHO_SAIDA_CALC[r.linha_id]) BANHO_SAIDA_CALC[r.linha_id] = {};
       if (!BANHO_AMOSTRA_ATIVA[r.linha_id]) BANHO_AMOSTRA_ATIVA[r.linha_id] = {};
+      if (!BANHO_PAUSADO[r.linha_id]) BANHO_PAUSADO[r.linha_id] = {};
       BANHO_INICIO[r.linha_id][r.banho] = r.amostra_inicio;
       BANHO_TOTAL_INICIO[r.linha_id][r.banho] = r.total_inicio;
       BANHO_AMOSTRAS[r.linha_id][r.banho] = r.amostras_contador;
       BANHO_SAIDA_CALC[r.linha_id][r.banho] = r.saida_calculada || null;
       BANHO_AMOSTRA_ATIVA[r.linha_id][r.banho] = r.amostra_ativa !== false;
+      BANHO_PAUSADO[r.linha_id][r.banho] = r.pausado_desde ? { desde: r.pausado_desde, motivo: r.pausado_motivo } : null;
       renderAll();
     })
     .subscribe();
@@ -1107,13 +1124,22 @@ let ESPECIFICACAO_DISCO = {}; // por linha — configurável em Parâmetros (µm
 let ESPECIFICACAO_LIGA = {};  // por linha+banho — % da liga esperada no revestimento (mock, ainda não grava no Supabase)
 let BANHO_SAIDA_CALC = {};    // por linha+banho — horário calculado (ISO) ou null
 let BANHO_AMOSTRA_ATIVA = {}; // por linha+banho — false = coleta de amostra desativada pra esse banho (banho fora de uso)
+let BANHO_PAUSADO = {};       // por linha+banho — { desde: iso, motivo } quando em parada de manutenção, senão null
 LINHAS.forEach(l=>{
   ESPECIFICACAO_DISCO[l.id] = null;
   ESPECIFICACAO_LIGA[l.id] = {};
   BANHO_SAIDA_CALC[l.id] = {};
   BANHO_AMOSTRA_ATIVA[l.id] = {};
-  BANHOS.forEach(b=>{ ESPECIFICACAO_LIGA[l.id][b] = null; BANHO_SAIDA_CALC[l.id][b] = null; BANHO_AMOSTRA_ATIVA[l.id][b] = true; });
+  BANHO_PAUSADO[l.id] = {};
+  BANHOS.forEach(b=>{ ESPECIFICACAO_LIGA[l.id][b] = null; BANHO_SAIDA_CALC[l.id][b] = null; BANHO_AMOSTRA_ATIVA[l.id][b] = true; BANHO_PAUSADO[l.id][b] = null; });
 });
+// Enquanto um banho está em parada de manutenção, os cronômetros ligados a
+// ele (Granalha/Limpeza/Amostra/Total) usam esse "agora" congelado no
+// instante da pausa, em vez do relógio de verdade — é isso que trava tudo.
+function agoraDoBanho(linhaId, banho){
+  const p = BANHO_PAUSADO[linhaId] && BANHO_PAUSADO[linhaId][banho];
+  return p ? new Date(p.desde) : new Date();
+}
 
 function fmtHoraRelogio(iso){
   return new Date(iso).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
@@ -1200,13 +1226,14 @@ const STATUS_HEX = { ok:'#1F9D55', warn:'#C98A00', crit:'#C7414F' };
 /* =========================================================================
    CÁLCULO DE STATUS
    ========================================================================= */
-function horasDesde(iso){ return (Date.now() - new Date(iso).getTime()) / 3600000; }
+function horasDesde(iso, agora){ agora = agora || new Date(); return (agora.getTime() - new Date(iso).getTime()) / 3600000; }
 
 function statusDe(p){
   if (!p) return 'ok'; // dado ainda não carregado (Supabase indisponível/lento) — não quebra a tela
   if (p.ativo === false) return 'off';
   if (p.tipo === 'evento') return 'evento';
-  const ratio = horasDesde(p.ultima) / p.limiteHoras;
+  const agora = p.banho ? agoraDoBanho(p.escopo, p.banho) : new Date();
+  const ratio = horasDesde(p.ultima, agora) / p.limiteHoras;
   if (ratio >= 1) return 'crit';
   if (ratio >= 0.75) return 'warn';
   return 'ok';
@@ -1224,16 +1251,17 @@ const LATAO_HORAS_AMOSTRA = [5, 7, 9];
 
 function statusBanho(linhaId, banho){
   if (BANHO_AMOSTRA_ATIVA[linhaId] && BANHO_AMOSTRA_ATIVA[linhaId][banho] === false) return 'off';
+  const agora = agoraDoBanho(linhaId, banho);
   if (ehLinhaLatao(linhaId)){
     const amostrasFeitas = BANHO_AMOSTRAS[linhaId][banho] || 0;
     const limiteHoras = LATAO_HORAS_AMOSTRA[amostrasFeitas];
     if (limiteHoras == null) return 'ok'; // já coletou as 3 programadas neste ciclo
-    const horasDecorridas = horasDesde(BANHO_TOTAL_INICIO[linhaId][banho]);
+    const horasDecorridas = horasDesde(BANHO_TOTAL_INICIO[linhaId][banho], agora);
     if (horasDecorridas >= limiteHoras) return 'crit';
     if (horasDecorridas >= limiteHoras - 0.5) return 'warn'; // 30min de antecedência
     return 'ok';
   }
-  const ratio = horasDesde(BANHO_INICIO[linhaId][banho]) / LIMITE_BANHO_HORAS;
+  const ratio = horasDesde(BANHO_INICIO[linhaId][banho], agora) / LIMITE_BANHO_HORAS;
   if (ratio >= 1) return 'crit';
   if (ratio >= 0.75) return 'warn';
   return 'ok';
@@ -1247,16 +1275,18 @@ function piorStatus(lista){
 }
 const STATUS_LABEL = { ok:'Em dia', warn:'Atenção', crit:'Vencida', evento:'Por banho', off:'Desativada' };
 
-function fmtCronometro(iso){
-  const totalMin = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+function fmtCronometro(iso, agora){
+  agora = agora || new Date();
+  const totalMin = Math.floor((agora.getTime() - new Date(iso).getTime()) / 60000);
   const dias = Math.floor(totalMin / 1440);
   const horas = Math.floor((totalMin % 1440) / 60);
   const min = totalMin % 60;
   if (dias > 0) return `${dias}d ${horas}h ${String(min).padStart(2,'0')}min`;
   return `${horas}h ${String(min).padStart(2,'0')}min`;
 }
-function fmtCronometroCurto(iso){
-  const totalMin = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+function fmtCronometroCurto(iso, agora){
+  agora = agora || new Date();
+  const totalMin = Math.floor((agora.getTime() - new Date(iso).getTime()) / 60000);
   const horas = Math.floor(totalMin / 60);
   const min = totalMin % 60;
   return `${horas}h${String(min).padStart(2,'0')}`;
@@ -1301,8 +1331,8 @@ function buildPlantaSVG(){
       ${sb ? 'Carregando dados do Supabase…' : 'Sem conexão com o Supabase — verifique a internet e recarregue a página.'}
     </div>`;
   }
-  const colW = 300;                          // largura total de cada coluna de linha
-  const btnR = 12, btnAreaW = 68;            // faixa esquerda: só START + Saída calculada
+  const colW = 332;                          // largura total de cada coluna de linha
+  const btnR = 12, btnAreaW = 100;           // faixa esquerda: START + Pausa + Saída calculada
   const colGap = 30, startX = 24, startY = 60;
   const bathH = 78, rowH = 24, banhoGap = 12; // mais respiro entre um banho e o próximo
   const bathUnitH = bathH + banhoGap;
@@ -1331,6 +1361,9 @@ function buildPlantaSVG(){
     svg += `<g class="plant-dot" data-action="historico-amostras" data-escopo="${linhaId}">
       <text x="${x+colW-9}" y="34" text-anchor="end" style="font-size:14px;" title="Histórico de amostras do ciclo atual">📋</text>
     </g>`;
+    svg += `<g class="plant-dot" data-action="historico-manutencao" data-escopo="${linhaId}">
+      <text x="${x+colW-30}" y="34" text-anchor="end" style="font-size:14px;" title="Histórico de paradas de manutenção (tudo, sem filtro de data)">🔧</text>
+    </g>`;
 
     // banhos B3/B2/B1 — faixa esquerda com START + Saída calculada; Granalha/Limpeza
     // voltam a ser ícones dentro da própria caixa (mesmo sistema de alerta/pisca)
@@ -1338,6 +1371,8 @@ function buildPlantaSVG(){
     BANHOS.forEach(banho=>{
       const inicio = BANHO_INICIO[linhaId][banho];
       const stBanho = statusBanho(linhaId, banho);
+      const agoraBanho = agoraDoBanho(linhaId, banho);
+      const pausaInfo = BANHO_PAUSADO[linhaId][banho];
       const boxX = x + btnAreaW, boxW = colW - btnAreaW;
 
       // botão START redondo — inicia um novo banho (zera cronômetro de amostra, total e contador)
@@ -1347,6 +1382,20 @@ function buildPlantaSVG(){
       svg += `<text x="${btnCx}" y="${btnCy+4}" text-anchor="middle" style="font-size:11px; fill:#fff;">▶</text>`;
       svg += `</g>`;
 
+      // botão de parada de manutenção — pausa (congela) sem resetar; vira "despausar" quando já pausado
+      const btnPauseCx = btnCx + 27;
+      if (pausaInfo){
+        svg += `<g class="plant-dot" data-action="despausar-banho" data-linha="${linhaId}" data-banho="${banho}">`;
+        svg += `<circle cx="${btnPauseCx}" cy="${btnCy}" r="${btnR}" fill="var(--brass)"></circle>`;
+        svg += `<text x="${btnPauseCx}" y="${btnCy+4}" text-anchor="middle" style="font-size:11px; fill:#241a0d;">▶</text>`;
+        svg += `</g>`;
+      } else {
+        svg += `<g class="plant-dot" data-action="pausar-banho" data-linha="${linhaId}" data-banho="${banho}">`;
+        svg += `<circle cx="${btnPauseCx}" cy="${btnCy}" r="${btnR}" fill="var(--ink-faint)"></circle>`;
+        svg += `<text x="${btnPauseCx}" y="${btnCy+4}" text-anchor="middle" style="font-size:10px; fill:#fff;">⏸</text>`;
+        svg += `</g>`;
+      }
+
       // "Saída do banho" calculada — em evidência, abaixo do START, só aparece após a 1ª amostra do ciclo
       const saidaIso = BANHO_SAIDA_CALC[linhaId] && BANHO_SAIDA_CALC[linhaId][banho];
       if (saidaIso){
@@ -1354,6 +1403,9 @@ function buildPlantaSVG(){
         svg += `<text class="banho-saida ${stSaida}" x="${x+btnAreaW/2}" y="${btnCy+26}" text-anchor="middle">${fmtHoraRelogio(saidaIso)}</text>`;
       } else {
         svg += `<text class="banho-saida-vazio" x="${x+btnAreaW/2}" y="${btnCy+26}" text-anchor="middle">—</text>`;
+      }
+      if (pausaInfo){
+        svg += `<text class="banho-pausado-selo" x="${x+btnAreaW/2}" y="${btnCy+40}" text-anchor="middle">⏸ Manutenção<title>${pausaInfo.motivo.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</title></text>`;
       }
 
       // caixa do banho — nome + cronômetro total/amostras + pílula de amostra
@@ -1364,7 +1416,7 @@ function buildPlantaSVG(){
       // cronômetro do banho TOTAL (só zera no START) + quantas amostras já foram tiradas nesse banho
       const totalInicio = BANHO_TOTAL_INICIO[linhaId][banho];
       const qtdAmostras = BANHO_AMOSTRAS[linhaId][banho] || 0;
-      svg += `<text class="bath-total-info" x="${boxX+46}" y="${y+25}" text-anchor="start">⏱ ${fmtCronometroCurto(totalInicio)} · ${qtdAmostras}×</text>`;
+      svg += `<text class="bath-total-info" x="${boxX+46}" y="${y+25}" text-anchor="start">⏱ ${fmtCronometroCurto(totalInicio, agoraBanho)} · ${qtdAmostras}×</text>`;
 
       // pílula da retirada de amostra — canto superior direito da caixa
       // (no Latão o relógio exibido é o mesmo que colore a pílula: desde o
@@ -1379,7 +1431,7 @@ function buildPlantaSVG(){
         svg += `<g class="plant-dot" data-action="reset-banho" data-linha="${linhaId}" data-banho="${banho}">`;
         svg += `<rect class="item-pill ${stBanho}" x="${amostraX}" y="${amostraY}" width="${amostraW}" height="${pillH}" rx="${pillH/2}"></rect>`;
         svg += `<text class="etapa-icon-sm" x="${amostraX+18}" y="${amostraY+pillH/2+5}" text-anchor="middle" style="font-size:16px;">🧪</text>`;
-        svg += `<text class="bath-timer ${stBanho}" x="${amostraX+amostraW-10}" y="${amostraY+pillH/2+4}" text-anchor="end" style="font-size:13.5px;">${fmtCronometroCurto(inicioExibido)}</text>`;
+        svg += `<text class="bath-timer ${stBanho}" x="${amostraX+amostraW-10}" y="${amostraY+pillH/2+4}" text-anchor="end" style="font-size:13.5px;">${fmtCronometroCurto(inicioExibido, agoraBanho)}</text>`;
         svg += `</g>`;
       }
 
@@ -1400,7 +1452,7 @@ function buildPlantaSVG(){
           svg += `<g class="plant-dot" data-action="reset-pendencia" data-pid="${p.id}">`;
           svg += `<rect class="item-pill ${st}" x="${px}" y="${py}" width="${pillW}" height="${pillH}" rx="${pillH/2}"></rect>`;
           svg += `<text class="etapa-icon-sm" x="${px+18}" y="${py+pillH/2+5}" text-anchor="middle" style="font-size:15px;">${icone}</text>`;
-          svg += `<text class="etapa-icon-timer ${st}" x="${px+pillW-10}" y="${py+pillH/2+4}" text-anchor="end" style="font-size:12.5px;">${fmtCronometroCurto(p.ultima)}</text>`;
+          svg += `<text class="etapa-icon-timer ${st}" x="${px+pillW-10}" y="${py+pillH/2+4}" text-anchor="end" style="font-size:12.5px;">${fmtCronometroCurto(p.ultima, agoraBanho)}</text>`;
           svg += `</g>`;
         }
       });
@@ -1543,10 +1595,61 @@ async function iniciarBanhoPorClique(linhaId, banho){
   BANHO_TOTAL_INICIO[linhaId][banho] = agora;
   BANHO_AMOSTRAS[linhaId][banho] = 0;
   BANHO_SAIDA_CALC[linhaId][banho] = null; // novo ciclo — apaga o cálculo do ciclo anterior
-  if (sb) sb.from('banho_ciclos').update({ amostra_inicio: agora, total_inicio: agora, amostras_contador: 0, saida_calculada: null }).eq('linha_id', linhaId).eq('banho', banho).then();
+  BANHO_PAUSADO[linhaId][banho] = null; // START também encerra qualquer pausa de manutenção pendente
+  if (sb) sb.from('banho_ciclos').update({ amostra_inicio: agora, total_inicio: agora, amostras_contador: 0, saida_calculada: null, pausado_desde: null, pausado_motivo: null }).eq('linha_id', linhaId).eq('banho', banho).then();
   registrarAcaoSupabase(col.re, 'start_banho', linhaId, banho, null);
   renderAll();
 }
+
+async function pausarBanhoPorClique(linhaId, banho){
+  const nome = LINHAS.find(l=>l.id===linhaId)?.nome || linhaId;
+  const col = await pedirConfirmacaoRE(`Pausar ${banho} (${nome}) pra manutenção — digite seu RE:`, { pedirTexto: true });
+  if (!col) return;
+  const agora = new Date().toISOString();
+  BANHO_PAUSADO[linhaId][banho] = { desde: agora, motivo: col.texto };
+  if (sb){
+    sb.from('banho_ciclos').update({ pausado_desde: agora, pausado_motivo: col.texto }).eq('linha_id', linhaId).eq('banho', banho).then();
+    sb.from('paradas_manutencao').insert({ linha_id: linhaId, banho, motivo: col.texto, inicio: agora, colaborador_re_inicio: col.re }).then();
+  }
+  registrarAcaoSupabase(col.re, 'pausar_manutencao', linhaId, banho, null, { motivo: col.texto });
+  renderAll();
+}
+
+async function despausarBanhoPorClique(linhaId, banho){
+  const nome = LINHAS.find(l=>l.id===linhaId)?.nome || linhaId;
+  const pausa = BANHO_PAUSADO[linhaId][banho];
+  if (!pausa) return;
+  const col = await pedirConfirmacaoRE(`Despausar ${banho} (${nome}) — os cronômetros continuam de onde pararam. Digite seu RE:`);
+  if (!col) return;
+  const agora = new Date();
+  const duracaoMs = agora.getTime() - new Date(pausa.desde).getTime();
+
+  // desloca todas as referências desse banho pra frente pela duração da pausa —
+  // é isso que faz continuar "de onde parou" em vez de resetar
+  const empurra = iso => iso ? new Date(new Date(iso).getTime() + duracaoMs).toISOString() : iso;
+  BANHO_INICIO[linhaId][banho] = empurra(BANHO_INICIO[linhaId][banho]);
+  BANHO_TOTAL_INICIO[linhaId][banho] = empurra(BANHO_TOTAL_INICIO[linhaId][banho]);
+  BANHO_SAIDA_CALC[linhaId][banho] = empurra(BANHO_SAIDA_CALC[linhaId][banho]);
+  const pGranalha = pendenciaDoBanho(linhaId, banho, 'Granalha');
+  const pLimpeza = pendenciaDoBanho(linhaId, banho, 'Limpeza de contato');
+  if (pGranalha) pGranalha.ultima = empurra(pGranalha.ultima);
+  if (pLimpeza) pLimpeza.ultima = empurra(pLimpeza.ultima);
+  BANHO_PAUSADO[linhaId][banho] = null;
+
+  if (sb){
+    sb.from('banho_ciclos').update({
+      amostra_inicio: BANHO_INICIO[linhaId][banho], total_inicio: BANHO_TOTAL_INICIO[linhaId][banho],
+      saida_calculada: BANHO_SAIDA_CALC[linhaId][banho], pausado_desde: null, pausado_motivo: null,
+    }).eq('linha_id', linhaId).eq('banho', banho).then();
+    if (pGranalha) sb.from('pendencias_rotina').update({ ultima_troca: pGranalha.ultima }).eq('id', pGranalha.id).then();
+    if (pLimpeza) sb.from('pendencias_rotina').update({ ultima_troca: pLimpeza.ultima }).eq('id', pLimpeza.id).then();
+    sb.from('paradas_manutencao').update({ fim: agora.toISOString(), colaborador_re_fim: col.re })
+      .eq('linha_id', linhaId).eq('banho', banho).is('fim', null).then();
+  }
+  registrarAcaoSupabase(col.re, 'despausar_manutencao', linhaId, banho, null, { duracao_min: Math.round(duracaoMs/60000) });
+  renderAll();
+}
+
 async function resetTanqueMaePorClique(){
   const p = pendenciasDoEscopo('tanque_mae')[0];
   const col = await pedirConfirmacaoRE('Confirmar verificação do nível do Tanque Mãe — digite seu RE:');
@@ -1568,6 +1671,9 @@ function attachPlantClickHandlers(container){
       else if (action === 'start-banho') iniciarBanhoPorClique(g.dataset.linha, g.dataset.banho);
       else if (action === 'reset-tanque') resetTanqueMaePorClique();
       else if (action === 'historico-amostras') abrirHistoricoAmostras(g.dataset.escopo);
+      else if (action === 'historico-manutencao') abrirHistoricoManutencao(g.dataset.escopo);
+      else if (action === 'pausar-banho') pausarBanhoPorClique(g.dataset.linha, g.dataset.banho);
+      else if (action === 'despausar-banho') despausarBanhoPorClique(g.dataset.linha, g.dataset.banho);
       else {
         document.querySelector('[data-view="pendencias"]').click();
         document.getElementById('filterLinha').value = g.dataset.escopo;
@@ -2006,6 +2112,52 @@ function fmtDeltaAbsoluto(atual, anterior, unidade){
   const cor = delta > 0 ? 'var(--ok)' : delta < 0 ? 'var(--crit)' : 'var(--ink-faint)';
   return `<span style="color:${cor};">${sinal}${delta.toFixed(2)} ${unidade}</span>`;
 }
+
+/* =========================================================================
+   HISTÓRICO DE MANUTENÇÃO — atemporal: traz TODAS as paradas já registradas
+   pra linha (todos os banhos, sem filtro de data).
+   ========================================================================= */
+async function abrirHistoricoManutencao(linhaId){
+  const linha = LINHAS.find(l=>l.id===linhaId);
+  document.getElementById('histManutencaoTitulo').textContent = `Histórico de manutenção — ${linha.nome}`;
+  const conteudo = document.getElementById('histManutencaoConteudo');
+  conteudo.innerHTML = '<div class="relatorio-vazio">Carregando…</div>';
+  document.getElementById('histManutencaoOverlay').style.display = 'flex';
+
+  let paradas = [];
+  if (sb){
+    const { data } = await sb.from('paradas_manutencao')
+      .select('*, inicio_colaborador:colaboradores!paradas_manutencao_colaborador_re_inicio_fkey(nome), fim_colaborador:colaboradores!paradas_manutencao_colaborador_re_fim_fkey(nome)')
+      .eq('linha_id', linhaId)
+      .order('inicio', { ascending:false });
+    paradas = data || [];
+  }
+
+  if (!paradas.length){
+    conteudo.innerHTML = '<div class="relatorio-vazio">Nenhuma parada de manutenção registrada ainda nessa linha.</div>';
+    return;
+  }
+
+  conteudo.innerHTML = paradas.map(p=>{
+    const nomeInicio = p.inicio_colaborador?.nome || p.colaborador_re_inicio;
+    const emAndamento = !p.fim;
+    const duracaoTxt = emAndamento
+      ? '<span style="color:var(--crit); font-weight:700;">Em andamento</span>'
+      : fmtHoras((new Date(p.fim) - new Date(p.inicio)) / 3600000);
+    const fimHTML = emAndamento ? '' : `<br>Retomado: ${fmtDataHoraCurtaBR(p.fim)} · ${p.fim_colaborador?.nome || p.colaborador_re_fim}`;
+    return `
+      <div class="relatorio-elemento-bloco ${emAndamento ? 'tem-alerta' : ''}">
+        <div class="relatorio-elemento-titulo"><span>${p.banho}</span><span class="faixa-ref">Duração: ${duracaoTxt}</span></div>
+        <div class="relatorio-correcao-linha" style="margin-top:6px;">
+          <strong>Motivo:</strong> ${p.motivo}<br>
+          Pausado: ${fmtDataHoraCurtaBR(p.inicio)} · ${nomeInicio}${fimHTML}
+        </div>
+      </div>`;
+  }).join('');
+}
+document.getElementById('histManutencaoFechar').addEventListener('click', ()=>{
+  document.getElementById('histManutencaoOverlay').style.display = 'none';
+});
 
 async function abrirHistoricoAmostras(linhaId){
   const linha = LINHAS.find(l=>l.id===linhaId);
