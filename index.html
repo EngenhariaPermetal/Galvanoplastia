@@ -1321,11 +1321,14 @@ function buildPlantaSVG(){
       svg += `<text class="bath-total-info" x="${boxX+46}" y="${y+25}" text-anchor="start">⏱ ${fmtCronometroCurto(totalInicio)} · ${qtdAmostras}×</text>`;
 
       // pílula da retirada de amostra — canto superior direito da caixa
+      // (no Latão o relógio exibido é o mesmo que colore a pílula: desde o
+      // START, nunca reseta — evita o texto e a cor mostrarem tempos diferentes)
+      const inicioExibido = ehLinhaLatao(linhaId) ? totalInicio : inicio;
       const amostraW = 92, amostraX = boxX + boxW - amostraW - 10, amostraY = y + 9;
       svg += `<g class="plant-dot" data-action="reset-banho" data-linha="${linhaId}" data-banho="${banho}">`;
       svg += `<rect class="item-pill ${stBanho}" x="${amostraX}" y="${amostraY}" width="${amostraW}" height="${pillH}" rx="${pillH/2}"></rect>`;
       svg += `<text class="etapa-icon-sm" x="${amostraX+18}" y="${amostraY+pillH/2+5}" text-anchor="middle" style="font-size:16px;">🧪</text>`;
-      svg += `<text class="bath-timer ${stBanho}" x="${amostraX+amostraW-10}" y="${amostraY+pillH/2+4}" text-anchor="end" style="font-size:13.5px;">${fmtCronometroCurto(inicio)}</text>`;
+      svg += `<text class="bath-timer ${stBanho}" x="${amostraX+amostraW-10}" y="${amostraY+pillH/2+4}" text-anchor="end" style="font-size:13.5px;">${fmtCronometroCurto(inicioExibido)}</text>`;
       svg += `</g>`;
 
       // pílulas de Granalha / Limpeza de contato — de volta pra base da caixa, lado a lado
