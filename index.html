@@ -487,6 +487,18 @@
 
 </main>
 
+<!-- Modal: histórico de amostras dos banhos correntes (esquece tudo no próximo START) -->
+<div class="modal-overlay" id="histAmostrasOverlay">
+  <div class="modal-box" id="histAmostrasBox" style="max-width:600px;">
+    <h3 id="histAmostrasTitulo">Histórico de amostras</h3>
+    <p class="modal-desc">Só o ciclo atual — some quando der START de novo naquele banho.</p>
+    <div id="histAmostrasConteudo" class="relatorio-lista" style="max-height:55vh;"></div>
+    <div class="modal-actions">
+      <button class="btn" id="histAmostrasFechar">Fechar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: relatório por período (linha inteira, todos os elementos, intervalo de datas) -->
 <div class="modal-overlay" id="periodoModalOverlay">
   <div class="modal-box" id="periodoModalBox" style="max-width:640px;">
@@ -1285,6 +1297,9 @@ function buildPlantaSVG(){
     svg += `<circle cx="${x+colW-9}" cy="13" r="7" fill="${colorLinha}" class="${stLinha!=='ok'?'pulse':''}"></circle>`;
     svg += `<text class="apoio-label" x="${x}" y="34" text-anchor="start">${linha.liga}</text>`;
     svg += `</g>`;
+    svg += `<g class="plant-dot" data-action="historico-amostras" data-escopo="${linhaId}">
+      <text x="${x+colW-9}" y="34" text-anchor="end" style="font-size:14px;" title="Histórico de amostras do ciclo atual">📋</text>
+    </g>`;
 
     // banhos B3/B2/B1 — faixa esquerda com START + Saída calculada; Granalha/Limpeza
     // voltam a ser ícones dentro da própria caixa (mesmo sistema de alerta/pisca)
@@ -1487,6 +1502,7 @@ function attachPlantClickHandlers(container){
       else if (action === 'reset-banho') resetBanhoPorClique(g.dataset.linha, g.dataset.banho);
       else if (action === 'start-banho') iniciarBanhoPorClique(g.dataset.linha, g.dataset.banho);
       else if (action === 'reset-tanque') resetTanqueMaePorClique();
+      else if (action === 'historico-amostras') abrirHistoricoAmostras(g.dataset.escopo);
       else {
         document.querySelector('[data-view="pendencias"]').click();
         document.getElementById('filterLinha').value = g.dataset.escopo;
@@ -1903,6 +1919,66 @@ function imprimirRelatorioPeriodo(dados){
   win.focus();
   win.print();
 }
+
+/* =========================================================================
+   HISTÓRICO DE AMOSTRAS DO CICLO ATUAL — por linha, cada banho (B1/B2/B3)
+   mostra as coletas feitas DESDE O ÚLTIMO START daquele banho específico
+   (um novo START apaga esse histórico rápido, começa do zero de novo).
+   ========================================================================= */
+function fmtVariacao(atual, anterior){
+  if (anterior == null || anterior === 0 || atual == null) return '';
+  const variacao = ((atual - anterior) / anterior) * 100;
+  const seta = variacao > 0 ? '▲' : variacao < 0 ? '▼' : '●';
+  const cor = variacao > 0 ? 'var(--ok)' : variacao < 0 ? 'var(--crit)' : 'var(--ink-faint)';
+  return `<span style="color:${cor}; font-weight:700;">${seta} ${variacao>0?'+':''}${variacao.toFixed(1)}%</span>`;
+}
+
+async function abrirHistoricoAmostras(linhaId){
+  const linha = LINHAS.find(l=>l.id===linhaId);
+  document.getElementById('histAmostrasTitulo').textContent = `Histórico de amostras — ${linha.nome}`;
+  const conteudo = document.getElementById('histAmostrasConteudo');
+  conteudo.innerHTML = '<div class="relatorio-vazio">Carregando…</div>';
+  document.getElementById('histAmostrasOverlay').style.display = 'flex';
+
+  const blocosPorBanho = await Promise.all(BANHOS.map(async banho=>{
+    const inicioCiclo = BANHO_TOTAL_INICIO[linhaId][banho];
+    let coletas = [];
+    if (sb){
+      const { data } = await sb.from('historico_acoes')
+        .select('*, colaboradores(nome)')
+        .eq('linha_id', linhaId).eq('banho', banho).eq('tipo_acao', 'coleta_amostra')
+        .gte('criado_em', inicioCiclo)
+        .order('criado_em', { ascending:true });
+      coletas = data || [];
+    }
+    return { banho, coletas };
+  }));
+
+  conteudo.innerHTML = blocosPorBanho.map(({banho, coletas})=>{
+    if (!coletas.length){
+      return `<div class="relatorio-elemento-bloco"><div class="relatorio-elemento-titulo"><span>${banho}</span></div><div class="relatorio-sem-registro">Nenhuma coleta neste ciclo ainda (desde o último START)</div></div>`;
+    }
+    const itensHTML = coletas.map((c, i)=>{
+      const d = c.detalhe || {};
+      const anterior = i>0 ? (coletas[i-1].detalhe || {}) : null;
+      const ordinal = ['1ª','2ª','3ª','4ª','5ª','6ª'][i] || `${i+1}ª`;
+      const nome = c.colaboradores?.nome || c.colaborador_re;
+      const camadaTxt = d.camada_media!=null ? `${Number(d.camada_media).toFixed(2)} µm` : '—';
+      const ligaTxt = d.liga_media!=null ? `${Number(d.liga_media).toFixed(2)}%` : '—';
+      const varCamada = anterior && d.camada_media!=null && anterior.camada_media!=null ? fmtVariacao(d.camada_media, anterior.camada_media) : '';
+      const varLiga = anterior && d.liga_media!=null && anterior.liga_media!=null ? fmtVariacao(d.liga_media, anterior.liga_media) : '';
+      return `
+        <div class="relatorio-correcao-linha" style="margin-bottom:6px;">
+          <strong>${ordinal} coleta</strong> — ${fmtDataHoraCurtaBR(c.criado_em)} · ${nome}<br>
+          Camada média: ${camadaTxt} ${varCamada} &nbsp;|&nbsp; Liga: ${ligaTxt} ${varLiga}
+        </div>`;
+    }).join('');
+    return `<div class="relatorio-elemento-bloco"><div class="relatorio-elemento-titulo"><span>${banho}</span><span class="faixa-ref">${coletas.length} coleta${coletas.length===1?'':'s'} neste ciclo</span></div>${itensHTML}</div>`;
+  }).join('');
+}
+document.getElementById('histAmostrasFechar').addEventListener('click', ()=>{
+  document.getElementById('histAmostrasOverlay').style.display = 'none';
+});
 
 async function abrirRelatorioIntervencoes(linhaId, elemento){
   const nomeLinha = ESCOPOS[linhaId] || linhaId;
