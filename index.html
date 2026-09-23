@@ -236,6 +236,7 @@
   .relatorio-leitura-linha.ok{color:var(--ink-soft);}
   .relatorio-desvio{font-family:'Inter',sans-serif; font-size:10.5px; font-weight:700;}
   .relatorio-correcao-linha{font-size:11.5px; color:var(--brass-deep); font-weight:600; margin:4px 0 6px; padding:5px 10px; background:rgba(176,141,87,0.08); border-radius:6px;}
+  .relatorio-delta-abs{font-size:10.5px; font-weight:700; text-align:right; white-space:nowrap; flex:none;}
   .relatorio-sem-registro{font-size:11.5px; color:var(--ink-faint); font-style:italic; margin-top:4px;}
   .quimico-card .param-table td{padding:8px 10px;}
   @media (max-width:900px){ .quimicos-grid{grid-template-columns:1fr;} }
@@ -1996,6 +1997,15 @@ function fmtVariacao(atual, anterior){
   const cor = variacao > 0 ? 'var(--ok)' : variacao < 0 ? 'var(--crit)' : 'var(--ink-faint)';
   return `<span style="color:${cor}; font-weight:700;">${seta} ${variacao>0?'+':''}${variacao.toFixed(1)}%</span>`;
 }
+// Diferença em valor absoluto (µm pra camada, p.p. pra liga — nunca "%" pra
+// liga, já que liga em si já é uma porcentagem e ficaria ambíguo)
+function fmtDeltaAbsoluto(atual, anterior, unidade){
+  if (anterior == null || atual == null) return '';
+  const delta = atual - anterior;
+  const sinal = delta > 0 ? '+' : '';
+  const cor = delta > 0 ? 'var(--ok)' : delta < 0 ? 'var(--crit)' : 'var(--ink-faint)';
+  return `<span style="color:${cor};">${sinal}${delta.toFixed(2)} ${unidade}</span>`;
+}
 
 async function abrirHistoricoAmostras(linhaId){
   const linha = LINHAS.find(l=>l.id===linhaId);
@@ -2031,10 +2041,19 @@ async function abrirHistoricoAmostras(linhaId){
       const ligaTxt = d.liga_media!=null ? `${Number(d.liga_media).toFixed(2)}%` : '—';
       const varCamada = anterior && d.camada_media!=null && anterior.camada_media!=null ? fmtVariacao(d.camada_media, anterior.camada_media) : '';
       const varLiga = anterior && d.liga_media!=null && anterior.liga_media!=null ? fmtVariacao(d.liga_media, anterior.liga_media) : '';
+      const deltaCamada = anterior && d.camada_media!=null && anterior.camada_media!=null ? fmtDeltaAbsoluto(d.camada_media, anterior.camada_media, 'µm') : '';
+      const deltaLiga = anterior && d.liga_media!=null && anterior.liga_media!=null ? fmtDeltaAbsoluto(d.liga_media, anterior.liga_media, 'p.p.') : '';
+      const temDelta = deltaCamada || deltaLiga;
       return `
-        <div class="relatorio-correcao-linha" style="margin-bottom:6px;">
-          <strong>${ordinal} coleta</strong> — ${fmtDataHoraCurtaBR(c.criado_em)} · ${nome}<br>
-          Camada média: ${camadaTxt} ${varCamada} &nbsp;|&nbsp; Liga: ${ligaTxt} ${varLiga}
+        <div class="relatorio-correcao-linha" style="display:flex; justify-content:space-between; align-items:flex-start; gap:14px; margin-bottom:6px;">
+          <div>
+            <strong>${ordinal} coleta</strong> — ${fmtDataHoraCurtaBR(c.criado_em)} · ${nome}<br>
+            Camada média: ${camadaTxt} ${varCamada} &nbsp;|&nbsp; Liga: ${ligaTxt} ${varLiga}
+          </div>
+          ${temDelta ? `<div class="relatorio-delta-abs">
+            ${deltaCamada ? `<div>Camada ${deltaCamada}</div>` : ''}
+            ${deltaLiga ? `<div>Liga ${deltaLiga}</div>` : ''}
+          </div>` : ''}
         </div>`;
     }).join('');
     return `<div class="relatorio-elemento-bloco"><div class="relatorio-elemento-titulo"><span>${banho}</span><span class="faixa-ref">${coletas.length} coleta${coletas.length===1?'':'s'} neste ciclo</span></div>${itensHTML}</div>`;
