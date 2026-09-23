@@ -693,6 +693,10 @@ async function carregarDadosIniciais(){
       const linhaId = r.chave.replace('especificacao_disco_', '');
       ESPECIFICACAO_DISCO[linhaId] = Number(r.valor);
     }
+    if (r.chave.startsWith('sangramento_k2co3_')){
+      const linhaId = r.chave.replace('sangramento_k2co3_', '');
+      LIMITE_SANGRAMENTO[linhaId] = Number(r.valor);
+    }
   });
 
   // intervenções vêm ordenadas da mais nova pra mais velha — a primeira de
@@ -800,6 +804,10 @@ function configurarRealtime(){
       if (r.chave === 'limite_banho_horas'){ LIMITE_BANHO_HORAS = Number(r.valor); renderAll(); }
       else if (r.chave.startsWith('especificacao_disco_')){
         ESPECIFICACAO_DISCO[r.chave.replace('especificacao_disco_','')] = Number(r.valor);
+      }
+      else if (r.chave.startsWith('sangramento_k2co3_')){
+        LIMITE_SANGRAMENTO[r.chave.replace('sangramento_k2co3_','')] = Number(r.valor);
+        renderAll();
       }
     })
     .subscribe();
@@ -1076,7 +1084,6 @@ const BANHOS = ['B3','B2','B1']; // ordem visual de cima pra baixo, dentro de ca
 const EQUIPAMENTOS_APOIO = [
   { id:'retificadores', nome:'Sala de Retificadores' },
   { id:'chiller',       nome:'Chiller' },
-  { id:'tanque_mae',    nome:'Tanque Mãe' },
   { id:'filtro',        nome:'Filtro' },
   { id:'estanato',      nome:'Plataforma Estanato' },
 ];
@@ -1209,16 +1216,15 @@ function fmtFaixa(faixa){
   return `${min} – ${max}`;
 }
 
-/* Automação: quando o K2CO3 de QUALQUER linha fica abaixo do mínimo
-   parametrizado, acende o alerta de "sangrar" no Tanque Mãe (gota de sangue).
-   OBS: confirmar com o usuário se a condição real é "abaixo" mesmo, já que
-   sangria costuma ser pra excesso (K2CO3 alto), não pra falta. */
-function precisaSangrarTanque(){
-  return LINHAS.some(linha=>{
-    const valor = LEITURAS_QUIMICAS[linha.id].K2CO3;
-    const [min] = FAIXAS_QUIMICAS[linha.id].K2CO3 || [null,null];
-    return min!=null && valor!=null && !isNaN(valor) && valor < min;
-  });
+/* Automação: cada linha tem seu próprio limite de K2CO3 pra disparar o
+   "sangramento" (gota de sangue) no segmento do Tanque Mãe daquela linha —
+   configurável em Parâmetros ("Quando acionar o sangramento?"). */
+let LIMITE_SANGRAMENTO = {}; // por linha — µg/L ou unidade equivalente, configurável
+LINHAS.forEach(l=>{ LIMITE_SANGRAMENTO[l.id] = 200; }); // default até carregar do Supabase
+function precisaSangrarLinha(linhaId){
+  const valor = LEITURAS_QUIMICAS[linhaId]?.K2CO3;
+  const limite = LIMITE_SANGRAMENTO[linhaId];
+  return valor != null && !isNaN(valor) && limite != null && valor > limite;
 }
 
 const STATUS_HEX = { ok:'#1F9D55', warn:'#C98A00', crit:'#C7414F' };
@@ -1341,7 +1347,7 @@ function buildPlantaSVG(){
   const farmRows = TANQUE_FARM.reduce((acc,e)=>acc+(e.qtd||1),0);
   const farmBlockH = farmRows * rowH;
   const H = Math.max(farmStartY + farmBlockH + 10, startY + bathsBlockH + 40);
-  const tanqueMaeW = 132, tanqueMaeGap = 46;
+  const tanqueMaeW = 300, tanqueMaeGap = 46;
   const W = startX + LAYOUT_ORDEM.length*colW + (LAYOUT_ORDEM.length-1)*colGap + tanqueMaeGap + tanqueMaeW + startX;
 
   let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
@@ -1510,28 +1516,39 @@ function buildPlantaSVG(){
     });
   });
 
-  // Tanque Mãe — à direita das 3 linhas, com verificação periódica (sem % de nível — sem boia pra medir isso)
+  // Tanque Mãe — dividido em 3 segmentos, um por linha (cada um com seu próprio
+  // sangramento — correlacionado ao K2CO3 daquela linha — e verificação própria)
   {
-    const tmX = startX + LAYOUT_ORDEM.length*colW + (LAYOUT_ORDEM.length-1)*colGap + tanqueMaeGap;
-    const tmTop = startY, tmH = H - startY - 12, tmW = tanqueMaeW;
-    const pTanque = pendenciasDoEscopo('tanque_mae')[0];
-    const stTanque = statusDe(pTanque);
+    const tmX0 = startX + LAYOUT_ORDEM.length*colW + (LAYOUT_ORDEM.length-1)*colGap + tanqueMaeGap;
+    const tmTop = startY, tmH = H - startY - 12;
+    const segGap = 10, segW = (tanqueMaeW - segGap*(LAYOUT_ORDEM.length-1)) / LAYOUT_ORDEM.length;
     const statusBarH = 38;
 
-    svg += `<text class="farm-label" x="${tmX}" y="${tmTop-30}">TANQUE MÃE</text>`;
-    svg += `<rect class="tanque-rect" x="${tmX}" y="${tmTop}" width="${tmW}" height="${tmH}" rx="10"></rect>`;
-    svg += `<rect x="${tmX+4}" y="${tmTop+4}" width="${tmW-8}" height="${tmH-8}" rx="7" fill="#AFCBDA" opacity="0.55"></rect>`;
-    if (precisaSangrarTanque()){
-      svg += `<g class="plant-dot" data-action="nav" data-escopo="tanque_mae">`;
-      svg += `<text class="sangria-icone" x="${tmX+tmW/2}" y="${tmTop+tmH/2+14}" text-anchor="middle">🩸</text>`;
-      svg += `<text class="etapa-label" x="${tmX+tmW/2}" y="${tmTop+tmH/2+34}" text-anchor="middle" style="font-size:9.5px;">SANGRAR</text>`;
-      svg += `</g>`;
-    }
-    svg += `<g class="plant-dot" data-action="reset-tanque">`;
-    svg += `<rect class="etapa-row-bg ${stTanque==='crit'||stTanque==='warn'?stTanque:''}" x="${tmX}" y="${tmTop+tmH-statusBarH}" width="${tmW}" height="${statusBarH}"></rect>`;
-    svg += `<text class="etapa-label" x="${tmX+8}" y="${tmTop+tmH-statusBarH/2-2}" style="font-size:10px;">verificado há</text>`;
-    svg += `<text class="etapa-timer ${stTanque}" x="${tmX+8}" y="${tmTop+tmH-statusBarH/2+11}" style="font-size:10.5px;">${fmtCronometro(pTanque.ultima)}</text>`;
-    svg += `</g>`;
+    svg += `<text class="farm-label" x="${tmX0}" y="${tmTop-30}">TANQUE MÃE</text>`;
+
+    LAYOUT_ORDEM.forEach((linhaId, si)=>{
+      const linha = LINHAS.find(l=>l.id===linhaId);
+      const tmX = tmX0 + si*(segW+segGap);
+      const pTanque = pendenciaDaLinha(linhaId, 'Verificar nível do tanque mãe');
+      const stTanque = statusDe(pTanque);
+
+      svg += `<text class="apoio-label" x="${tmX+segW/2}" y="${tmTop-10}" text-anchor="middle" style="font-size:10px;">${linha.nome}</text>`;
+      svg += `<rect class="tanque-rect" x="${tmX}" y="${tmTop}" width="${segW}" height="${tmH}" rx="10"></rect>`;
+      svg += `<rect x="${tmX+4}" y="${tmTop+4}" width="${segW-8}" height="${tmH-8}" rx="7" fill="#AFCBDA" opacity="0.55"></rect>`;
+      if (precisaSangrarLinha(linhaId)){
+        svg += `<g class="plant-dot" data-action="nav" data-escopo="${linhaId}">`;
+        svg += `<text class="sangria-icone" x="${tmX+segW/2}" y="${tmTop+tmH/2+10}" text-anchor="middle" style="font-size:22px;">🩸</text>`;
+        svg += `<text class="etapa-label" x="${tmX+segW/2}" y="${tmTop+tmH/2+28}" text-anchor="middle" style="font-size:8.5px;">SANGRAR</text>`;
+        svg += `</g>`;
+      }
+      if (pTanque){
+        svg += `<g class="plant-dot" data-action="reset-tanque" data-linha="${linhaId}">`;
+        svg += `<rect class="etapa-row-bg ${stTanque==='crit'||stTanque==='warn'?stTanque:''}" x="${tmX}" y="${tmTop+tmH-statusBarH}" width="${segW}" height="${statusBarH}"></rect>`;
+        svg += `<text class="etapa-label" x="${tmX+7}" y="${tmTop+tmH-statusBarH/2-2}" style="font-size:8.5px;">verificado há</text>`;
+        svg += `<text class="etapa-timer ${stTanque}" x="${tmX+7}" y="${tmTop+tmH-statusBarH/2+11}" style="font-size:9.5px;">${fmtCronometro(pTanque.ultima)}</text>`;
+        svg += `</g>`;
+      }
+    });
   }
 
   svg += `</svg>`;
@@ -1651,14 +1668,16 @@ async function despausarBanhoPorClique(linhaId, banho){
   renderAll();
 }
 
-async function resetTanqueMaePorClique(){
-  const p = pendenciasDoEscopo('tanque_mae')[0];
-  const col = await pedirConfirmacaoRE('Confirmar verificação do nível do Tanque Mãe — digite seu RE:');
+async function resetTanqueMaePorClique(linhaId){
+  const p = pendenciaDaLinha(linhaId, 'Verificar nível do tanque mãe');
+  if (!p) return;
+  const nome = LINHAS.find(l=>l.id===linhaId)?.nome || linhaId;
+  const col = await pedirConfirmacaoRE(`Confirmar verificação do nível do Tanque Mãe — ${nome}. Digite seu RE:`);
   if (!col) return;
   const agora = new Date().toISOString();
   p.ultima = agora;
   if (sb) sb.from('pendencias_rotina').update({ ultima_troca: agora }).eq('id', p.id).then();
-  registrarAcaoSupabase(col.re, 'verificacao_tanque_mae', 'tanque_mae', null, p.item);
+  registrarAcaoSupabase(col.re, 'verificacao_tanque_mae', linhaId, null, p.item);
   renderAll();
 }
 
@@ -1670,7 +1689,7 @@ function attachPlantClickHandlers(container){
       if (action === 'reset-pendencia') resetPendenciaPorId(Number(g.dataset.pid));
       else if (action === 'reset-banho') resetBanhoPorClique(g.dataset.linha, g.dataset.banho);
       else if (action === 'start-banho') iniciarBanhoPorClique(g.dataset.linha, g.dataset.banho);
-      else if (action === 'reset-tanque') resetTanqueMaePorClique();
+      else if (action === 'reset-tanque') resetTanqueMaePorClique(g.dataset.linha);
       else if (action === 'historico-amostras') abrirHistoricoAmostras(g.dataset.escopo);
       else if (action === 'historico-manutencao') abrirHistoricoManutencao(g.dataset.escopo);
       else if (action === 'pausar-banho') pausarBanhoPorClique(g.dataset.linha, g.dataset.banho);
@@ -1720,24 +1739,10 @@ function renderMobileResumo(){
       </div>`;
   }).join('');
 
-  const pTanque = pendenciasDoEscopo('tanque_mae')[0];
-  const stTanque = statusDe(pTanque);
-  const subTanque = stTanque==='crit' ? 'Verificação vencida' : stTanque==='warn' ? 'Próxima do limite' : 'Em dia';
-  const tanqueHTML = `
-    <div class="mobile-resumo-linha" data-escopo="tanque_mae">
-      <span class="chip-dot ${stTanque}"></span>
-      <div class="mobile-resumo-linha-info">
-        <div class="mobile-resumo-linha-nome">Tanque Mãe</div>
-        <div class="mobile-resumo-linha-sub">${subTanque}</div>
-      </div>
-      <span class="mobile-resumo-seta">›</span>
-    </div>`;
-
   wrap.innerHTML = `
     <div class="mobile-resumo-card">
       <div class="mobile-resumo-titulo">Status por linha</div>
       ${linhaLinha}
-      ${tanqueHTML}
     </div>`;
 
   wrap.querySelectorAll('.mobile-resumo-linha').forEach(row=>{
@@ -2113,6 +2118,13 @@ function fmtDeltaAbsoluto(atual, anterior, unidade){
   const cor = delta > 0 ? 'var(--ok)' : delta < 0 ? 'var(--crit)' : 'var(--ink-faint)';
   return `<span style="color:${cor};">${sinal}${delta.toFixed(2)} ${unidade}</span>`;
 }
+// Menor e maior valor dentre as medições brutas de UMA coleta (não compara
+// com outra coleta — é a dispersão interna daquela própria retirada)
+function fmtMinMax(valores, unidade){
+  if (!valores || !valores.length) return '';
+  const min = Math.min(...valores), max = Math.max(...valores);
+  return `<span style="color:var(--ok);">▲ ${max.toFixed(2)}${unidade}</span> &nbsp;·&nbsp; <span style="color:var(--crit);">▼ ${min.toFixed(2)}${unidade}</span>`;
+}
 
 /* =========================================================================
    HISTÓRICO DE MANUTENÇÃO — atemporal: traz TODAS as paradas já registradas
@@ -2192,8 +2204,8 @@ async function abrirHistoricoAmostras(linhaId){
       const nome = c.colaboradores?.nome || c.colaborador_re;
       const camadaTxt = d.camada_media!=null ? `${Number(d.camada_media).toFixed(2)} µm` : '—';
       const ligaTxt = d.liga_media!=null ? `${Number(d.liga_media).toFixed(2)}%` : '—';
-      const varCamada = anterior && d.camada_media!=null && anterior.camada_media!=null ? fmtVariacao(d.camada_media, anterior.camada_media) : '';
-      const varLiga = anterior && d.liga_media!=null && anterior.liga_media!=null ? fmtVariacao(d.liga_media, anterior.liga_media) : '';
+      const minMaxCamada = fmtMinMax(d.camada_valores, 'µm');
+      const minMaxLiga = fmtMinMax(d.liga_valores, '%');
       const deltaCamada = anterior && d.camada_media!=null && anterior.camada_media!=null ? fmtDeltaAbsoluto(d.camada_media, anterior.camada_media, 'µm') : '';
       const deltaLiga = anterior && d.liga_media!=null && anterior.liga_media!=null ? fmtDeltaAbsoluto(d.liga_media, anterior.liga_media, 'p.p.') : '';
       const temDelta = deltaCamada || deltaLiga;
@@ -2201,7 +2213,8 @@ async function abrirHistoricoAmostras(linhaId){
         <div class="relatorio-correcao-linha" style="display:flex; justify-content:space-between; align-items:flex-start; gap:14px; margin-bottom:6px;">
           <div>
             <strong>${ordinal} coleta</strong> — ${fmtDataHoraCurtaBR(c.criado_em)} · ${nome}<br>
-            Camada média: ${camadaTxt} ${varCamada} &nbsp;|&nbsp; Liga: ${ligaTxt} ${varLiga}
+            Camada média: ${camadaTxt} ${minMaxCamada ? `&nbsp;(${minMaxCamada})` : ''}<br>
+            Liga: ${ligaTxt} ${minMaxLiga ? `&nbsp;(${minMaxLiga})` : ''}
           </div>
           ${temDelta ? `<div class="relatorio-delta-abs">
             ${deltaCamada ? `<div>Camada ${deltaCamada}</div>` : ''}
@@ -2364,7 +2377,8 @@ function renderFullTable(){
 function renderParametros(){
   if (!PENDENCIAS.length) return; // ainda carregando do Supabase
   document.getElementById('paramLimiteBanho').value = LIMITE_BANHO_HORAS;
-  document.getElementById('paramTanqueMae').value = pendenciasDoEscopo('tanque_mae')[0].limiteHoras;
+  const pTanqueRef = pendenciaDaLinha(LINHAS[0].id, 'Verificar nível do tanque mãe');
+  if (pTanqueRef) document.getElementById('paramTanqueMae').value = pTanqueRef.limiteHoras;
 
   const wrap = document.getElementById('parametrosWrap');
   wrap.innerHTML = LINHAS.map(linha=>{
@@ -2408,6 +2422,12 @@ function renderParametros(){
                  value="${ESPECIFICACAO_DISCO[linha.id] ?? ''}" placeholder="µm" style="width:90px;">
           <span class="hint">Especificação do disco (µm)</span>
         </div>
+        <div class="param-subtitle">Quando acionar o sangramento?</div>
+        <div style="margin-bottom:14px;">
+          <input type="number" min="0" step="1" class="param-input" data-limite-sangramento data-linha="${linha.id}"
+                 value="${LIMITE_SANGRAMENTO[linha.id] ?? ''}" placeholder="200" style="width:90px;">
+          <span class="hint">Sangra quando o K2CO3 dessa linha ficar acima deste valor</span>
+        </div>
         <div class="param-subtitle">Por banho</div>
         <table class="data-table param-table">
           <thead><tr><th>Banho</th><th>Granalha</th><th>Limpeza de contato</th><th>Coleta de amostra</th><th>Especif. Liga (%)</th></tr></thead>
@@ -2439,6 +2459,17 @@ function renderParametros(){
       const v = parseFloat(el.value);
       ESPECIFICACAO_LIGA[el.dataset.linha][el.dataset.banho] = isNaN(v) ? null : v;
       // mock por enquanto — mesma lógica que a especificação do disco tinha antes de validar
+    });
+  });
+  wrap.querySelectorAll('[data-limite-sangramento]').forEach(el=>{
+    el.addEventListener('change', ()=>{
+      const v = parseFloat(el.value);
+      const linhaId = el.dataset.linha;
+      LIMITE_SANGRAMENTO[linhaId] = isNaN(v) ? null : v;
+      if (sb && !isNaN(v)){
+        sb.from('config_geral').upsert({ chave: 'sangramento_k2co3_'+linhaId, valor: String(v) }, { onConflict:'chave' }).then();
+      }
+      renderAll();
     });
   });
   wrap.querySelectorAll('[data-ativo-pendencia]').forEach(el=>{
@@ -2501,9 +2532,12 @@ document.getElementById('paramLimiteBanho').addEventListener('change', (e)=>{
 document.getElementById('paramTanqueMae').addEventListener('change', (e)=>{
   const v = parseFloat(e.target.value);
   if (!isNaN(v) && v > 0){
-    const p = pendenciasDoEscopo('tanque_mae')[0];
-    p.limiteHoras = v;
-    if (sb) sb.from('pendencias_rotina').update({ limite_horas: v }).eq('id', p.id).then();
+    LINHAS.forEach(linha=>{
+      const p = pendenciaDaLinha(linha.id, 'Verificar nível do tanque mãe');
+      if (!p) return;
+      p.limiteHoras = v;
+      if (sb) sb.from('pendencias_rotina').update({ limite_horas: v }).eq('id', p.id).then();
+    });
     renderAll();
   }
 });
