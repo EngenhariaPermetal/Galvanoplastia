@@ -138,6 +138,8 @@
 
   /* Pílula (oblongo) — deixa claro que o ícone + cronômetro é clicável */
   .item-pill{stroke-width:1.5;}
+  .item-pill.off{fill:var(--surface-warm); stroke:var(--hairline);}
+  .etapa-icon-timer.off, .bath-timer.off{fill:var(--ink-faint); font-style:italic;}
   .item-pill.ok{fill:var(--surface); stroke:var(--hairline);}
   .item-pill.warn{fill:var(--warn-bg); stroke:var(--warn);}
   .item-pill.crit{fill:var(--crit-bg); stroke:var(--crit); animation: pillGlow .9s ease-in-out infinite;}
@@ -185,6 +187,7 @@
   .badge.warn{background:var(--warn-bg); color:var(--warn);}
   .badge.crit{background:var(--crit-bg); color:var(--crit);}
   .badge.evento{background:var(--bg); color:var(--ink-soft);}
+  .badge.off{background:var(--bg); color:var(--ink-faint); font-style:italic;}
   .table-note{font-size:12px; color:var(--ink-faint); margin-top:10px;}
 
   /* ---------- Parametrização ---------- */
@@ -439,6 +442,7 @@
         <option value="warn">Próximas do limite</option>
         <option value="ok">Em dia</option>
         <option value="evento">Por banho (evento)</option>
+        <option value="off">Desativada</option>
       </select>
       <div style="flex:1"></div>
       <span class="table-note" style="margin:0;">"Zerar cronômetro" é só front-end por enquanto — vai virar gravação no Supabase.</span>
@@ -618,6 +622,7 @@ async function carregarDadosIniciais(){
   PENDENCIAS = (pend.data || []).map(r => ({
     id: r.id, escopo: r.escopo, banho: r.banho, item: r.item, tanque: r.tanque,
     tipo: r.tipo, limiteHoras: r.limite_horas, descricao: r.descricao, ultima: r.ultima_troca,
+    ativo: r.ativo !== false,
   }));
 
   (banho.data || []).forEach(r => {
@@ -625,10 +630,12 @@ async function carregarDadosIniciais(){
     if (!BANHO_TOTAL_INICIO[r.linha_id]) BANHO_TOTAL_INICIO[r.linha_id] = {};
     if (!BANHO_AMOSTRAS[r.linha_id]) BANHO_AMOSTRAS[r.linha_id] = {};
     if (!BANHO_SAIDA_CALC[r.linha_id]) BANHO_SAIDA_CALC[r.linha_id] = {};
+    if (!BANHO_AMOSTRA_ATIVA[r.linha_id]) BANHO_AMOSTRA_ATIVA[r.linha_id] = {};
     BANHO_INICIO[r.linha_id][r.banho] = r.amostra_inicio;
     BANHO_TOTAL_INICIO[r.linha_id][r.banho] = r.total_inicio;
     BANHO_AMOSTRAS[r.linha_id][r.banho] = r.amostras_contador;
     BANHO_SAIDA_CALC[r.linha_id][r.banho] = r.saida_calculada || null;
+    BANHO_AMOSTRA_ATIVA[r.linha_id][r.banho] = r.amostra_ativa !== false;
   });
 
   (faixas.data || []).forEach(r => {
@@ -703,6 +710,7 @@ function configurarRealtime(){
         const item = {
           id:r.id, escopo:r.escopo, banho:r.banho, item:r.item, tanque:r.tanque,
           tipo:r.tipo, limiteHoras:r.limite_horas, descricao:r.descricao, ultima:r.ultima_troca,
+          ativo:r.ativo !== false,
         };
         const idx = PENDENCIAS.findIndex(p => p.id === r.id);
         if (idx >= 0) PENDENCIAS[idx] = item; else PENDENCIAS.push(item);
@@ -719,10 +727,12 @@ function configurarRealtime(){
       if (!BANHO_TOTAL_INICIO[r.linha_id]) BANHO_TOTAL_INICIO[r.linha_id] = {};
       if (!BANHO_AMOSTRAS[r.linha_id]) BANHO_AMOSTRAS[r.linha_id] = {};
       if (!BANHO_SAIDA_CALC[r.linha_id]) BANHO_SAIDA_CALC[r.linha_id] = {};
+      if (!BANHO_AMOSTRA_ATIVA[r.linha_id]) BANHO_AMOSTRA_ATIVA[r.linha_id] = {};
       BANHO_INICIO[r.linha_id][r.banho] = r.amostra_inicio;
       BANHO_TOTAL_INICIO[r.linha_id][r.banho] = r.total_inicio;
       BANHO_AMOSTRAS[r.linha_id][r.banho] = r.amostras_contador;
       BANHO_SAIDA_CALC[r.linha_id][r.banho] = r.saida_calculada || null;
+      BANHO_AMOSTRA_ATIVA[r.linha_id][r.banho] = r.amostra_ativa !== false;
       renderAll();
     })
     .subscribe();
@@ -1095,11 +1105,13 @@ LINHAS.forEach(l=>{ BANHO_INICIO[l.id]={}; BANHO_TOTAL_INICIO[l.id]={}; BANHO_AM
 let ESPECIFICACAO_DISCO = {}; // por linha — configurável em Parâmetros (µm)
 let ESPECIFICACAO_LIGA = {};  // por linha+banho — % da liga esperada no revestimento (mock, ainda não grava no Supabase)
 let BANHO_SAIDA_CALC = {};    // por linha+banho — horário calculado (ISO) ou null
+let BANHO_AMOSTRA_ATIVA = {}; // por linha+banho — false = coleta de amostra desativada pra esse banho (banho fora de uso)
 LINHAS.forEach(l=>{
   ESPECIFICACAO_DISCO[l.id] = null;
   ESPECIFICACAO_LIGA[l.id] = {};
   BANHO_SAIDA_CALC[l.id] = {};
-  BANHOS.forEach(b=>{ ESPECIFICACAO_LIGA[l.id][b] = null; BANHO_SAIDA_CALC[l.id][b] = null; });
+  BANHO_AMOSTRA_ATIVA[l.id] = {};
+  BANHOS.forEach(b=>{ ESPECIFICACAO_LIGA[l.id][b] = null; BANHO_SAIDA_CALC[l.id][b] = null; BANHO_AMOSTRA_ATIVA[l.id][b] = true; });
 });
 
 function fmtHoraRelogio(iso){
@@ -1191,6 +1203,7 @@ function horasDesde(iso){ return (Date.now() - new Date(iso).getTime()) / 360000
 
 function statusDe(p){
   if (!p) return 'ok'; // dado ainda não carregado (Supabase indisponível/lento) — não quebra a tela
+  if (p.ativo === false) return 'off';
   if (p.tipo === 'evento') return 'evento';
   const ratio = horasDesde(p.ultima) / p.limiteHoras;
   if (ratio >= 1) return 'crit';
@@ -1209,6 +1222,7 @@ function ehLinhaLatao(linhaId){
 const LATAO_HORAS_AMOSTRA = [5, 7, 9];
 
 function statusBanho(linhaId, banho){
+  if (BANHO_AMOSTRA_ATIVA[linhaId] && BANHO_AMOSTRA_ATIVA[linhaId][banho] === false) return 'off';
   if (ehLinhaLatao(linhaId)){
     const amostrasFeitas = BANHO_AMOSTRAS[linhaId][banho] || 0;
     const limiteHoras = LATAO_HORAS_AMOSTRA[amostrasFeitas];
@@ -1225,12 +1239,12 @@ function statusBanho(linhaId, banho){
 }
 function saldoHoras(p){ return p.tipo === 'evento' ? Infinity : p.limiteHoras - horasDesde(p.ultima); }
 function piorStatus(lista){
-  const relevantes = lista.filter(s=>s!=='evento');
+  const relevantes = lista.filter(s=>s!=='evento' && s!=='off');
   if (relevantes.some(s=>s==='crit')) return 'crit';
   if (relevantes.some(s=>s==='warn')) return 'warn';
   return 'ok';
 }
-const STATUS_LABEL = { ok:'Em dia', warn:'Atenção', crit:'Vencida', evento:'Por banho' };
+const STATUS_LABEL = { ok:'Em dia', warn:'Atenção', crit:'Vencida', evento:'Por banho', off:'Desativada' };
 
 function fmtCronometro(iso){
   const totalMin = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
@@ -1356,11 +1370,17 @@ function buildPlantaSVG(){
       // START, nunca reseta — evita o texto e a cor mostrarem tempos diferentes)
       const inicioExibido = ehLinhaLatao(linhaId) ? totalInicio : inicio;
       const amostraW = 92, amostraX = boxX + boxW - amostraW - 10, amostraY = y + 9;
-      svg += `<g class="plant-dot" data-action="reset-banho" data-linha="${linhaId}" data-banho="${banho}">`;
-      svg += `<rect class="item-pill ${stBanho}" x="${amostraX}" y="${amostraY}" width="${amostraW}" height="${pillH}" rx="${pillH/2}"></rect>`;
-      svg += `<text class="etapa-icon-sm" x="${amostraX+18}" y="${amostraY+pillH/2+5}" text-anchor="middle" style="font-size:16px;">🧪</text>`;
-      svg += `<text class="bath-timer ${stBanho}" x="${amostraX+amostraW-10}" y="${amostraY+pillH/2+4}" text-anchor="end" style="font-size:13.5px;">${fmtCronometroCurto(inicioExibido)}</text>`;
-      svg += `</g>`;
+      if (stBanho === 'off'){
+        svg += `<rect class="item-pill off" x="${amostraX}" y="${amostraY}" width="${amostraW}" height="${pillH}" rx="${pillH/2}"></rect>`;
+        svg += `<text class="etapa-icon-sm" x="${amostraX+18}" y="${amostraY+pillH/2+5}" text-anchor="middle" style="font-size:16px; opacity:.4;">🧪</text>`;
+        svg += `<text class="bath-timer off" x="${amostraX+amostraW-10}" y="${amostraY+pillH/2+4}" text-anchor="end" style="font-size:10.5px;">desativado</text>`;
+      } else {
+        svg += `<g class="plant-dot" data-action="reset-banho" data-linha="${linhaId}" data-banho="${banho}">`;
+        svg += `<rect class="item-pill ${stBanho}" x="${amostraX}" y="${amostraY}" width="${amostraW}" height="${pillH}" rx="${pillH/2}"></rect>`;
+        svg += `<text class="etapa-icon-sm" x="${amostraX+18}" y="${amostraY+pillH/2+5}" text-anchor="middle" style="font-size:16px;">🧪</text>`;
+        svg += `<text class="bath-timer ${stBanho}" x="${amostraX+amostraW-10}" y="${amostraY+pillH/2+4}" text-anchor="end" style="font-size:13.5px;">${fmtCronometroCurto(inicioExibido)}</text>`;
+        svg += `</g>`;
+      }
 
       // pílulas de Granalha / Limpeza de contato — de volta pra base da caixa, lado a lado
       const pillMargin = 8, pillGap = 6;
@@ -1371,11 +1391,17 @@ function buildPlantaSVG(){
         const st = statusDe(p);
         const icone = ICONE_ETAPA[etapa.item] || '•';
         const px = boxX + pillMargin + ei*(pillW+pillGap);
-        svg += `<g class="plant-dot" data-action="reset-pendencia" data-pid="${p.id}">`;
-        svg += `<rect class="item-pill ${st}" x="${px}" y="${py}" width="${pillW}" height="${pillH}" rx="${pillH/2}"></rect>`;
-        svg += `<text class="etapa-icon-sm" x="${px+18}" y="${py+pillH/2+5}" text-anchor="middle" style="font-size:15px;">${icone}</text>`;
-        svg += `<text class="etapa-icon-timer ${st}" x="${px+pillW-10}" y="${py+pillH/2+4}" text-anchor="end" style="font-size:12.5px;">${fmtCronometroCurto(p.ultima)}</text>`;
-        svg += `</g>`;
+        if (st === 'off'){
+          svg += `<rect class="item-pill off" x="${px}" y="${py}" width="${pillW}" height="${pillH}" rx="${pillH/2}"></rect>`;
+          svg += `<text class="etapa-icon-sm" x="${px+18}" y="${py+pillH/2+5}" text-anchor="middle" style="font-size:15px; opacity:.4;">${icone}</text>`;
+          svg += `<text class="etapa-icon-timer off" x="${px+pillW-10}" y="${py+pillH/2+4}" text-anchor="end" style="font-size:10.5px;">desativado</text>`;
+        } else {
+          svg += `<g class="plant-dot" data-action="reset-pendencia" data-pid="${p.id}">`;
+          svg += `<rect class="item-pill ${st}" x="${px}" y="${py}" width="${pillW}" height="${pillH}" rx="${pillH/2}"></rect>`;
+          svg += `<text class="etapa-icon-sm" x="${px+18}" y="${py+pillH/2+5}" text-anchor="middle" style="font-size:15px;">${icone}</text>`;
+          svg += `<text class="etapa-icon-timer ${st}" x="${px+pillW-10}" y="${py+pillH/2+4}" text-anchor="end" style="font-size:12.5px;">${fmtCronometroCurto(p.ultima)}</text>`;
+          svg += `</g>`;
+        }
       });
 
       y += bathH + banhoGap;
@@ -2174,10 +2200,13 @@ function renderParametros(){
     const linhasBanho = BANHOS.map(banho=>{
       const campos = ETAPAS_POR_BANHO.map(etapa=>{
         const p = pendenciaDoBanho(linha.id, banho, etapa.item);
-        return `<td>${etapa.item}: <input type="number" min="0" step="0.5" class="param-input" data-param data-linha="${linha.id}" data-banho="${banho}" data-item="${etapa.item}" data-kind="horas" value="${p.limiteHoras}"></td>`;
+        const checkbox = `<input type="checkbox" class="param-ativo-check" data-ativo-pendencia data-pid="${p.id}" ${p.ativo!==false?'checked':''} title="Ativo/desativado">`;
+        return `<td>${checkbox} ${etapa.item}: <input type="number" min="0" step="0.5" class="param-input" data-param data-linha="${linha.id}" data-banho="${banho}" data-item="${etapa.item}" data-kind="horas" value="${p.limiteHoras}" ${p.ativo===false?'disabled':''}></td>`;
       }).join('');
+      const amostraAtiva = BANHO_AMOSTRA_ATIVA[linha.id][banho] !== false;
+      const campoAmostra = `<td><label style="display:flex; align-items:center; gap:6px; font-size:12.5px;"><input type="checkbox" class="param-ativo-check" data-ativo-amostra data-linha="${linha.id}" data-banho="${banho}" ${amostraAtiva?'checked':''}> ${amostraAtiva?'Ativa':'Desativada'}</label></td>`;
       const campoLiga = `<td><input type="number" min="0" step="0.1" class="param-input" data-espec-liga data-linha="${linha.id}" data-banho="${banho}" value="${ESPECIFICACAO_LIGA[linha.id][banho] ?? ''}" placeholder="%" style="width:70px;"></td>`;
-      return `<tr><td>${banho}</td>${campos}${campoLiga}</tr>`;
+      return `<tr><td>${banho}</td>${campos}${campoAmostra}${campoLiga}</tr>`;
     }).join('');
 
     // fazenda de tanques da linha
@@ -2209,7 +2238,7 @@ function renderParametros(){
         </div>
         <div class="param-subtitle">Por banho</div>
         <table class="data-table param-table">
-          <thead><tr><th>Banho</th><th>Granalha</th><th>Limpeza de contato</th><th>Especif. Liga (%)</th></tr></thead>
+          <thead><tr><th>Banho</th><th>Granalha</th><th>Limpeza de contato</th><th>Coleta de amostra</th><th>Especif. Liga (%)</th></tr></thead>
           <tbody>${linhasBanho}</tbody>
         </table>
         <div class="param-subtitle">Tanques da linha</div>
@@ -2238,6 +2267,26 @@ function renderParametros(){
       const v = parseFloat(el.value);
       ESPECIFICACAO_LIGA[el.dataset.linha][el.dataset.banho] = isNaN(v) ? null : v;
       // mock por enquanto — mesma lógica que a especificação do disco tinha antes de validar
+    });
+  });
+  wrap.querySelectorAll('[data-ativo-pendencia]').forEach(el=>{
+    el.addEventListener('change', ()=>{
+      const id = Number(el.dataset.pid);
+      const p = PENDENCIAS.find(x=>x.id===id);
+      if (!p) return;
+      p.ativo = el.checked;
+      if (sb) sb.from('pendencias_rotina').update({ ativo: el.checked }).eq('id', id).then();
+      renderParametros();
+      renderAll();
+    });
+  });
+  wrap.querySelectorAll('[data-ativo-amostra]').forEach(el=>{
+    el.addEventListener('change', ()=>{
+      const linhaId = el.dataset.linha, banho = el.dataset.banho;
+      BANHO_AMOSTRA_ATIVA[linhaId][banho] = el.checked;
+      if (sb) sb.from('banho_ciclos').update({ amostra_ativa: el.checked }).eq('linha_id', linhaId).eq('banho', banho).then();
+      renderParametros();
+      renderAll();
     });
   });
 }
