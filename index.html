@@ -1096,12 +1096,12 @@ const ICONE_ETAPA = { 'Granalha':'🧱', 'Limpeza de contato':'⚡' };
 // Desengraxante e Ácido já vêm com as 2 águas de enxágue seguintes agrupadas
 // no mesmo tanque/etapa; depois Potassa; depois as 3 águas de saída finais.
 const TANQUE_FARM = [
-  { item:'Desengraxante + 2 Águas', tipo:'tempo', limiteHoras:48, qtd:1 },
-  { item:'Ácido + 2 Águas',         tipo:'tempo', limiteHoras:48, qtd:1 },
-  { item:'Potassa',                 tipo:'tempo', limiteHoras:48, qtd:1 },
-  { item:'3° Água de saída',        tipo:'tempo', limiteHoras:48, qtd:1 },
-  { item:'2° Água de saída',        tipo:'tempo', limiteHoras:48, qtd:1 },
-  { item:'1° Água de saída',        tipo:'tempo', limiteHoras:48, qtd:1 },
+  { item:'Desengraxante + 2 Águas', tipo:'tempo', limiteHoras:48, qtd:1, acao:'Montagem nova' },
+  { item:'Ácido + 2 Águas',         tipo:'tempo', limiteHoras:48, qtd:1, acao:'Montagem nova' },
+  { item:'Potassa',                 tipo:'tempo', limiteHoras:48, qtd:1, acao:'Troca de Potassa' },
+  { item:'3° Água de saída',        tipo:'tempo', limiteHoras:48, qtd:1, acao:'Trocar água' },
+  { item:'2° Água de saída',        tipo:'tempo', limiteHoras:48, qtd:1, acao:'Trocar água' },
+  { item:'1° Água de saída',        tipo:'tempo', limiteHoras:48, qtd:1, acao:'Trocar água' },
 ];
 
 // pendencias_rotina, ciclos de banho e limite geral — populados a partir do
@@ -1499,10 +1499,11 @@ function buildPlantaSVG(){
           continue;
         }
         const st = statusDe(p);
+        const textoDireita = st === 'crit' && etapa.acao ? `${etapa.acao} · ${fmtCronometro(p.ultima)}` : fmtCronometro(p.ultima);
         svg += `<g class="plant-dot" data-action="reset-pendencia" data-pid="${p.id}">`;
         svg += `<rect class="etapa-row-bg ${st==='crit'||st==='warn'?st:''}" x="${x}" y="${fy}" width="${colW}" height="${rowH}"></rect>`;
         svg += `<text class="etapa-label" x="${x+8}" y="${fy+rowH/2+4}">${label}</text>`;
-        svg += `<text class="etapa-timer ${st}" x="${x+colW-8}" y="${fy+rowH/2+4}" text-anchor="end">${fmtCronometro(p.ultima)}</text>`;
+        svg += `<text class="etapa-timer ${st}" x="${x+colW-8}" y="${fy+rowH/2+4}" text-anchor="end" style="${st==='crit'?'font-weight:700; font-size:10.5px;':''}">${textoDireita}</text>`;
         svg += `</g>`;
         fy += rowH;
       }
