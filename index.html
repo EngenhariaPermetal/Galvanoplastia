@@ -280,6 +280,7 @@
   .camada-cell-pair{display:flex; flex-direction:column; gap:3px;}
   .camada-cell-pair .liga-cell{width:64px; padding:4px 3px; border:1px solid var(--brass); border-radius:6px; font-family:'IBM Plex Mono',monospace; font-size:11.5px; text-align:center; background:rgba(176,141,87,0.06);}
   .camada-cell-solo{margin:14px 0;}
+  .foto-cell{display:flex; align-items:center; justify-content:center; background:var(--surface-warm); color:var(--ink-soft); cursor:default;}
   .toggle-cabecalho{background:rgba(31,157,85,0.1); border:1px solid var(--ok); color:var(--ok); font-weight:700; font-size:10.5px; padding:4px 8px; border-radius:6px; cursor:pointer; white-space:nowrap;}
   .toggle-cabecalho:hover{filter:brightness(0.95);}
   .toggle-cabecalho.toggle-inativo{background:var(--surface-warm); border-color:var(--hairline); color:var(--ink-faint); text-decoration:line-through;}
@@ -502,6 +503,21 @@
     <div id="histManutencaoConteudo" class="relatorio-lista" style="max-height:55vh;"></div>
     <div class="modal-actions">
       <button class="btn" id="histManutencaoFechar">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: fotografia de uma coleta específica (grade completa, só leitura) -->
+<div class="modal-overlay" id="fotoColetaOverlay">
+  <div class="modal-box" id="fotoColetaBox" style="max-width:600px;">
+    <h3 id="fotoColetaTitulo">Coleta</h3>
+    <p class="modal-desc" id="fotoColetaSub">—</p>
+    <div class="camada-grid-scroll">
+      <table class="camada-grid" id="fotoColetaGrid"></table>
+    </div>
+    <div class="camada-media" id="fotoColetaMedia"></div>
+    <div class="modal-actions">
+      <button class="btn" id="fotoColetaFechar">Fechar</button>
     </div>
   </div>
 </div>
@@ -922,10 +938,13 @@ function atualizarMediaCamada(){
     if (elL) elL.textContent = !ativo ? 'off' : (mediaTamborLiga==null ? '—' : mediaTamborLiga.toFixed(2));
   }
 
+  const gridCamada = camadaInputs.map(i=>({ tambor:Number(i.dataset.tambor), amostra:Number(i.dataset.amostra), valor:parseFloat(i.value) })).filter(g=>!isNaN(g.valor));
+  const gridLiga = ligaInputs.map(i=>({ tambor:Number(i.dataset.tambor), amostra:Number(i.dataset.amostra), valor:parseFloat(i.value) })).filter(g=>!isNaN(g.valor));
+
   return {
     valoresCamada, mediaCamada, completoCamada: valoresCamada.length === esperadas.camada && esperadas.camada > 0,
     valoresLiga, mediaLiga, completoLiga: valoresLiga.length === esperadas.liga && esperadas.liga >= 0,
-    esperadas,
+    esperadas, gridCamada, gridLiga,
   };
 }
 
@@ -944,6 +963,7 @@ function pedirConfirmacaoRE(descricao, opcoes){
     document.getElementById('reModalTexto').value = '';
     document.getElementById('reModalBox').style.maxWidth = opcoes.pedirCamada ? '600px' : opcoes.pedirTexto ? '440px' : '380px';
     if (opcoes.pedirCamada){
+      document.querySelectorAll('.camada-cell, .liga-cell').forEach(i=>{ i.value=''; i.disabled=false; });
       TAMBORES_ATIVOS = new Set([1,2,3,4,5,6]);
       AMOSTRAS_ATIVAS = new Set([1,2,3,4,5]);
       aplicarEstadoAtivos();
@@ -962,25 +982,26 @@ document.getElementById('reModalConfirm').addEventListener('click', async ()=>{
   const errEl = document.getElementById('reModalError');
   const pedeCamada = document.getElementById('reModalCamadaWrap').style.display !== 'none';
   const pedeTexto = document.getElementById('reModalTextoWrap').style.display !== 'none';
-  let camada = null, camadaValores = null, liga = null, ligaValores = null, texto = null;
+  let camada = null, camadaValores = null, liga = null, ligaValores = null, texto = null, camadaGrid = null, ligaGrid = null;
   if (pedeCamada){
-    const { valoresCamada, mediaCamada, completoCamada, valoresLiga, mediaLiga, completoLiga, esperadas } = atualizarMediaCamada();
+    const { valoresCamada, mediaCamada, completoCamada, valoresLiga, mediaLiga, completoLiga, esperadas, gridCamada, gridLiga } = atualizarMediaCamada();
     if (esperadas.camada === 0){ errEl.textContent = 'Selecione ao menos um tambor e uma amostra.'; return; }
     if (!completoLiga){ errEl.textContent = `Preencha as ${esperadas.liga} medições de liga habilitadas (faltam ${esperadas.liga - valoresLiga.length}).`; return; }
     if (!completoCamada){ errEl.textContent = `Preencha as ${esperadas.camada} medições de camada habilitadas (faltam ${esperadas.camada - valoresCamada.length}).`; return; }
     camada = mediaCamada; camadaValores = valoresCamada;
     liga = mediaLiga; ligaValores = valoresLiga;
+    camadaGrid = gridCamada; ligaGrid = gridLiga;
   }
   if (pedeTexto){
     texto = document.getElementById('reModalTexto').value.trim();
     if (!texto){ errEl.textContent = 'Descreva a ação tomada.'; return; }
   }
   if (!re || re.length !== 4){ errEl.textContent = 'Digite os 4 dígitos do seu RE.'; return; }
-  if (!sb){ fecharReModal({ re, camada, camadaValores, liga, ligaValores, texto }); return; } // sem conexão Supabase, só segue com o RE digitado
+  if (!sb){ fecharReModal({ re, camada, camadaValores, liga, ligaValores, texto, camadaGrid, ligaGrid }); return; } // sem conexão Supabase, só segue com o RE digitado
   errEl.textContent = 'Verificando…';
   const { data, error } = await sb.from('colaboradores').select('re,nome').eq('re', re).eq('ativo', true).maybeSingle();
   if (error || !data){ errEl.textContent = 'RE não encontrado ou inativo.'; return; }
-  fecharReModal({ ...data, camada, camadaValores, liga, ligaValores, texto });
+  fecharReModal({ ...data, camada, camadaValores, liga, ligaValores, texto, camadaGrid, ligaGrid });
 });
 document.getElementById('reModalInput').addEventListener('keydown', e=>{ if (e.key==='Enter') document.getElementById('reModalConfirm').click(); });
 document.getElementById('reModalInput').addEventListener('input', e=>{ e.target.value = e.target.value.replace(/\D/g,'').slice(0,4); });
@@ -1347,7 +1368,7 @@ function buildPlantaSVG(){
   const farmRows = TANQUE_FARM.reduce((acc,e)=>acc+(e.qtd||1),0);
   const farmBlockH = farmRows * rowH;
   const H = Math.max(farmStartY + farmBlockH + 10, startY + bathsBlockH + 40);
-  const tanqueMaeW = 300, tanqueMaeGap = 46;
+  const tanqueMaeW = 140, tanqueMaeGap = 46;
   const W = startX + LAYOUT_ORDEM.length*colW + (LAYOUT_ORDEM.length-1)*colGap + tanqueMaeGap + tanqueMaeW + startX;
 
   let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
@@ -1601,7 +1622,7 @@ async function resetBanhoPorClique(linhaId, banho){
     amostras_contador: BANHO_AMOSTRAS[linhaId][banho],
     saida_calculada: BANHO_SAIDA_CALC[linhaId][banho],
   }).eq('linha_id', linhaId).eq('banho', banho).then();
-  registrarAcaoSupabase(col.re, 'coleta_amostra', linhaId, banho, null, col.camada ? { camada_media: col.camada, camada_valores: col.camadaValores, liga_media: col.liga, liga_valores: col.ligaValores, primeira_amostra: ehPrimeiraAmostra } : null);
+  registrarAcaoSupabase(col.re, 'coleta_amostra', linhaId, banho, null, col.camada ? { camada_media: col.camada, camada_valores: col.camadaValores, camada_grid: col.camadaGrid, liga_media: col.liga, liga_valores: col.ligaValores, liga_grid: col.ligaGrid, primeira_amostra: ehPrimeiraAmostra } : null);
   renderAll();
 }
 async function iniciarBanhoPorClique(linhaId, banho){
@@ -2193,6 +2214,7 @@ async function abrirHistoricoAmostras(linhaId){
     return { banho, coletas };
   }));
 
+  HISTORICO_COLETAS_CACHE = [];
   conteudo.innerHTML = blocosPorBanho.map(({banho, coletas})=>{
     if (!coletas.length){
       return `<div class="relatorio-elemento-bloco"><div class="relatorio-elemento-titulo"><span>${banho}</span></div><div class="relatorio-sem-registro">Nenhuma coleta neste ciclo ainda (desde o último START)</div></div>`;
@@ -2209,12 +2231,16 @@ async function abrirHistoricoAmostras(linhaId){
       const deltaCamada = anterior && d.camada_media!=null && anterior.camada_media!=null ? fmtDeltaAbsoluto(d.camada_media, anterior.camada_media, 'µm') : '';
       const deltaLiga = anterior && d.liga_media!=null && anterior.liga_media!=null ? fmtDeltaAbsoluto(d.liga_media, anterior.liga_media, 'p.p.') : '';
       const temDelta = deltaCamada || deltaLiga;
+      const idx = HISTORICO_COLETAS_CACHE.length;
+      HISTORICO_COLETAS_CACHE.push({ coleta:c, banho, linhaNome: linha.nome });
+      const temGrade = (d.camada_grid && d.camada_grid.length) || (d.liga_grid && d.liga_grid.length);
       return `
         <div class="relatorio-correcao-linha" style="display:flex; justify-content:space-between; align-items:flex-start; gap:14px; margin-bottom:6px;">
           <div>
             <strong>${ordinal} coleta</strong> — ${fmtDataHoraCurtaBR(c.criado_em)} · ${nome}<br>
             Camada média: ${camadaTxt} ${minMaxCamada ? `&nbsp;(${minMaxCamada})` : ''}<br>
             Liga: ${ligaTxt} ${minMaxLiga ? `&nbsp;(${minMaxLiga})` : ''}
+            ${temGrade ? `<br><button class="interv-btn interv-btn-secundario" data-ver-grade data-idx="${idx}" style="margin-top:4px;">👁 Ver grade completa</button>` : ''}
           </div>
           ${temDelta ? `<div class="relatorio-delta-abs">
             ${deltaCamada ? `<div>Camada ${deltaCamada}</div>` : ''}
@@ -2224,9 +2250,79 @@ async function abrirHistoricoAmostras(linhaId){
     }).join('');
     return `<div class="relatorio-elemento-bloco"><div class="relatorio-elemento-titulo"><span>${banho}</span><span class="faixa-ref">${coletas.length} coleta${coletas.length===1?'':'s'} neste ciclo</span></div>${itensHTML}</div>`;
   }).join('');
+
+  conteudo.querySelectorAll('[data-ver-grade]').forEach(btn=>{
+    btn.addEventListener('click', ()=> abrirFotoColeta(Number(btn.dataset.idx)));
+  });
 }
 document.getElementById('histAmostrasFechar').addEventListener('click', ()=>{
   document.getElementById('histAmostrasOverlay').style.display = 'none';
+});
+
+/* =========================================================================
+   FOTOGRAFIA DE UMA COLETA — reconstrói a grade completa (Liga+Camada por
+   tambor/amostra) de uma coleta já registrada, só leitura.
+   ========================================================================= */
+let HISTORICO_COLETAS_CACHE = [];
+function abrirFotoColeta(idx){
+  const item = HISTORICO_COLETAS_CACHE[idx];
+  if (!item) return;
+  const { coleta, banho, linhaNome } = item;
+  const d = coleta.detalhe || {};
+  const nome = coleta.colaboradores?.nome || coleta.colaborador_re;
+
+  document.getElementById('fotoColetaTitulo').textContent = `Coleta — ${banho} · ${linhaNome}`;
+  document.getElementById('fotoColetaSub').textContent = `${fmtDataHoraCurtaBR(coleta.criado_em)} · ${nome}`;
+
+  const camadaMap = {}, ligaMap = {};
+  (d.camada_grid || []).forEach(g=> camadaMap[g.tambor+'_'+g.amostra] = g.valor);
+  (d.liga_grid || []).forEach(g=> ligaMap[g.tambor+'_'+g.amostra] = g.valor);
+  const media = arr => arr.length ? (arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(2) : '—';
+
+  let thead = '<thead><tr><th></th>';
+  for (let t=1; t<=CAMADA_TAMBORES; t++) thead += `<th>T${t}</th>`;
+  thead += '</tr></thead>';
+
+  let tbody = '<tbody>';
+  for (let a=1; a<=CAMADA_AMOSTRAS; a++){
+    tbody += `<tr><td>Amostra ${String(a).padStart(2,'0')}</td>`;
+    for (let t=1; t<=CAMADA_TAMBORES; t++){
+      const camadaV = camadaMap[t+'_'+a];
+      const camadaTxt = camadaV!=null ? camadaV : '—';
+      if (a <= LIGA_AMOSTRAS){
+        const ligaV = ligaMap[t+'_'+a];
+        tbody += `<td><div class="camada-cell-pair">
+          <div class="liga-cell foto-cell">${ligaV!=null?ligaV:'—'}</div>
+          <div class="camada-cell foto-cell">${camadaTxt}</div>
+        </div></td>`;
+      } else {
+        tbody += `<td><div class="camada-cell foto-cell camada-cell-solo">${camadaTxt}</div></td>`;
+      }
+    }
+    tbody += '</tr>';
+  }
+  tbody += '</tbody>';
+
+  let tfoot = '<tfoot><tr><td>Média Liga</td>';
+  for (let t=1; t<=CAMADA_TAMBORES; t++){
+    const vals = []; for (let a=1; a<=LIGA_AMOSTRAS; a++){ const v = ligaMap[t+'_'+a]; if (v!=null) vals.push(v); }
+    tfoot += `<td class="camada-media-tambor">${media(vals)}</td>`;
+  }
+  tfoot += '</tr><tr><td>Média Camada</td>';
+  for (let t=1; t<=CAMADA_TAMBORES; t++){
+    const vals = []; for (let a=1; a<=CAMADA_AMOSTRAS; a++){ const v = camadaMap[t+'_'+a]; if (v!=null) vals.push(v); }
+    tfoot += `<td class="camada-media-tambor">${media(vals)}</td>`;
+  }
+  tfoot += '</tr></tfoot>';
+
+  document.getElementById('fotoColetaGrid').innerHTML = thead + tbody + tfoot;
+  const mediaLigaGeral = d.liga_media!=null ? Number(d.liga_media).toFixed(2) : '—';
+  const mediaCamadaGeral = d.camada_media!=null ? Number(d.camada_media).toFixed(2) : '—';
+  document.getElementById('fotoColetaMedia').textContent = `Média Liga: ${mediaLigaGeral}% · Média Camada: ${mediaCamadaGeral} µm`;
+  document.getElementById('fotoColetaOverlay').style.display = 'flex';
+}
+document.getElementById('fotoColetaFechar').addEventListener('click', ()=>{
+  document.getElementById('fotoColetaOverlay').style.display = 'none';
 });
 
 async function abrirRelatorioIntervencoes(linhaId, elemento){
