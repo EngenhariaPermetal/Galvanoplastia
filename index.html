@@ -508,11 +508,11 @@
 </div>
 
 <!-- Modal: fotografia de uma coleta específica (grade completa, só leitura) -->
-<div class="modal-overlay" id="fotoColetaOverlay">
+<div class="modal-overlay" id="fotoColetaOverlay" style="z-index:600;">
   <div class="modal-box" id="fotoColetaBox" style="max-width:600px;">
     <h3 id="fotoColetaTitulo">Coleta</h3>
     <p class="modal-desc" id="fotoColetaSub">—</p>
-    <div class="camada-grid-scroll">
+    <div class="camada-grid-scroll" id="fotoColetaScroll">
       <table class="camada-grid" id="fotoColetaGrid"></table>
     </div>
     <div class="camada-media" id="fotoColetaMedia"></div>
@@ -2233,14 +2233,13 @@ async function abrirHistoricoAmostras(linhaId){
       const temDelta = deltaCamada || deltaLiga;
       const idx = HISTORICO_COLETAS_CACHE.length;
       HISTORICO_COLETAS_CACHE.push({ coleta:c, banho, linhaNome: linha.nome });
-      const temGrade = (d.camada_grid && d.camada_grid.length) || (d.liga_grid && d.liga_grid.length);
       return `
         <div class="relatorio-correcao-linha" style="display:flex; justify-content:space-between; align-items:flex-start; gap:14px; margin-bottom:6px;">
           <div>
             <strong>${ordinal} coleta</strong> — ${fmtDataHoraCurtaBR(c.criado_em)} · ${nome}<br>
             Camada média: ${camadaTxt} ${minMaxCamada ? `&nbsp;(${minMaxCamada})` : ''}<br>
             Liga: ${ligaTxt} ${minMaxLiga ? `&nbsp;(${minMaxLiga})` : ''}
-            ${temGrade ? `<br><button class="interv-btn interv-btn-secundario" data-ver-grade data-idx="${idx}" style="margin-top:4px;">👁 Ver grade completa</button>` : ''}
+            <br><button class="interv-btn interv-btn-secundario" data-ver-grade data-idx="${idx}" style="margin-top:4px;">👁 Ver grade completa</button>
           </div>
           ${temDelta ? `<div class="relatorio-delta-abs">
             ${deltaCamada ? `<div>Camada ${deltaCamada}</div>` : ''}
@@ -2274,6 +2273,58 @@ function abrirFotoColeta(idx){
   document.getElementById('fotoColetaTitulo').textContent = `Coleta — ${banho} · ${linhaNome}`;
   document.getElementById('fotoColetaSub').textContent = `${fmtDataHoraCurtaBR(coleta.criado_em)} · ${nome}`;
 
+  let temGradeEstruturada = (d.camada_grid && d.camada_grid.length) || (d.liga_grid && d.liga_grid.length);
+  const temAlgumDado = temGradeEstruturada || (d.camada_valores && d.camada_valores.length) || (d.liga_valores && d.liga_valores.length) || d.camada_media!=null;
+  const scroll = document.getElementById('fotoColetaScroll');
+
+  if (!temAlgumDado){
+    scroll.innerHTML = '<div class="relatorio-vazio">Essa coleta não tem dado detalhado registrado (foi feita antes dessa função existir, ou não teve valores preenchidos).</div>';
+    document.getElementById('fotoColetaMedia').textContent = '';
+    document.getElementById('fotoColetaOverlay').style.display = 'flex';
+    return;
+  }
+
+  // Coleta antiga (de antes da grade existir) mas com a lista solta COMPLETA
+  // (30 de camada, 18 de liga): nessa época não existiam os toggles de
+  // tambor/amostra, então a ordem de preenchimento sempre foi fixa —
+  // dá pra reconstruir a posição de cada valor com segurança.
+  if (!temGradeEstruturada){
+    const totalCamadaCompleto = CAMADA_TAMBORES * CAMADA_AMOSTRAS;
+    const totalLigaCompleto = CAMADA_TAMBORES * LIGA_AMOSTRAS;
+    if ((d.camada_valores||[]).length === totalCamadaCompleto){
+      const gridReconstruido = [];
+      let i = 0;
+      for (let a=1; a<=CAMADA_AMOSTRAS; a++) for (let t=1; t<=CAMADA_TAMBORES; t++) gridReconstruido.push({ tambor:t, amostra:a, valor:d.camada_valores[i++] });
+      d.camada_grid = gridReconstruido;
+      if ((d.liga_valores||[]).length === totalLigaCompleto){
+        const ligaReconstruida = [];
+        let j = 0;
+        for (let a=1; a<=LIGA_AMOSTRAS; a++) for (let t=1; t<=CAMADA_TAMBORES; t++) ligaReconstruida.push({ tambor:t, amostra:a, valor:d.liga_valores[j++] });
+        d.liga_grid = ligaReconstruida;
+      }
+      temGradeEstruturada = true;
+    }
+  }
+
+  if (!temGradeEstruturada){
+    // coleta parcial (só existiu durante a janela em que os toggles já existiam mas a grade ainda não era guardada) — não dá pra saber qual tambor era qual com segurança
+    const listaCamada = (d.camada_valores||[]).map(v=>Number(v).toFixed(2)).join(', ') || '—';
+    const listaLiga = (d.liga_valores||[]).map(v=>Number(v).toFixed(2)).join(', ') || '—';
+    scroll.innerHTML = `
+      <div class="relatorio-vazio" style="text-align:left; font-style:normal;">
+        Essa coleta é de um período em que a posição exata não era guardada, e não tinha o total completo pra reconstruir com segurança.<br><br>
+        <strong>Camada (µm):</strong> ${listaCamada}<br><br>
+        <strong>Liga (%):</strong> ${listaLiga}
+      </div>`;
+    const mediaLigaGeral = d.liga_media!=null ? Number(d.liga_media).toFixed(2) : '—';
+    const mediaCamadaGeral = d.camada_media!=null ? Number(d.camada_media).toFixed(2) : '—';
+    document.getElementById('fotoColetaMedia').textContent = `Média Liga: ${mediaLigaGeral}% · Média Camada: ${mediaCamadaGeral} µm`;
+    document.getElementById('fotoColetaOverlay').style.display = 'flex';
+    return;
+  }
+
+  // grade completa (real ou reconstruída) — reconstrói a tabela do zero dentro do container (pode ter sido substituída por um dos avisos acima numa abertura anterior)
+  scroll.innerHTML = '<table class="camada-grid" id="fotoColetaGrid"></table>';
   const camadaMap = {}, ligaMap = {};
   (d.camada_grid || []).forEach(g=> camadaMap[g.tambor+'_'+g.amostra] = g.valor);
   (d.liga_grid || []).forEach(g=> ligaMap[g.tambor+'_'+g.amostra] = g.valor);
