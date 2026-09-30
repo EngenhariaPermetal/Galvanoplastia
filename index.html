@@ -364,6 +364,7 @@
   <div class="tabs">
     <button class="tab-btn active" data-view="painel">Painel</button>
     <button class="tab-btn" data-view="pendencias">Pendências</button>
+    <button class="tab-btn" data-view="producao">Produção</button>
     <button class="tab-btn" data-view="parametros">Parâmetros</button>
     <button class="tab-btn tv-btn" data-view="tv">▶ Modo TV</button>
   </div>
@@ -454,6 +455,12 @@
       <thead><tr><th>Linha</th><th>Banho</th><th>Item</th><th>Limite</th><th>Última troca</th><th>Cronômetro</th><th>Status</th><th></th></tr></thead>
       <tbody></tbody>
     </table>
+  </div>
+
+  <!-- ============ VIEW: PRODUÇÃO ============ -->
+  <div class="view" id="view-producao">
+    <h2 class="section-title">Produção diária · por linha e turno</h2>
+    <div id="producaoWrap" class="quimicos-grid"></div>
   </div>
 
   <!-- ============ VIEW: PARÂMETROS ============ -->
@@ -640,14 +647,17 @@ const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE
 async function carregarDadosIniciais(){
   if (!sb) return; // sem Supabase configurado — mantém tudo vazio/default
 
-  const [pend, banho, faixas, leituras, config, intervencoes] = await Promise.all([
+  const hojeISO = new Date().toISOString().slice(0,10);
+  const [pend, banho, faixas, leituras, config, intervencoes, producao] = await Promise.all([
     sb.from('pendencias_rotina').select('*'),
     sb.from('banho_ciclos').select('*'),
     sb.from('parametros_quimicos').select('*'),
     sb.from('leituras_quimicas').select('*').order('criado_em', { ascending:false }),
     sb.from('config_geral').select('*'),
     sb.from('intervencoes_quimicas').select('*, colaboradores(nome)').order('criado_em', { ascending:false }),
+    sb.from('apontamentos_producao').select('*, colaboradores(nome)').eq('data', hojeISO).order('criado_em', { ascending:true }),
   ]);
+  LINHAS.forEach(l=>{ PRODUCAO_HOJE[l.id] = (producao.data || []).filter(r=>r.linha_id===l.id); });
 
   PENDENCIAS = (pend.data || []).map(r => ({
     id: r.id, escopo: r.escopo, banho: r.banho, item: r.item, tanque: r.tanque,
@@ -712,6 +722,10 @@ async function carregarDadosIniciais(){
     if (r.chave.startsWith('sangramento_k2co3_')){
       const linhaId = r.chave.replace('sangramento_k2co3_', '');
       LIMITE_SANGRAMENTO[linhaId] = Number(r.valor);
+    }
+    if (r.chave.startsWith('produto_atual_')){
+      const linhaId = r.chave.replace('produto_atual_', '');
+      PRODUTO_ATUAL[linhaId] = r.valor;
     }
   });
 
@@ -813,6 +827,18 @@ function configurarRealtime(){
     })
     .subscribe();
 
+  sb.channel('realtime-apontamentos-producao')
+    .on('postgres_changes', { event:'INSERT', schema:'public', table:'apontamentos_producao' }, payload => {
+      const r = payload.new;
+      if (!r) return;
+      const hojeISO = new Date().toISOString().slice(0,10);
+      if (r.data !== hojeISO) return; // só nos importa o total de hoje
+      if (!PRODUCAO_HOJE[r.linha_id]) PRODUCAO_HOJE[r.linha_id] = [];
+      PRODUCAO_HOJE[r.linha_id].push(r);
+      if (document.getElementById('view-producao').classList.contains('active')) renderProducao();
+    })
+    .subscribe();
+
   sb.channel('realtime-config-geral')
     .on('postgres_changes', { event:'*', schema:'public', table:'config_geral' }, payload => {
       const r = payload.new;
@@ -824,6 +850,10 @@ function configurarRealtime(){
       else if (r.chave.startsWith('sangramento_k2co3_')){
         LIMITE_SANGRAMENTO[r.chave.replace('sangramento_k2co3_','')] = Number(r.valor);
         renderAll();
+      }
+      else if (r.chave.startsWith('produto_atual_')){
+        PRODUTO_ATUAL[r.chave.replace('produto_atual_','')] = r.valor;
+        if (document.getElementById('view-producao').classList.contains('active')) renderProducao();
       }
     })
     .subscribe();
@@ -1161,6 +1191,22 @@ LINHAS.forEach(l=>{
   BANHO_PAUSADO[l.id] = {};
   BANHOS.forEach(b=>{ ESPECIFICACAO_LIGA[l.id][b] = null; BANHO_SAIDA_CALC[l.id][b] = null; BANHO_AMOSTRA_ATIVA[l.id][b] = true; BANHO_PAUSADO[l.id][b] = null; });
 });
+/* =========================================================================
+   PRODUÇÃO DIÁRIA — apontamentos de peso (KG) por linha, turno e produto.
+   Linha 1 e Linha 3 têm um produto/spec só (que muda de vez em quando,
+   configurável em Parâmetros); Linha 2 tem dois produtos em paralelo,
+   sempre os mesmos: Anel e Núcleo A.
+   ========================================================================= */
+const PRODUTOS_LINHA2 = ['Anel', 'Núcleo A'];
+let PRODUTO_ATUAL = {}; // por linha1/linha3 — nome do produto/spec vigente
+LINHAS.forEach(l=>{ PRODUTO_ATUAL[l.id] = null; });
+let PRODUCAO_HOJE = {}; // por linha — lista de apontamentos de hoje (cache local, pra somar sem reconsultar toda hora)
+LINHAS.forEach(l=>{ PRODUCAO_HOJE[l.id] = []; });
+
+function produtosDaLinha(linhaId){
+  return linhaId === 'linha2' ? PRODUTOS_LINHA2 : [PRODUTO_ATUAL[linhaId] || '—'];
+}
+
 // Enquanto um banho está em parada de manutenção, os cronômetros ligados a
 // ele (Granalha/Limpeza/Amostra/Total) usam esse "agora" congelado no
 // instante da pausa, em vez do relógio de verdade — é isso que trava tudo.
@@ -1599,14 +1645,15 @@ async function resetBanhoPorClique(linhaId, banho){
   if (!col) return;
   const agora = new Date().toISOString();
 
-  // Cálculo de saída do banho: no Latão recalcula (e sobrescreve) em TODA
-  // coleta, sempre a partir do tempo total desde o START (o cronômetro de
-  // amostra não reseta nessa linha); nas demais, só na 1ª amostra do ciclo,
-  // igual já era.
-  if (latao || ehPrimeiraAmostra){
-    const minutosDecorridos = latao
-      ? horasDesde(BANHO_TOTAL_INICIO[linhaId][banho]) * 60
-      : horasDesde(BANHO_INICIO[linhaId][banho]) * 60;
+  // Cálculo de saída do banho: recalcula (e sobrescreve) em TODA coleta, em
+  // todas as linhas — sempre a partir do tempo TOTAL decorrido desde o START
+  // (BANHO_TOTAL_INICIO), nunca desde o último reset da amostra. Isso importa
+  // principalmente a partir da 2ª coleta em diante: nas linhas de bronze o
+  // cronômetro de amostra reseta a cada coleta, então usar ele aqui faria a
+  // conta enxergar só o tempo desde a coleta anterior, não desde o início
+  // real do banho — subestimando bastante o tempo decorrido.
+  {
+    const minutosDecorridos = horasDesde(BANHO_TOTAL_INICIO[linhaId][banho]) * 60;
     const especificacao = ESPECIFICACAO_DISCO[linhaId];
     if (especificacao && col.camada){
       const tempoFinalMin = (especificacao * minutosDecorridos) / col.camada;
@@ -1938,7 +1985,9 @@ function attachQuimicoHandlers(container){
    ========================================================================= */
 document.getElementById('periodoLinha').innerHTML = LINHAS.map(l=>`<option value="${l.id}">${l.nome} · ${l.liga}</option>`).join('');
 
-function abrirRelatorioPeriodo(linhaId){
+let PERIODO_MODO = 'quimico'; // 'quimico' | 'producao'
+function abrirRelatorioPeriodo(linhaId, modo){
+  PERIODO_MODO = modo || 'quimico';
   document.getElementById('periodoLinha').value = linhaId;
   const hoje = new Date().toISOString().slice(0,10);
   document.getElementById('periodoDataInicio').value = hoje;
@@ -1947,6 +1996,7 @@ function abrirRelatorioPeriodo(linhaId){
   document.getElementById('periodoModalImprimir').style.display = 'none';
   document.getElementById('periodoModalOverlay').style.display = 'flex';
 }
+function abrirRelatorioProducao(linhaId){ abrirRelatorioPeriodo(linhaId, 'producao'); }
 document.getElementById('periodoModalFechar').addEventListener('click', ()=>{
   document.getElementById('periodoModalOverlay').style.display = 'none';
 });
@@ -2045,7 +2095,102 @@ function renderBlocosRelatorioPeriodo(blocos, alvo){
   }).join('');
 }
 
+async function montarRelatorioProducaoPeriodo(){
+  const linhaId = document.getElementById('periodoLinha').value;
+  const dataInicio = document.getElementById('periodoDataInicio').value;
+  const dataFim = document.getElementById('periodoDataFim').value;
+  const resultado = document.getElementById('periodoResultado');
+  if (!dataInicio || !dataFim){ resultado.innerHTML = '<div class="relatorio-vazio">Escolha as duas datas.</div>'; return null; }
+  resultado.innerHTML = '<div class="relatorio-vazio">Carregando…</div>';
+
+  let apontamentos = [];
+  if (sb){
+    const { data } = await sb.from('apontamentos_producao')
+      .select('*, colaboradores(nome)')
+      .eq('linha_id', linhaId).gte('data', dataInicio).lte('data', dataFim)
+      .order('data', { ascending:true });
+    apontamentos = data || [];
+  }
+  const linha = LINHAS.find(l=>l.id===linhaId);
+  const porDia = {};
+  apontamentos.forEach(a=>{ (porDia[a.data] = porDia[a.data] || []).push(a); });
+  const dias = Object.keys(porDia).sort();
+  return { linha, dataInicio, dataFim, porDia, dias };
+}
+
+function agruparProdutoTurno(registros){
+  const porProdutoTurno = {};
+  registros.forEach(r=>{
+    const key = r.produto+'|'+r.turno;
+    porProdutoTurno[key] = (porProdutoTurno[key]||0) + Number(r.peso_kg);
+  });
+  return porProdutoTurno;
+}
+
+function renderBlocosRelatorioProducao(dados, alvo){
+  if (!dados.dias.length){ alvo.innerHTML = '<div class="relatorio-vazio">Nenhum apontamento registrado nesse período.</div>'; return; }
+  alvo.innerHTML = dados.dias.map(dia=>{
+    const registros = dados.porDia[dia];
+    const totalDia = registros.reduce((s,r)=>s+Number(r.peso_kg),0);
+    const porProdutoTurno = agruparProdutoTurno(registros);
+    const linhasProduto = Object.entries(porProdutoTurno).map(([key,total])=>{
+      const [produto,turno] = key.split('|');
+      return `<div class="relatorio-leitura-linha ok"><span>${produto} · Turno ${turno}</span><span>${total.toLocaleString('pt-BR')} kg</span></div>`;
+    }).join('');
+    const obsHTML = registros.filter(r=>r.observacao).map(r=>
+      `<div class="relatorio-correcao-linha">${r.produto} · Turno ${r.turno} — ${r.observacao} (${r.colaboradores?.nome||r.colaborador_re})</div>`
+    ).join('');
+    return `
+      <div class="relatorio-elemento-bloco">
+        <div class="relatorio-elemento-titulo"><span>${fmtDataCurtaBR(dia)}</span><span class="faixa-ref">Total do dia: ${totalDia.toLocaleString('pt-BR')} kg</span></div>
+        ${linhasProduto}${obsHTML}
+      </div>`;
+  }).join('');
+}
+
+function imprimirRelatorioProducao(dados){
+  let totalGeral = 0;
+  const diasHTML = dados.dias.map(dia=>{
+    const registros = dados.porDia[dia];
+    const totalDia = registros.reduce((s,r)=>s+Number(r.peso_kg),0);
+    totalGeral += totalDia;
+    const porProdutoTurno = agruparProdutoTurno(registros);
+    const linhasProduto = Object.entries(porProdutoTurno).map(([key,total])=>{
+      const [produto,turno] = key.split('|');
+      return `<div style="display:flex; justify-content:space-between; font-size:12.5px; padding:3px 0;"><span>${produto} · Turno ${turno}</span><span>${total.toLocaleString('pt-BR')} kg</span></div>`;
+    }).join('');
+    const obsHTML = registros.filter(r=>r.observacao).map(r=>
+      `<div style="font-size:11.5px; color:#8a5a1f; margin-top:2px;">${r.produto} · Turno ${r.turno} — ${r.observacao}</div>`
+    ).join('');
+    return `
+      <div style="border:1px solid #e2e2e2; border-radius:10px; padding:12px 16px; margin-bottom:10px; page-break-inside:avoid;">
+        <div style="display:flex; justify-content:space-between; font-weight:700;"><span>${fmtDataCurtaBR(dia)}</span><span style="font-weight:400; color:#888;">Total: ${totalDia.toLocaleString('pt-BR')} kg</span></div>
+        ${linhasProduto}${obsHTML}
+      </div>`;
+  }).join('');
+
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Produção — ${dados.linha.nome}</title>
+    <style>body{font-family:Arial,sans-serif; padding:36px; color:#1a1a1a; max-width:860px; margin:0 auto;} h1{font-size:21px; margin-bottom:2px;} h2{font-size:13px; color:#888; font-weight:normal; margin-top:0;}</style>
+    </head><body>
+    <h1>Relatório de produção — ${dados.linha.nome} <span style="font-weight:400; color:#999;">(${dados.linha.liga})</span></h1>
+    <h2>Período: ${dados.dataInicio} a ${dados.dataFim} · total geral: ${totalGeral.toLocaleString('pt-BR')} kg · emitido em ${new Date().toLocaleString('pt-BR')}</h2>
+    ${diasHTML}
+    </body></html>`);
+  win.document.close();
+  win.focus();
+  win.print();
+}
+
 document.getElementById('periodoGerar').addEventListener('click', async ()=>{
+  if (PERIODO_MODO === 'producao'){
+    const dados = await montarRelatorioProducaoPeriodo();
+    if (!dados) return;
+    renderBlocosRelatorioProducao(dados, document.getElementById('periodoResultado'));
+    document.getElementById('periodoModalImprimir').style.display = 'inline-block';
+    document.getElementById('periodoModalImprimir').onclick = () => imprimirRelatorioProducao(dados);
+    return;
+  }
   const dados = await montarRelatorioPeriodo();
   if (!dados) return;
   renderBlocosRelatorioPeriodo(dados.blocos, document.getElementById('periodoResultado'));
@@ -2433,6 +2578,112 @@ function imprimirRelatorio(nomeLinha, elemento, itens){
   win.print();
 }
 
+/* =========================================================================
+   PRODUÇÃO DIÁRIA
+   ========================================================================= */
+function resumoProducaoHoje(linhaId){
+  const produtos = produtosDaLinha(linhaId);
+  const porProduto = {};
+  produtos.forEach(p=>{ porProduto[p] = { 1:0, 2:0 }; });
+  (PRODUCAO_HOJE[linhaId] || []).forEach(r=>{
+    if (!porProduto[r.produto]) porProduto[r.produto] = { 1:0, 2:0 };
+    porProduto[r.produto][r.turno] = (porProduto[r.produto][r.turno] || 0) + Number(r.peso_kg);
+  });
+  return porProduto;
+}
+
+function buildProducaoHTML(){
+  const turnoSugerido = new Date().getHours() < 14 ? 1 : 2;
+  return LINHAS.map(linha=>{
+    const produtos = produtosDaLinha(linha.id);
+    const resumo = resumoProducaoHoje(linha.id);
+
+    const linhasResumo = produtos.map(p=>{
+      const r = resumo[p] || {1:0,2:0};
+      const total = r[1] + r[2];
+      return `<tr><td>${p}</td><td class="mono">${r[1].toLocaleString('pt-BR')} kg</td><td class="mono">${r[2].toLocaleString('pt-BR')} kg</td><td class="mono"><strong>${total.toLocaleString('pt-BR')} kg</strong></td></tr>`;
+    }).join('');
+
+    const totalGeralHoje = produtos.reduce((acc,p)=> acc + (resumo[p]?.[1]||0) + (resumo[p]?.[2]||0), 0);
+
+    const seletorProduto = linha.id === 'linha2'
+      ? `<select class="param-input" data-produto-input style="width:120px;">${PRODUTOS_LINHA2.map(p=>`<option value="${p}">${p}</option>`).join('')}</select>`
+      : `<input type="hidden" data-produto-input value="${PRODUTO_ATUAL[linha.id] || ''}"><span class="hint">${PRODUTO_ATUAL[linha.id] || 'produto não configurado — ajuste em Parâmetros'}</span>`;
+
+    return `
+      <div class="card quimico-card" data-producao-linha="${linha.id}">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap;">
+          <h3 class="param-card-title">${linha.nome}<span class="param-liga">${linha.liga}</span></h3>
+          <button class="interv-btn interv-btn-secundario" data-relatorio-producao data-linha="${linha.id}" title="Relatório por período">📅 Relatório do período</button>
+        </div>
+        <div class="param-subtitle">Hoje, ${new Date().toLocaleDateString('pt-BR')} — total: ${totalGeralHoje.toLocaleString('pt-BR')} kg</div>
+        <table class="data-table param-table">
+          <thead><tr><th>Produto</th><th>Turno 1</th><th>Turno 2</th><th>Total</th></tr></thead>
+          <tbody>${linhasResumo}</tbody>
+        </table>
+        <div class="param-subtitle" style="margin-top:14px;">Apontar produção</div>
+        <div class="producao-form">
+          <label>Turno
+            <select class="param-input" data-turno-input style="width:70px;">
+              <option value="1" ${turnoSugerido===1?'selected':''}>1</option>
+              <option value="2" ${turnoSugerido===2?'selected':''}>2</option>
+            </select>
+          </label>
+          <label>Produto ${seletorProduto}</label>
+          <label>Peso (kg)
+            <input type="number" min="0" step="0.5" class="param-input" data-peso-input placeholder="ex: 850" style="width:110px;">
+          </label>
+          <label style="flex:1; min-width:160px;">Observação (opcional)
+            <input type="text" class="param-input" data-obs-input placeholder="ex: Retrabalho, Camada alta...">
+          </label>
+        </div>
+        <button class="btn primary small" data-registrar-producao data-linha="${linha.id}" style="margin-top:10px; width:100%;">Registrar apontamento</button>
+        <div class="quimico-save-msg" id="producaoMsg-${linha.id}"></div>
+      </div>`;
+  }).join('');
+}
+
+function renderProducao(){
+  const wrap = document.getElementById('producaoWrap');
+  wrap.innerHTML = buildProducaoHTML();
+
+  wrap.querySelectorAll('[data-registrar-producao]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const linhaId = btn.dataset.linha;
+      const card = btn.closest('[data-producao-linha]');
+      const turno = Number(card.querySelector('[data-turno-input]').value);
+      const produto = card.querySelector('[data-produto-input]').value;
+      const pesoKg = parseFloat(card.querySelector('[data-peso-input]').value);
+      const observacao = card.querySelector('[data-obs-input]').value.trim();
+      const msgEl = document.getElementById('producaoMsg-'+linhaId);
+
+      if (!produto){ msgEl.textContent = 'Configure o produto atual dessa linha em Parâmetros antes de apontar.'; msgEl.style.color = 'var(--crit)'; return; }
+      if (isNaN(pesoKg) || pesoKg <= 0){ msgEl.textContent = 'Digite um peso válido (kg).'; msgEl.style.color = 'var(--crit)'; return; }
+
+      const nomeLinha = ESCOPOS[linhaId] || linhaId;
+      const col = await pedirConfirmacaoRE(`Registrar apontamento de produção — ${nomeLinha}, Turno ${turno}, ${produto}. Digite seu RE:`);
+      if (!col) return;
+
+      const hojeISO = new Date().toISOString().slice(0,10);
+      const novoRegistro = { data:hojeISO, turno, linha_id:linhaId, produto, peso_kg:pesoKg, observacao: observacao||null, colaborador_re:col.re, criado_em:new Date().toISOString() };
+      PRODUCAO_HOJE[linhaId].push(novoRegistro);
+
+      if (sb){
+        try { await sb.from('apontamentos_producao').insert({ data:hojeISO, turno, linha_id:linhaId, produto, peso_kg:pesoKg, observacao: observacao||null, colaborador_re:col.re }); }
+        catch(e){ console.error('Falha ao gravar apontamento de produção:', e); }
+      }
+      registrarAcaoSupabase(col.re, 'apontamento_producao', linhaId, null, produto, { turno, peso_kg:pesoKg, observacao });
+      renderProducao();
+      const novoMsgEl = document.getElementById('producaoMsg-'+linhaId);
+      if (novoMsgEl){ novoMsgEl.textContent = 'Registrado ✓'; novoMsgEl.style.color = 'var(--ok)'; }
+    });
+  });
+
+  wrap.querySelectorAll('[data-relatorio-producao]').forEach(btn=>{
+    btn.addEventListener('click', ()=> abrirRelatorioProducao(btn.dataset.linha));
+  });
+}
+
 function renderQuimicos(){
   const wrap = document.getElementById('quimicosWrap');
   wrap.innerHTML = buildQuimicosHTML();
@@ -2575,6 +2826,13 @@ function renderParametros(){
                  value="${LIMITE_SANGRAMENTO[linha.id] ?? ''}" placeholder="200" style="width:90px;">
           <span class="hint">Sangra quando o K2CO3 dessa linha ficar acima deste valor</span>
         </div>
+        ${linha.id !== 'linha2' ? `
+        <div class="param-subtitle">Produto/spec atual (produção)</div>
+        <div style="margin-bottom:14px;">
+          <input type="text" class="param-input" data-produto-atual data-linha="${linha.id}"
+                 value="${PRODUTO_ATUAL[linha.id] ?? ''}" placeholder="ex: 0,10mm ou GTQ" style="width:120px;">
+          <span class="hint">Usado na aba Produção — troque quando o spec/código do que está rodando mudar</span>
+        </div>` : ''}
         <div class="param-subtitle">Por banho</div>
         <table class="data-table param-table">
           <thead><tr><th>Banho</th><th>Granalha</th><th>Limpeza de contato</th><th>Coleta de amostra</th><th>Especif. Liga (%)</th></tr></thead>
@@ -2617,6 +2875,16 @@ function renderParametros(){
         sb.from('config_geral').upsert({ chave: 'sangramento_k2co3_'+linhaId, valor: String(v) }, { onConflict:'chave' }).then();
       }
       renderAll();
+    });
+  });
+  wrap.querySelectorAll('[data-produto-atual]').forEach(el=>{
+    el.addEventListener('change', ()=>{
+      const v = el.value.trim();
+      const linhaId = el.dataset.linha;
+      PRODUTO_ATUAL[linhaId] = v || null;
+      if (sb && v){
+        sb.from('config_geral').upsert({ chave: 'produto_atual_'+linhaId, valor: v }, { onConflict:'chave' }).then();
+      }
     });
   });
   wrap.querySelectorAll('[data-ativo-pendencia]').forEach(el=>{
@@ -2955,6 +3223,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     document.body.classList.toggle('tv-active', view==='tv');
     if (view==='tv') renderTvScreens();
     if (view==='parametros'){ renderParametros(); renderParamsQuimicos(); }
+    if (view==='producao') renderProducao();
   });
 });
 
