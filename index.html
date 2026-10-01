@@ -275,6 +275,7 @@
   .produto-chip{display:inline-flex; align-items:center; gap:6px; background:rgba(176,141,87,0.1); border:1px solid var(--brass); color:var(--brass-deep); font-size:12.5px; font-weight:600; padding:4px 6px 4px 10px; border-radius:20px;}
   .produto-chip button{background:none; border:none; color:var(--brass-deep); font-size:14px; font-weight:700; cursor:pointer; line-height:1; padding:2px 4px;}
   .produto-chip button:hover{color:var(--crit);}
+  .produto-liga-select{font-size:11px; font-weight:600; color:var(--ink-soft); background:#fff; border:1px solid var(--hairline); border-radius:10px; padding:1px 4px; cursor:pointer;}
   .interv-btn-secundario:hover{background:var(--surface-warm);}
   .relatorio-lista{max-height:50vh; overflow-y:auto; display:flex; flex-direction:column; gap:10px; margin:10px 0;}
   .relatorio-item{border:1px solid var(--hairline); border-radius:10px; padding:10px 12px; background:var(--surface-warm);}
@@ -734,7 +735,7 @@ async function carregarDadosIniciais(){
   PRODUCAO_DIA_ATUAL = diaProdutivoISO();
   LINHAS.forEach(l=>{ PRODUCAO_HOJE[l.id] = (producao.data || []).filter(r=>r.linha_id===l.id && diaDoRegistro(r)===PRODUCAO_DIA_ATUAL); });
   (producao.data || []).forEach(r=>{ if (r.colaboradores && r.colaboradores.nome) NOME_POR_RE[r.colaborador_re] = r.colaboradores.nome; });
-  LINHAS.forEach(l=>{ PRODUTOS_LINHA[l.id] = (produtosLinha.data || []).filter(r=>r.linha_id===l.id).map(r=>({id:r.id, nome:r.nome})); });
+  LINHAS.forEach(l=>{ PRODUTOS_LINHA[l.id] = (produtosLinha.data || []).filter(r=>r.linha_id===l.id).map(r=>({id:r.id, nome:r.nome, liga:r.liga || null})); });
 
   PENDENCIAS = (pend.data || []).map(r => ({
     id: r.id, escopo: r.escopo, banho: r.banho, item: r.item, tanque: r.tanque,
@@ -940,7 +941,15 @@ function configurarRealtime(){
       const r = payload.new;
       if (!r) return;
       if (!PRODUTOS_LINHA[r.linha_id]) PRODUTOS_LINHA[r.linha_id] = [];
-      if (!PRODUTOS_LINHA[r.linha_id].some(p=>p.id===r.id)) PRODUTOS_LINHA[r.linha_id].push({ id:r.id, nome:r.nome });
+      if (!PRODUTOS_LINHA[r.linha_id].some(p=>p.id===r.id)) PRODUTOS_LINHA[r.linha_id].push({ id:r.id, nome:r.nome, liga:r.liga || null });
+      if (document.getElementById('view-producao').classList.contains('active')) renderProducao();
+      if (document.getElementById('view-parametros').classList.contains('active')) renderParametros();
+    })
+    .on('postgres_changes', { event:'UPDATE', schema:'public', table:'produtos_linha' }, payload => {
+      const r = payload.new;
+      if (!r) return;
+      const p = (PRODUTOS_LINHA[r.linha_id]||[]).find(x=>x.id===r.id);
+      if (p){ p.nome = r.nome; p.liga = r.liga || null; }
       if (document.getElementById('view-producao').classList.contains('active')) renderProducao();
       if (document.getElementById('view-parametros').classList.contains('active')) renderParametros();
     })
@@ -1358,6 +1367,16 @@ function rankingPorRE(registros, produto){
 
 function produtosDaLinha(linhaId){
   return (PRODUTOS_LINHA[linhaId] || []).map(p=>p.nome);
+}
+// Liga do banho de cada produto (cadastrada em Parâmetros). Só muda o RÓTULO
+// mostrado na aba Produção — não altera linha.liga, que comanda o cronograma
+// de amostras do Latão e o resto do painel.
+const LIGAS_PRODUTO = ['Bronze','Cobre','Latão'];
+function ligaDoProduto(linhaId, nome){
+  const p = (PRODUTOS_LINHA[linhaId] || []).find(x=>x.nome===nome);
+  if (p && p.liga) return p.liga;
+  const linha = LINHAS.find(l=>l.id===linhaId);
+  return linha ? linha.liga : '';
 }
 
 // Enquanto um banho está em parada de manutenção, os cronômetros ligados a
@@ -2798,6 +2817,8 @@ function atualizarFiltroProduto(linhaId){
   const produto = produtoSelecionado(linhaId);
   card.querySelector('[data-lista-apontamentos]').innerHTML = htmlListaApontamentos(linhaId, produto);
   card.querySelector('[data-ontem-produto]').textContent = produto ? `· ${produto}` : '';
+  const ligaEl = card.querySelector('[data-liga-produto]');
+  if (ligaEl) ligaEl.textContent = produto ? ligaDoProduto(linhaId, produto) : ((LINHAS.find(l=>l.id===linhaId)||{}).liga || '');
   document.getElementById('ontemTotal-'+linhaId).textContent = produto ? textoOntem(linhaId, produto) : '—';
 }
 
@@ -3000,7 +3021,7 @@ function buildProducaoHTML(){
     return `
       <div class="card quimico-card" data-producao-linha="${linha.id}">
         <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap;">
-          <h3 class="param-card-title">${linha.nome}<span class="param-liga">${linha.liga}</span></h3>
+          <h3 class="param-card-title">${linha.nome}<span class="param-liga" data-liga-produto title="Liga do banho do produto selecionado">${produto ? ligaDoProduto(linha.id, produto) : linha.liga}</span></h3>
           <button class="interv-btn interv-btn-secundario" data-relatorio-producao data-linha="${linha.id}" title="Relatório por período">📅 Relatório do período</button>
         </div>
         ${htmlHojeLinha(linha.id)}
@@ -3380,14 +3401,21 @@ function renderParametros(){
         <div class="param-subtitle">Produtos que rodam nessa linha (produção)</div>
         <div class="produtos-lista" data-produtos-lista="${linha.id}">
           ${(PRODUTOS_LINHA[linha.id]||[]).map(p=>`
-            <span class="produto-chip">${p.nome}<button type="button" data-remover-produto data-id="${p.id}" data-linha="${linha.id}" title="Remover">×</button></span>
+            <span class="produto-chip">${p.nome}
+              <select class="produto-liga-select" data-liga-produto-select data-id="${p.id}" data-linha="${linha.id}" title="Liga do banho desse produto">
+                ${LIGAS_PRODUTO.map(l=>`<option value="${l}" ${(p.liga||linha.liga)===l?'selected':''}>${l}</option>`).join('')}
+              </select>
+              <button type="button" data-remover-produto data-id="${p.id}" data-linha="${linha.id}" title="Remover">×</button></span>
           `).join('') || '<span class="hint">Nenhum produto cadastrado ainda</span>'}
         </div>
         <div style="display:flex; gap:8px; margin:10px 0 14px;">
           <input type="text" class="param-input" data-novo-produto-input data-linha="${linha.id}" placeholder="ex: 0,10mm, Anel, GTQ..." style="width:160px;">
+          <select class="param-input" data-novo-produto-liga data-linha="${linha.id}" title="Liga do banho" style="width:100px;">
+            ${LIGAS_PRODUTO.map(l=>`<option value="${l}" ${l==='Bronze'?'selected':''}>${l}</option>`).join('')}
+          </select>
           <button type="button" class="btn small" data-adicionar-produto data-linha="${linha.id}">+ Adicionar</button>
         </div>
-        <div class="hint" style="margin:-10px 0 14px;">Qualquer produto pode rodar em qualquer linha — essa lista é só o que aparece pra escolher na aba Produção</div>
+        <div class="hint" style="margin:-10px 0 14px;">Qualquer produto pode rodar em qualquer linha — essa lista é só o que aparece pra escolher na aba Produção. A liga de cada produto vira o rótulo do card na aba Produção.</div>
         <div class="param-subtitle">Por banho</div>
         <table class="data-table param-table">
           <thead><tr><th>Banho</th><th>Granalha</th><th>Limpeza de contato</th><th>Coleta de amostra</th><th>Especif. Liga (%)</th></tr></thead>
@@ -3437,15 +3465,27 @@ function renderParametros(){
       const linhaId = btn.dataset.linha;
       const input = wrap.querySelector(`[data-novo-produto-input][data-linha="${linhaId}"]`);
       const nome = input.value.trim();
+      const liga = wrap.querySelector(`[data-novo-produto-liga][data-linha="${linhaId}"]`).value;
       if (!nome) return;
       if ((PRODUTOS_LINHA[linhaId]||[]).some(p=>p.nome.toLowerCase()===nome.toLowerCase())){ input.value=''; return; }
       if (sb){
-        const { data, error } = await sb.from('produtos_linha').insert({ linha_id: linhaId, nome }).select().single();
-        if (!error && data) PRODUTOS_LINHA[linhaId].push({ id:data.id, nome:data.nome });
+        const { data, error } = await sb.from('produtos_linha').insert({ linha_id: linhaId, nome, liga }).select().single();
+        if (error) console.error('Falha ao cadastrar produto:', error);
+        if (!error && data && !PRODUTOS_LINHA[linhaId].some(p=>p.id===data.id)) PRODUTOS_LINHA[linhaId].push({ id:data.id, nome:data.nome, liga:data.liga || liga });
       } else {
-        PRODUTOS_LINHA[linhaId].push({ id:`local-${Date.now()}`, nome });
+        PRODUTOS_LINHA[linhaId].push({ id:`local-${Date.now()}`, nome, liga });
       }
       renderParametros();
+    });
+  });
+  wrap.querySelectorAll('[data-liga-produto-select]').forEach(sel=>{
+    sel.addEventListener('change', ()=>{
+      const linhaId = sel.dataset.linha;
+      const id = isNaN(Number(sel.dataset.id)) ? sel.dataset.id : Number(sel.dataset.id);
+      const p = (PRODUTOS_LINHA[linhaId]||[]).find(x=>x.id===id);
+      if (!p) return;
+      p.liga = sel.value;
+      if (sb && typeof id === 'number') sb.from('produtos_linha').update({ liga: sel.value }).eq('id', id).then(({error})=>{ if (error) console.error('Falha ao salvar liga do produto:', error); });
     });
   });
   wrap.querySelectorAll('[data-remover-produto]').forEach(btn=>{
