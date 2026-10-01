@@ -494,6 +494,71 @@ h2.section-title{ font-weight:700; font-size:20px; letter-spacing:-.015em; }
 .plant-dot[data-action="despausar-banho"] circle{ fill:#FF9F0A; }
 .banho-pausado-selo{ fill:#B25000; font-weight:600; }
 
+
+/* ---------- aba Produção (tema macOS) ---------- */
+.param-subtitle, .producao-form label, .producao-kpi-titulo, .producao-ontem-label, .producao-hoje-label,
+.data-table thead th{ text-transform:none !important; letter-spacing:0 !important; }
+.param-subtitle{ font-size:13px; font-weight:600; color:var(--ink-soft); }
+.producao-form label{ font-size:12px; font-weight:500; color:var(--ink-soft); }
+.data-table thead th{ font-size:12px; font-weight:600; color:var(--ink-soft); background:transparent !important; }
+.param-input{ background:rgba(118,118,128,.12); border:none; border-radius:8px; height:30px; padding:4px 10px; font-size:13px; color:var(--ink); }
+.param-input:focus{ outline:none; box-shadow:0 0 0 3px rgba(0,122,255,.35); background:#fff; }
+.btn.primary{ background:#007AFF; border-color:#007AFF; border-radius:10px; font-weight:600; }
+.btn.primary:hover{ background:#0062CC; border-color:#0062CC; }
+.interv-btn-secundario{ background:rgba(118,118,128,.12) !important; border:none !important; border-radius:7px !important; color:var(--ink) !important; font-weight:500 !important; }
+
+/* Dia anterior: o número que outro setor usa — destaque azul, grande e copiável */
+.producao-ontem-destaque{ display:block; background:rgba(0,122,255,.09); border:none; border-radius:12px; padding:12px 16px 12px; margin:12px 0 10px; }
+.producao-ontem-topo{ display:flex; justify-content:space-between; align-items:center; gap:10px; }
+.producao-ontem-label{ font-size:13px; font-weight:600; color:#0060DF; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.producao-ontem-periodo, .producao-hoje-label, .producao-hoje-sub{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.producao-ontem-copiar{ flex:none; }
+.producao-ontem-numero{ font-size:34px; font-weight:800; letter-spacing:-.02em; color:#0A3A8C; line-height:1.15; margin-top:2px; font-variant-numeric:tabular-nums; }
+.producao-ontem-periodo{ font-size:12px; color:#3A6FC4; margin-top:2px; }
+.producao-ontem-copiar{ border:none; background:#007AFF; color:#fff; font-size:12px; font-weight:600; padding:4px 12px; border-radius:999px; cursor:pointer; }
+.producao-ontem-copiar:hover{ background:#0062CC; }
+.producao-ontem-copiar.ok{ background:#34C759; }
+.producao-ontem-copiar:focus-visible{ outline:none; box-shadow:0 0 0 3px rgba(0,122,255,.35); }
+
+/* Hoje: widget cinza claro do sistema (sai o bloco preto) */
+.producao-hoje-box{ background:rgba(118,118,128,.08); color:var(--ink); border-radius:12px; }
+.producao-hoje-label{ color:var(--ink-soft); font-size:13px; font-weight:600; }
+.producao-hoje-sub{ color:var(--ink-soft); }
+.producao-hoje-numero{ color:var(--ink); font-size:30px; letter-spacing:-.02em; }
+.producao-hoje-numero small{ color:var(--ink-soft); }
+.producao-hoje-re .nome{ color:var(--ink); }
+.producao-hoje-re .valor{ color:var(--ink); font-variant-numeric:tabular-nums; }
+.producao-hoje-re .barra{ background:rgba(118,118,128,.16); }
+.producao-hoje-re .barra > div{ background:#8E8E93; }
+.producao-hoje-re.lider .barra > div{ background:#34C759; }
+.producao-produto-resumo span{ color:#0060DF; }
+
+/* ranking e KPIs */
+.ranking-valor strong{ color:var(--ink); }
+.ranking-barra{ background:rgba(118,118,128,.12); border:none; }
+.ranking-barra > div{ background:#8E8E93; }
+.ranking-item.primeiro .ranking-barra > div{ background:#34C759; }
+.producao-kpi-numero{ color:var(--ink); letter-spacing:-.02em; }
+.producao-kpi-barra{ background:rgba(118,118,128,.12); }
+.producao-kpi-barra-fill{ background:#007AFF; }
+.tv-grafico-titulo{ font-weight:700; letter-spacing:-.01em; }
+.tv-grafico-canvas-wrap{ position:relative; }
+#producaoWrap.quimicos-grid{ grid-template-columns:repeat(3, minmax(0,1fr)); } /* 3 colunas iguais, mesmo com nomes longos */
+@media (max-width:900px){ #producaoWrap.quimicos-grid{ grid-template-columns:1fr; } }
+.producao-form [data-obs-input]{ width:100%; text-align:left; }
+.grafico-vazio{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; padding:20px;
+  font-size:13px; color:var(--ink-faint); background:rgba(255,255,255,.75); }
+
+/* ---------- Produção: usa a largura da tela (até 1800px) ---------- */
+main:has(#view-producao.active){ max-width:1800px; }
+#producaoWrap .quimico-card{ container-type:inline-size; }
+.producao-destaques{ display:grid; grid-template-columns:1fr; gap:10px; margin:12px 0 4px; }
+.producao-destaques > .producao-ontem-destaque, .producao-destaques > .producao-hoje-box{ margin:0; }
+@container (min-width:500px){
+  .producao-destaques{ grid-template-columns:1fr 1fr; align-items:stretch; }
+  .producao-destaques .producao-hoje-topo{ flex-direction:column; align-items:flex-start; gap:2px; }
+  .producao-destaques .producao-hoje-numero{ font-size:34px; }
+}
 @media (prefers-reduced-motion: reduce){ *{ animation:none !important; } }
 </style>
 </head>
@@ -2931,7 +2996,7 @@ function atualizarFiltroProduto(linhaId){
   if (!card) return;
   const produto = produtoSelecionado(linhaId);
   card.querySelector('[data-lista-apontamentos]').innerHTML = htmlListaApontamentos(linhaId, produto);
-  card.querySelector('[data-ontem-produto]').textContent = produto ? `· ${produto}` : '';
+  card.querySelector('[data-ontem-produto]').textContent = produto || '—';
   const ligaEl = card.querySelector('[data-liga-produto]');
   if (ligaEl) ligaEl.textContent = produto ? ligaDoProduto(linhaId, produto) : ((LINHAS.find(l=>l.id===linhaId)||{}).liga || '');
   document.getElementById('ontemTotal-'+linhaId).textContent = produto ? textoOntem(linhaId, produto) : '—';
@@ -3139,10 +3204,16 @@ function buildProducaoHTML(){
           <h3 class="param-card-title">${linha.nome}<span class="param-liga" data-liga-produto title="Liga do banho do produto selecionado">${produto ? ligaDoProduto(linha.id, produto) : linha.liga}</span></h3>
           <button class="interv-btn interv-btn-secundario" data-relatorio-producao data-linha="${linha.id}" title="Relatório por período">📅 Relatório do período</button>
         </div>
-        ${htmlHojeLinha(linha.id)}
+        <div class="producao-destaques">
         <div class="producao-ontem-destaque">
-          <span class="producao-ontem-label">Dia anterior (07h→07h) <span data-ontem-produto>${produto ? '· '+produto : ''}</span></span>
-          <span class="producao-ontem-numero" id="ontemTotal-${linha.id}">${produto ? textoOntem(linha.id, produto) : '—'}</span>
+          <div class="producao-ontem-topo">
+            <span class="producao-ontem-label">Dia anterior · <span data-ontem-produto>${produto || '—'}</span></span>
+            <button type="button" class="producao-ontem-copiar" data-copiar-ontem data-linha="${linha.id}" title="Copiar o valor em kg para colar em outro sistema">Copiar</button>
+          </div>
+          <div class="producao-ontem-numero" id="ontemTotal-${linha.id}">${produto ? textoOntem(linha.id, produto) : '—'}</div>
+          <div class="producao-ontem-periodo">${fmtDataCurtaBR(diaProdutivoAnteriorISO())} 07h → ${fmtDataCurtaBR(PRODUCAO_DIA_ATUAL)} 07h · fechado</div>
+        </div>
+        ${htmlHojeLinha(linha.id)}
         </div>
         <div data-lista-apontamentos>${htmlListaApontamentos(linha.id, produto)}</div>
         <div class="param-subtitle" style="margin-top:14px;">Apontar produção</div>
@@ -3232,18 +3303,36 @@ function renderProducao(){
   wrap.querySelectorAll('[data-relatorio-producao]').forEach(btn=>{
     btn.addEventListener('click', ()=> abrirRelatorioProducao(btn.dataset.linha));
   });
+  wrap.querySelectorAll('[data-copiar-ontem]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const linhaId = btn.dataset.linha;
+      const v = totalOntemDoProduto(PRODUCAO_REGISTROS_10D, linhaId, produtoSelecionado(linhaId));
+      if (v == null) return;
+      const texto = String(Math.round(v * 10) / 10).replace('.', ','); // número puro, ex: 8354 — cola direto em planilha
+      try { await navigator.clipboard.writeText(texto); }
+      catch(e){ const t=document.createElement('textarea'); t.value=texto; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); }
+      btn.textContent = 'Copiado ✓'; btn.classList.add('ok');
+      setTimeout(()=>{ btn.textContent = 'Copiar'; btn.classList.remove('ok'); }, 1800);
+    });
+  });
 
   const graficosWrap = document.getElementById('producaoGraficosWrap');
   graficosWrap.innerHTML = LINHAS.map(linha=>`
     <div class="tv-grafico-card" style="height:260px;">
-      <div class="tv-grafico-titulo">${linha.nome} · ${linha.liga}</div>
+      <div class="tv-grafico-titulo">${linha.nome}</div>
       <div class="tv-grafico-canvas-wrap"><canvas id="chart-producao-${linha.id}"></canvas></div>
     </div>`).join('');
   renderRankingLideres();
   initProducaoCharts();
 }
 
-const PRODUTO_COR_PALETTE = ['#B08D57','#2AA9A0','#8A5FBF','#C98A00'];
+// cores de sistema (macOS) — cada PRODUTO tem sempre a mesma cor, em qualquer linha
+const PRODUTO_COR_PALETTE = ['#007AFF','#34C759','#FF9500','#AF52DE','#FF2D55','#5AC8FA','#A2845E','#5856D6'];
+function corDoProduto(nome){
+  const todos = [...new Set(LINHAS.flatMap(l => produtosDaLinha(l.id)))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  const i = todos.indexOf(nome);
+  return PRODUTO_COR_PALETTE[(i >= 0 ? i : todos.length) % PRODUTO_COR_PALETTE.length];
+}
 let PRODUCAO_CHART_INSTANCES = [];
 async function initProducaoCharts(){
   // dados primeiro (o "ontem", o ranking e os KPIs não dependem do Chart.js)
@@ -3287,7 +3376,9 @@ async function initProducaoCharts(){
   LINHAS.forEach(linha=>{
     const canvas = document.getElementById('chart-producao-'+linha.id);
     if (!canvas) return;
-    const produtos = produtosDaLinha(linha.id);
+    // só os produtos que de fato rodaram na linha nesses 10 dias (a liga muda com o produto)
+    const regsLinha = registros.filter(r=>r.linha_id===linha.id && datas.includes(r.dia));
+    const produtos = [...new Set(regsLinha.map(r=>r.produto))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
     const porDiaProduto = {};
     produtos.forEach(p=>{ porDiaProduto[p] = {}; datas.forEach(d=> porDiaProduto[p][d]=0); });
     registros.filter(r=>r.linha_id===linha.id).forEach(r=>{
@@ -3296,11 +3387,16 @@ async function initProducaoCharts(){
       porDiaProduto[r.produto][r.dia] += Number(r.peso_kg);
     });
 
-    const datasets = produtos.map((p,i)=>{
-      const cor = PRODUTO_COR_PALETTE[i % PRODUTO_COR_PALETTE.length];
+    const datasets = produtos.map(p=>{
+      const cor = corDoProduto(p);
       const valores = datas.map(d => porDiaProduto[p][d] || null); // dia sem apontamento = buraco, não vira 0 artificial
-      return { label:p, data:valores, borderColor:cor, backgroundColor:cor, spanGaps:true, tension:0.25, pointRadius:3 };
+      return { label:`${p} · ${ligaDoProduto(linha.id, p)}`, data:valores, borderColor:cor, backgroundColor:cor, spanGaps:true, tension:0.25, pointRadius:3 };
     });
+    const vazioEl = canvas.parentElement.querySelector('.grafico-vazio');
+    if (vazioEl) vazioEl.remove();
+    if (!datasets.length){
+      canvas.parentElement.insertAdjacentHTML('beforeend', '<div class="grafico-vazio">Nenhuma produção apontada nesta linha nos últimos 10 dias.</div>');
+    }
 
     PRODUCAO_CHART_INSTANCES.push(new Chart(canvas.getContext('2d'), {
       type:'line',
@@ -3308,7 +3404,7 @@ async function initProducaoCharts(){
       options: {
         responsive:true, maintainAspectRatio:false,
         plugins:{
-          legend:{ display: produtos.length>1, position:'bottom', labels:{ boxWidth:10, font:{size:9} } },
+          legend:{ display: produtos.length>0, position:'bottom', labels:{ boxWidth:8, boxHeight:8, usePointStyle:true, pointStyle:'circle', font:{size:10} } },
           datalabels:{ align:'top', anchor:'end', font:{size:8,weight:'600'}, color: ctx=>ctx.dataset.borderColor, formatter:v=> v==null?'':v.toLocaleString('pt-BR') },
         },
         scales:{ y:{ beginAtZero:true, ticks:{font:{size:9}} }, x:{ ticks:{font:{size:9}} } },
