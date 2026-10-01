@@ -122,6 +122,7 @@
   .banho-saida{font-family:'Space Grotesk',sans-serif; font-size:12.5px; font-weight:700; fill:var(--brass-deep);}
   .banho-saida.warn{fill:var(--warn); font-size:13.5px;}
   .banho-saida.crit{fill:var(--crit); font-size:14px; font-weight:800; animation: blinkCrit .8s steps(1,end) infinite;}
+  .banho-start-hora{font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:600; fill:var(--ink-soft);}
   .banho-saida-vazio{font-family:'Inter',sans-serif; font-size:10.5px; fill:var(--ink-faint);}
   .banho-pausado-selo{font-family:'Inter',sans-serif; font-size:9px; font-weight:700; fill:var(--brass-deep);}
   .banho-tag-label{font-family:'Inter',sans-serif; font-size:8.5px; font-weight:700; fill:var(--ink-faint); letter-spacing:.03em;}
@@ -752,6 +753,8 @@ async function carregarDadosIniciais(){
     if (!BANHO_PAUSADO[r.linha_id]) BANHO_PAUSADO[r.linha_id] = {};
     BANHO_INICIO[r.linha_id][r.banho] = r.amostra_inicio;
     BANHO_TOTAL_INICIO[r.linha_id][r.banho] = r.total_inicio;
+    if (!BANHO_START_REAL[r.linha_id]) BANHO_START_REAL[r.linha_id] = {};
+    BANHO_START_REAL[r.linha_id][r.banho] = r.start_em || r.total_inicio;
     BANHO_AMOSTRAS[r.linha_id][r.banho] = r.amostras_contador;
     BANHO_SAIDA_CALC[r.linha_id][r.banho] = r.saida_calculada || null;
     BANHO_AMOSTRA_ATIVA[r.linha_id][r.banho] = r.amostra_ativa !== false;
@@ -855,6 +858,8 @@ function configurarRealtime(){
       if (!BANHO_PAUSADO[r.linha_id]) BANHO_PAUSADO[r.linha_id] = {};
       BANHO_INICIO[r.linha_id][r.banho] = r.amostra_inicio;
       BANHO_TOTAL_INICIO[r.linha_id][r.banho] = r.total_inicio;
+      if (!BANHO_START_REAL[r.linha_id]) BANHO_START_REAL[r.linha_id] = {};
+      BANHO_START_REAL[r.linha_id][r.banho] = r.start_em || r.total_inicio;
       BANHO_AMOSTRAS[r.linha_id][r.banho] = r.amostras_contador;
       BANHO_SAIDA_CALC[r.linha_id][r.banho] = r.saida_calculada || null;
       BANHO_AMOSTRA_ATIVA[r.linha_id][r.banho] = r.amostra_ativa !== false;
@@ -1274,6 +1279,11 @@ let BANHO_INICIO = {};
 let BANHO_TOTAL_INICIO = {};
 let BANHO_AMOSTRAS = {};
 LINHAS.forEach(l=>{ BANHO_INICIO[l.id]={}; BANHO_TOTAL_INICIO[l.id]={}; BANHO_AMOSTRAS[l.id]={}; });
+// Hora REAL em que o START foi dado. Diferente de BANHO_TOTAL_INICIO, que é
+// empurrado pra frente a cada despausa (pra descontar a manutenção do tempo
+// corrido) — este aqui nunca é deslocado.
+let BANHO_START_REAL = {};
+LINHAS.forEach(l=>{ BANHO_START_REAL[l.id]={}; });
 
 /* =========================================================================
    CÁLCULO DE SAÍDA DO BANHO (MOCK — ainda só local, não grava no Supabase)
@@ -1387,6 +1397,12 @@ function agoraDoBanho(linhaId, banho){
   return p ? new Date(p.desde) : new Date();
 }
 
+// hora do START: só HH:MM se foi hoje; com a data se foi em outro dia
+function fmtStartBanho(iso){
+  const d = new Date(iso), hoje = new Date();
+  const hhmm = d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  return d.toDateString() === hoje.toDateString() ? hhmm : `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} ${hhmm}`;
+}
 function fmtHoraRelogio(iso){
   return new Date(iso).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
 }
@@ -1622,6 +1638,12 @@ function buildPlantaSVG(){
 
       // botão START redondo — inicia um novo banho (zera cronômetro de amostra, total e contador)
       const btnCx = x + 16, btnCy = y + bathH/2 - 10;
+
+      // hora em que o START foi dado (real, não deslocada pelas pausas) — acima dos botões
+      const startReal = BANHO_START_REAL[linhaId] && BANHO_START_REAL[linhaId][banho];
+      if (startReal){
+        svg += `<text class="banho-start-hora" x="${x+btnAreaW/2}" y="${btnCy-17}" text-anchor="middle">▶ ${fmtStartBanho(startReal)}<title>START do banho: ${new Date(startReal).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</title></text>`;
+      }
       svg += `<g class="plant-dot" data-action="start-banho" data-linha="${linhaId}" data-banho="${banho}">`;
       svg += `<circle cx="${btnCx}" cy="${btnCy}" r="${btnR}" fill="var(--ok)"></circle>`;
       svg += `<text x="${btnCx}" y="${btnCy+4}" text-anchor="middle" style="font-size:11px; fill:#fff;">▶</text>`;
@@ -1851,10 +1873,11 @@ async function iniciarBanhoPorClique(linhaId, banho){
   const agora = new Date().toISOString();
   BANHO_INICIO[linhaId][banho] = agora;
   BANHO_TOTAL_INICIO[linhaId][banho] = agora;
+  BANHO_START_REAL[linhaId][banho] = agora;
   BANHO_AMOSTRAS[linhaId][banho] = 0;
   BANHO_SAIDA_CALC[linhaId][banho] = null; // novo ciclo — apaga o cálculo do ciclo anterior
   BANHO_PAUSADO[linhaId][banho] = null; // START também encerra qualquer pausa de manutenção pendente
-  if (sb) sb.from('banho_ciclos').update({ amostra_inicio: agora, total_inicio: agora, amostras_contador: 0, saida_calculada: null, pausado_desde: null, pausado_motivo: null }).eq('linha_id', linhaId).eq('banho', banho).then();
+  if (sb) sb.from('banho_ciclos').update({ amostra_inicio: agora, total_inicio: agora, start_em: agora, amostras_contador: 0, saida_calculada: null, pausado_desde: null, pausado_motivo: null }).eq('linha_id', linhaId).eq('banho', banho).then();
   registrarAcaoSupabase(col.re, 'start_banho', linhaId, banho, null);
   renderAll();
 }
@@ -2518,7 +2541,7 @@ async function abrirHistoricoAmostras(linhaId){
   document.getElementById('histAmostrasOverlay').style.display = 'flex';
 
   const blocosPorBanho = await Promise.all(BANHOS.map(async banho=>{
-    const inicioCiclo = BANHO_TOTAL_INICIO[linhaId][banho];
+    const inicioCiclo = (BANHO_START_REAL[linhaId] && BANHO_START_REAL[linhaId][banho]) || BANHO_TOTAL_INICIO[linhaId][banho];
     let coletas = [];
     if (sb){
       const { data } = await sb.from('historico_acoes')
