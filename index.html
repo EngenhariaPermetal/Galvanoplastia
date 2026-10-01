@@ -2039,7 +2039,12 @@ async function iniciarBanhoPorClique(linhaId, banho){
   BANHO_AMOSTRAS[linhaId][banho] = 0;
   BANHO_SAIDA_CALC[linhaId][banho] = null; // novo ciclo — apaga o cálculo do ciclo anterior
   BANHO_PAUSADO[linhaId][banho] = null; // START também encerra qualquer pausa de manutenção pendente
-  if (sb) sb.from('banho_ciclos').update({ amostra_inicio: agora, total_inicio: agora, start_em: agora, amostras_contador: 0, saida_calculada: null, pausado_desde: null, pausado_motivo: null }).eq('linha_id', linhaId).eq('banho', banho).then();
+  if (sb){
+    sb.from('banho_ciclos').update({ amostra_inicio: agora, total_inicio: agora, start_em: agora, amostras_contador: 0, saida_calculada: null, pausado_desde: null, pausado_motivo: null }).eq('linha_id', linhaId).eq('banho', banho).then();
+    // START durante manutenção encerra a parada — fecha o registro pra não ficar "Em andamento"
+    sb.from('paradas_manutencao').update({ fim: agora, colaborador_re_fim: col.re })
+      .eq('linha_id', linhaId).eq('banho', banho).is('fim', null).then();
+  }
   registrarAcaoSupabase(col.re, 'start_banho', linhaId, banho, null);
   renderAll();
 }
