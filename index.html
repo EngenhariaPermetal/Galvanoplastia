@@ -234,6 +234,10 @@
   .producao-ontem-destaque{display:flex; justify-content:space-between; align-items:baseline; background:var(--surface-warm); border:1px solid var(--hairline); border-radius:10px; padding:10px 14px; margin:10px 0;}
   .producao-ontem-label{font-size:11px; font-weight:700; color:var(--ink-faint); text-transform:uppercase; letter-spacing:.03em;}
   .producao-ontem-numero{font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:800; color:var(--brass-deep);}
+  .produtos-lista{display:flex; flex-wrap:wrap; gap:8px; min-height:28px;}
+  .produto-chip{display:inline-flex; align-items:center; gap:6px; background:rgba(176,141,87,0.1); border:1px solid var(--brass); color:var(--brass-deep); font-size:12.5px; font-weight:600; padding:4px 6px 4px 10px; border-radius:20px;}
+  .produto-chip button{background:none; border:none; color:var(--brass-deep); font-size:14px; font-weight:700; cursor:pointer; line-height:1; padding:2px 4px;}
+  .produto-chip button:hover{color:var(--crit);}
   .interv-btn-secundario:hover{background:var(--surface-warm);}
   .relatorio-lista{max-height:50vh; overflow-y:auto; display:flex; flex-direction:column; gap:10px; margin:10px 0;}
   .relatorio-item{border:1px solid var(--hairline); border-radius:10px; padding:10px 12px; background:var(--surface-warm);}
@@ -671,7 +675,7 @@ async function carregarDadosIniciais(){
   if (!sb) return; // sem Supabase configurado — mantém tudo vazio/default
 
   const hojeISO = new Date().toISOString().slice(0,10);
-  const [pend, banho, faixas, leituras, config, intervencoes, producao] = await Promise.all([
+  const [pend, banho, faixas, leituras, config, intervencoes, producao, produtosLinha] = await Promise.all([
     sb.from('pendencias_rotina').select('*'),
     sb.from('banho_ciclos').select('*'),
     sb.from('parametros_quimicos').select('*'),
@@ -679,8 +683,10 @@ async function carregarDadosIniciais(){
     sb.from('config_geral').select('*'),
     sb.from('intervencoes_quimicas').select('*, colaboradores(nome)').order('criado_em', { ascending:false }),
     sb.from('apontamentos_producao').select('*, colaboradores(nome)').eq('data', hojeISO).order('criado_em', { ascending:true }),
+    sb.from('produtos_linha').select('*').order('criado_em', { ascending:true }),
   ]);
   LINHAS.forEach(l=>{ PRODUCAO_HOJE[l.id] = (producao.data || []).filter(r=>r.linha_id===l.id); });
+  LINHAS.forEach(l=>{ PRODUTOS_LINHA[l.id] = (produtosLinha.data || []).filter(r=>r.linha_id===l.id).map(r=>({id:r.id, nome:r.nome})); });
 
   PENDENCIAS = (pend.data || []).map(r => ({
     id: r.id, escopo: r.escopo, banho: r.banho, item: r.item, tanque: r.tanque,
@@ -745,14 +751,6 @@ async function carregarDadosIniciais(){
     if (r.chave.startsWith('sangramento_k2co3_')){
       const linhaId = r.chave.replace('sangramento_k2co3_', '');
       LIMITE_SANGRAMENTO[linhaId] = Number(r.valor);
-    }
-    if (r.chave.startsWith('produto_atual_linha2_')){
-      const indice = Number(r.chave.replace('produto_atual_linha2_', ''));
-      PRODUTO_ATUAL_LINHA2[indice] = r.valor;
-    }
-    else if (r.chave.startsWith('produto_atual_')){
-      const linhaId = r.chave.replace('produto_atual_', '');
-      PRODUTO_ATUAL[linhaId] = r.valor;
     }
   });
 
@@ -879,14 +877,24 @@ function configurarRealtime(){
         LIMITE_SANGRAMENTO[r.chave.replace('sangramento_k2co3_','')] = Number(r.valor);
         renderAll();
       }
-      else if (r.chave.startsWith('produto_atual_linha2_')){
-        PRODUTO_ATUAL_LINHA2[Number(r.chave.replace('produto_atual_linha2_',''))] = r.valor;
-        if (document.getElementById('view-producao').classList.contains('active')) renderProducao();
-      }
-      else if (r.chave.startsWith('produto_atual_')){
-        PRODUTO_ATUAL[r.chave.replace('produto_atual_','')] = r.valor;
-        if (document.getElementById('view-producao').classList.contains('active')) renderProducao();
-      }
+    })
+    .subscribe();
+
+  sb.channel('realtime-produtos-linha')
+    .on('postgres_changes', { event:'INSERT', schema:'public', table:'produtos_linha' }, payload => {
+      const r = payload.new;
+      if (!r) return;
+      if (!PRODUTOS_LINHA[r.linha_id]) PRODUTOS_LINHA[r.linha_id] = [];
+      if (!PRODUTOS_LINHA[r.linha_id].some(p=>p.id===r.id)) PRODUTOS_LINHA[r.linha_id].push({ id:r.id, nome:r.nome });
+      if (document.getElementById('view-producao').classList.contains('active')) renderProducao();
+      if (document.getElementById('view-parametros').classList.contains('active')) renderParametros();
+    })
+    .on('postgres_changes', { event:'DELETE', schema:'public', table:'produtos_linha' }, payload => {
+      const r = payload.old;
+      if (!r) return;
+      LINHAS.forEach(l=>{ PRODUTOS_LINHA[l.id] = (PRODUTOS_LINHA[l.id]||[]).filter(p=>p.id!==r.id); });
+      if (document.getElementById('view-producao').classList.contains('active')) renderProducao();
+      if (document.getElementById('view-parametros').classList.contains('active')) renderParametros();
     })
     .subscribe();
 }
@@ -1225,18 +1233,17 @@ LINHAS.forEach(l=>{
 });
 /* =========================================================================
    PRODUÇÃO DIÁRIA — apontamentos de peso (KG) por linha, turno e produto.
-   Linha 1 e Linha 3 têm um produto/spec só; Linha 2 tem dois produtos em
-   paralelo (por padrão Anel e Núcleo A). Todos configuráveis em Parâmetros,
-   já que o nome/spec pode mudar de vez em quando.
+   Qualquer produto pode rodar em qualquer linha — cada linha tem uma LISTA
+   de produtos possíveis (editável em Parâmetros: adiciona/remove), e na aba
+   Produção o operador escolhe qual da lista está apontando.
    ========================================================================= */
-let PRODUTO_ATUAL = {}; // por linha1/linha3 — nome do produto/spec vigente
-let PRODUTO_ATUAL_LINHA2 = ['Anel', 'Núcleo A']; // os dois produtos em paralelo da Linha 2
-LINHAS.forEach(l=>{ PRODUTO_ATUAL[l.id] = null; });
+let PRODUTOS_LINHA = {}; // por linha — array de {id, nome}, carregado do Supabase
+LINHAS.forEach(l=>{ PRODUTOS_LINHA[l.id] = []; });
 let PRODUCAO_HOJE = {}; // por linha — lista de apontamentos de hoje (cache local, pra somar sem reconsultar toda hora)
 LINHAS.forEach(l=>{ PRODUCAO_HOJE[l.id] = []; });
 
 function produtosDaLinha(linhaId){
-  return linhaId === 'linha2' ? PRODUTO_ATUAL_LINHA2 : [PRODUTO_ATUAL[linhaId] || '—'];
+  return (PRODUTOS_LINHA[linhaId] || []).map(p=>p.nome);
 }
 
 // Enquanto um banho está em parada de manutenção, os cronômetros ligados a
@@ -2638,9 +2645,9 @@ function buildProducaoHTML(){
 
     const totalGeralHoje = produtos.reduce((acc,p)=> acc + (resumo[p]?.[1]||0) + (resumo[p]?.[2]||0), 0);
 
-    const seletorProduto = linha.id === 'linha2'
-      ? `<select class="param-input" data-produto-input style="width:120px;">${PRODUTO_ATUAL_LINHA2.map(p=>`<option value="${p}">${p}</option>`).join('')}</select>`
-      : `<input type="hidden" data-produto-input value="${PRODUTO_ATUAL[linha.id] || ''}"><span class="hint">${PRODUTO_ATUAL[linha.id] || 'produto não configurado — ajuste em Parâmetros'}</span>`;
+    const seletorProduto = produtos.length
+      ? `<select class="param-input" data-produto-input style="width:140px;">${produtos.map(p=>`<option value="${p}">${p}</option>`).join('')}</select>`
+      : `<span class="hint">Nenhum produto cadastrado — adicione em Parâmetros</span>`;
 
     return `
       <div class="card quimico-card" data-producao-linha="${linha.id}">
@@ -2994,19 +3001,17 @@ function renderParametros(){
                  value="${LIMITE_SANGRAMENTO[linha.id] ?? ''}" placeholder="200" style="width:90px;">
           <span class="hint">Sangra quando o K2CO3 dessa linha ficar acima deste valor</span>
         </div>
-        <div class="param-subtitle">Produto/spec atual (produção)</div>
-        <div style="margin-bottom:14px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-          ${linha.id === 'linha2' ? `
-            <input type="text" class="param-input" data-produto-atual-linha2 data-indice="0"
-                   value="${PRODUTO_ATUAL_LINHA2[0] ?? ''}" placeholder="ex: Anel" style="width:120px;">
-            <input type="text" class="param-input" data-produto-atual-linha2 data-indice="1"
-                   value="${PRODUTO_ATUAL_LINHA2[1] ?? ''}" placeholder="ex: Núcleo A" style="width:120px;">
-          ` : `
-            <input type="text" class="param-input" data-produto-atual data-linha="${linha.id}"
-                   value="${PRODUTO_ATUAL[linha.id] ?? ''}" placeholder="ex: 0,10mm ou GTQ" style="width:120px;">
-          `}
+        <div class="param-subtitle">Produtos que rodam nessa linha (produção)</div>
+        <div class="produtos-lista" data-produtos-lista="${linha.id}">
+          ${(PRODUTOS_LINHA[linha.id]||[]).map(p=>`
+            <span class="produto-chip">${p.nome}<button type="button" data-remover-produto data-id="${p.id}" data-linha="${linha.id}" title="Remover">×</button></span>
+          `).join('') || '<span class="hint">Nenhum produto cadastrado ainda</span>'}
         </div>
-        <div class="hint" style="margin:-10px 0 14px;">Usado na aba Produção — troque quando o spec/código do que está rodando mudar</div>
+        <div style="display:flex; gap:8px; margin:10px 0 14px;">
+          <input type="text" class="param-input" data-novo-produto-input data-linha="${linha.id}" placeholder="ex: 0,10mm, Anel, GTQ..." style="width:160px;">
+          <button type="button" class="btn small" data-adicionar-produto data-linha="${linha.id}">+ Adicionar</button>
+        </div>
+        <div class="hint" style="margin:-10px 0 14px;">Qualquer produto pode rodar em qualquer linha — essa lista é só o que aparece pra escolher na aba Produção</div>
         <div class="param-subtitle">Por banho</div>
         <table class="data-table param-table">
           <thead><tr><th>Banho</th><th>Granalha</th><th>Limpeza de contato</th><th>Coleta de amostra</th><th>Especif. Liga (%)</th></tr></thead>
@@ -3051,23 +3056,29 @@ function renderParametros(){
       renderAll();
     });
   });
-  wrap.querySelectorAll('[data-produto-atual]').forEach(el=>{
-    el.addEventListener('change', ()=>{
-      const v = el.value.trim();
-      const linhaId = el.dataset.linha;
-      PRODUTO_ATUAL[linhaId] = v || null;
-      if (sb && v){
-        sb.from('config_geral').upsert({ chave: 'produto_atual_'+linhaId, valor: v }, { onConflict:'chave' }).then();
+  wrap.querySelectorAll('[data-adicionar-produto]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const linhaId = btn.dataset.linha;
+      const input = wrap.querySelector(`[data-novo-produto-input][data-linha="${linhaId}"]`);
+      const nome = input.value.trim();
+      if (!nome) return;
+      if ((PRODUTOS_LINHA[linhaId]||[]).some(p=>p.nome.toLowerCase()===nome.toLowerCase())){ input.value=''; return; }
+      if (sb){
+        const { data, error } = await sb.from('produtos_linha').insert({ linha_id: linhaId, nome }).select().single();
+        if (!error && data) PRODUTOS_LINHA[linhaId].push({ id:data.id, nome:data.nome });
+      } else {
+        PRODUTOS_LINHA[linhaId].push({ id:`local-${Date.now()}`, nome });
       }
+      renderParametros();
     });
   });
-  wrap.querySelectorAll('[data-produto-atual-linha2]').forEach(el=>{
-    el.addEventListener('change', ()=>{
-      const v = el.value.trim();
-      const indice = Number(el.dataset.indice);
-      if (!v) return;
-      PRODUTO_ATUAL_LINHA2[indice] = v;
-      if (sb) sb.from('config_geral').upsert({ chave: 'produto_atual_linha2_'+indice, valor: v }, { onConflict:'chave' }).then();
+  wrap.querySelectorAll('[data-remover-produto]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const linhaId = btn.dataset.linha;
+      const id = isNaN(Number(btn.dataset.id)) ? btn.dataset.id : Number(btn.dataset.id);
+      PRODUTOS_LINHA[linhaId] = PRODUTOS_LINHA[linhaId].filter(p=>p.id!==id);
+      if (sb && typeof id === 'number') sb.from('produtos_linha').delete().eq('id', id).then();
+      renderParametros();
     });
   });
   wrap.querySelectorAll('[data-ativo-pendencia]').forEach(el=>{
