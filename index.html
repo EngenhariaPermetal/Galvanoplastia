@@ -215,6 +215,25 @@
   .interv-btn{margin-top:4px; margin-right:4px; font-size:10.5px; font-weight:700; color:var(--brass-deep); background:none; border:1px solid var(--brass); border-radius:8px; padding:3px 8px; cursor:pointer;}
   .interv-btn:hover{background:rgba(176,141,87,0.1);}
   .interv-btn-secundario{color:var(--ink-soft); border-color:var(--hairline);}
+  .producao-form{display:flex; flex-wrap:wrap; gap:12px; margin-top:8px; align-items:flex-start;}
+  .producao-form label{display:flex; flex-direction:column; gap:4px; font-size:11px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.03em;}
+  .producao-form label > *{text-transform:none; letter-spacing:normal; font-weight:400;}
+  .producao-form input, .producao-form select{box-sizing:border-box; max-width:100%;}
+  @media (max-width:480px){ .producao-form label{flex:1 1 100%;} .producao-form input, .producao-form select{width:100%;} }
+  .producao-kpi-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:16px;}
+  @media (max-width:900px){ .producao-kpi-grid{grid-template-columns:repeat(2,1fr);} }
+  @media (max-width:560px){ .producao-kpi-grid{grid-template-columns:1fr;} }
+  .producao-kpi-card{padding:18px;}
+  .producao-kpi-titulo{font-size:11px; font-weight:700; color:var(--ink-faint); text-transform:uppercase; letter-spacing:.04em; margin-bottom:10px;}
+  .producao-kpi-barra{height:10px; border-radius:6px; background:var(--surface-warm); overflow:hidden; margin-bottom:8px;}
+  .producao-kpi-barra-fill{height:100%; background:var(--brass); border-radius:6px 0 0 6px;}
+  .producao-kpi-legenda{display:flex; flex-direction:column; gap:3px; font-size:12px; color:var(--ink-soft);}
+  .producao-kpi-linha-row{display:flex; justify-content:space-between; font-size:13px; padding:4px 0; border-bottom:1px solid var(--hairline);}
+  .producao-kpi-linha-row:last-child{border-bottom:none;}
+  .producao-kpi-numero{font-family:'Space Grotesk',sans-serif; font-size:28px; font-weight:700; color:var(--brass-deep);}
+  .producao-ontem-destaque{display:flex; justify-content:space-between; align-items:baseline; background:var(--surface-warm); border:1px solid var(--hairline); border-radius:10px; padding:10px 14px; margin:10px 0;}
+  .producao-ontem-label{font-size:11px; font-weight:700; color:var(--ink-faint); text-transform:uppercase; letter-spacing:.03em;}
+  .producao-ontem-numero{font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:800; color:var(--brass-deep);}
   .interv-btn-secundario:hover{background:var(--surface-warm);}
   .relatorio-lista{max-height:50vh; overflow-y:auto; display:flex; flex-direction:column; gap:10px; margin:10px 0;}
   .relatorio-item{border:1px solid var(--hairline); border-radius:10px; padding:10px 12px; background:var(--surface-warm);}
@@ -461,6 +480,10 @@
   <div class="view" id="view-producao">
     <h2 class="section-title">Produção diária · por linha e turno</h2>
     <div id="producaoWrap" class="quimicos-grid"></div>
+    <h2 class="section-title" style="margin-top:28px;">Histórico de produção · últimos 10 dias</h2>
+    <div id="producaoGraficosWrap" class="quimicos-grid"></div>
+    <h2 class="section-title" style="margin-top:28px;">KPIs de produtividade · últimos 10 dias</h2>
+    <div id="producaoKpiWrap"></div>
   </div>
 
   <!-- ============ VIEW: PARÂMETROS ============ -->
@@ -723,7 +746,11 @@ async function carregarDadosIniciais(){
       const linhaId = r.chave.replace('sangramento_k2co3_', '');
       LIMITE_SANGRAMENTO[linhaId] = Number(r.valor);
     }
-    if (r.chave.startsWith('produto_atual_')){
+    if (r.chave.startsWith('produto_atual_linha2_')){
+      const indice = Number(r.chave.replace('produto_atual_linha2_', ''));
+      PRODUTO_ATUAL_LINHA2[indice] = r.valor;
+    }
+    else if (r.chave.startsWith('produto_atual_')){
       const linhaId = r.chave.replace('produto_atual_', '');
       PRODUTO_ATUAL[linhaId] = r.valor;
     }
@@ -834,6 +861,7 @@ function configurarRealtime(){
       const hojeISO = new Date().toISOString().slice(0,10);
       if (r.data !== hojeISO) return; // só nos importa o total de hoje
       if (!PRODUCAO_HOJE[r.linha_id]) PRODUCAO_HOJE[r.linha_id] = [];
+      if (PRODUCAO_HOJE[r.linha_id].some(x=>x.id===r.id)) return; // já temos esse registro (inserido por esta mesma tela) — não duplica
       PRODUCAO_HOJE[r.linha_id].push(r);
       if (document.getElementById('view-producao').classList.contains('active')) renderProducao();
     })
@@ -850,6 +878,10 @@ function configurarRealtime(){
       else if (r.chave.startsWith('sangramento_k2co3_')){
         LIMITE_SANGRAMENTO[r.chave.replace('sangramento_k2co3_','')] = Number(r.valor);
         renderAll();
+      }
+      else if (r.chave.startsWith('produto_atual_linha2_')){
+        PRODUTO_ATUAL_LINHA2[Number(r.chave.replace('produto_atual_linha2_',''))] = r.valor;
+        if (document.getElementById('view-producao').classList.contains('active')) renderProducao();
       }
       else if (r.chave.startsWith('produto_atual_')){
         PRODUTO_ATUAL[r.chave.replace('produto_atual_','')] = r.valor;
@@ -1193,18 +1225,18 @@ LINHAS.forEach(l=>{
 });
 /* =========================================================================
    PRODUÇÃO DIÁRIA — apontamentos de peso (KG) por linha, turno e produto.
-   Linha 1 e Linha 3 têm um produto/spec só (que muda de vez em quando,
-   configurável em Parâmetros); Linha 2 tem dois produtos em paralelo,
-   sempre os mesmos: Anel e Núcleo A.
+   Linha 1 e Linha 3 têm um produto/spec só; Linha 2 tem dois produtos em
+   paralelo (por padrão Anel e Núcleo A). Todos configuráveis em Parâmetros,
+   já que o nome/spec pode mudar de vez em quando.
    ========================================================================= */
-const PRODUTOS_LINHA2 = ['Anel', 'Núcleo A'];
 let PRODUTO_ATUAL = {}; // por linha1/linha3 — nome do produto/spec vigente
+let PRODUTO_ATUAL_LINHA2 = ['Anel', 'Núcleo A']; // os dois produtos em paralelo da Linha 2
 LINHAS.forEach(l=>{ PRODUTO_ATUAL[l.id] = null; });
 let PRODUCAO_HOJE = {}; // por linha — lista de apontamentos de hoje (cache local, pra somar sem reconsultar toda hora)
 LINHAS.forEach(l=>{ PRODUCAO_HOJE[l.id] = []; });
 
 function produtosDaLinha(linhaId){
-  return linhaId === 'linha2' ? PRODUTOS_LINHA2 : [PRODUTO_ATUAL[linhaId] || '—'];
+  return linhaId === 'linha2' ? PRODUTO_ATUAL_LINHA2 : [PRODUTO_ATUAL[linhaId] || '—'];
 }
 
 // Enquanto um banho está em parada de manutenção, os cronômetros ligados a
@@ -2607,7 +2639,7 @@ function buildProducaoHTML(){
     const totalGeralHoje = produtos.reduce((acc,p)=> acc + (resumo[p]?.[1]||0) + (resumo[p]?.[2]||0), 0);
 
     const seletorProduto = linha.id === 'linha2'
-      ? `<select class="param-input" data-produto-input style="width:120px;">${PRODUTOS_LINHA2.map(p=>`<option value="${p}">${p}</option>`).join('')}</select>`
+      ? `<select class="param-input" data-produto-input style="width:120px;">${PRODUTO_ATUAL_LINHA2.map(p=>`<option value="${p}">${p}</option>`).join('')}</select>`
       : `<input type="hidden" data-produto-input value="${PRODUTO_ATUAL[linha.id] || ''}"><span class="hint">${PRODUTO_ATUAL[linha.id] || 'produto não configurado — ajuste em Parâmetros'}</span>`;
 
     return `
@@ -2615,6 +2647,10 @@ function buildProducaoHTML(){
         <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap;">
           <h3 class="param-card-title">${linha.nome}<span class="param-liga">${linha.liga}</span></h3>
           <button class="interv-btn interv-btn-secundario" data-relatorio-producao data-linha="${linha.id}" title="Relatório por período">📅 Relatório do período</button>
+        </div>
+        <div class="producao-ontem-destaque">
+          <span class="producao-ontem-label">Produção de ontem</span>
+          <span class="producao-ontem-numero" id="ontemTotal-${linha.id}">—</span>
         </div>
         <div class="param-subtitle">Hoje, ${new Date().toLocaleDateString('pt-BR')} — total: ${totalGeralHoje.toLocaleString('pt-BR')} kg</div>
         <table class="data-table param-table">
@@ -2665,13 +2701,22 @@ function renderProducao(){
       if (!col) return;
 
       const hojeISO = new Date().toISOString().slice(0,10);
-      const novoRegistro = { data:hojeISO, turno, linha_id:linhaId, produto, peso_kg:pesoKg, observacao: observacao||null, colaborador_re:col.re, criado_em:new Date().toISOString() };
-      PRODUCAO_HOJE[linhaId].push(novoRegistro);
+      const payload = { data:hojeISO, turno, linha_id:linhaId, produto, peso_kg:pesoKg, observacao: observacao||null, colaborador_re:col.re };
 
       if (sb){
-        try { await sb.from('apontamentos_producao').insert({ data:hojeISO, turno, linha_id:linhaId, produto, peso_kg:pesoKg, observacao: observacao||null, colaborador_re:col.re }); }
-        catch(e){ console.error('Falha ao gravar apontamento de produção:', e); }
+        try {
+          const { data: inserido } = await sb.from('apontamentos_producao').insert(payload).select().single();
+          // usa o registro de volta (com id real) — o canal de Realtime também vai receber
+          // esse INSERT e tenta inserir de novo, mas ele confere o id e pula se já existir
+          if (inserido && !PRODUCAO_HOJE[linhaId].some(x=>x.id===inserido.id)) PRODUCAO_HOJE[linhaId].push(inserido);
+        } catch(e){
+          console.error('Falha ao gravar apontamento de produção:', e);
+          PRODUCAO_HOJE[linhaId].push({ ...payload, id:`local-${Date.now()}`, criado_em:new Date().toISOString() }); // sem Supabase, mantém só localmente
+        }
+      } else {
+        PRODUCAO_HOJE[linhaId].push({ ...payload, id:`local-${Date.now()}`, criado_em:new Date().toISOString() });
       }
+
       registrarAcaoSupabase(col.re, 'apontamento_producao', linhaId, null, produto, { turno, peso_kg:pesoKg, observacao });
       renderProducao();
       const novoMsgEl = document.getElementById('producaoMsg-'+linhaId);
@@ -2682,6 +2727,129 @@ function renderProducao(){
   wrap.querySelectorAll('[data-relatorio-producao]').forEach(btn=>{
     btn.addEventListener('click', ()=> abrirRelatorioProducao(btn.dataset.linha));
   });
+
+  const graficosWrap = document.getElementById('producaoGraficosWrap');
+  graficosWrap.innerHTML = LINHAS.map(linha=>`
+    <div class="tv-grafico-card" style="height:260px;">
+      <div class="tv-grafico-titulo">${linha.nome} · ${linha.liga}</div>
+      <div class="tv-grafico-canvas-wrap"><canvas id="chart-producao-${linha.id}"></canvas></div>
+    </div>`).join('');
+  initProducaoCharts();
+}
+
+const PRODUTO_COR_PALETTE = ['#B08D57','#2AA9A0','#8A5FBF','#C98A00'];
+let PRODUCAO_CHART_INSTANCES = [];
+async function initProducaoCharts(){
+  if (typeof Chart === 'undefined') return; // sem internet / biblioteca não carregou
+  if (typeof ChartDataLabels !== 'undefined' && !Chart.registry.plugins.get('datalabels')) Chart.register(ChartDataLabels);
+  PRODUCAO_CHART_INSTANCES.forEach(c=>c.destroy());
+  PRODUCAO_CHART_INSTANCES = [];
+
+  const datas = ultimosNDias(10); // mesma janela fixa usada no histórico químico
+  let registros = [];
+  if (sb){
+    const { data } = await sb.from('apontamentos_producao').select('data,linha_id,produto,turno,peso_kg,observacao').gte('data', datas[0]);
+    registros = data || [];
+  }
+
+  // um gráfico por linha, mas com uma série por PRODUTO daquela linha (cor
+  // própria) — assim a Linha 2 mostra Anel e Núcleo A separados visualmente
+  LINHAS.forEach(linha=>{
+    const canvas = document.getElementById('chart-producao-'+linha.id);
+    if (!canvas) return;
+    const produtos = produtosDaLinha(linha.id);
+    const porDiaProduto = {};
+    produtos.forEach(p=>{ porDiaProduto[p] = {}; datas.forEach(d=> porDiaProduto[p][d]=0); });
+    registros.filter(r=>r.linha_id===linha.id).forEach(r=>{
+      if (!porDiaProduto[r.produto]) porDiaProduto[r.produto] = {};
+      if (porDiaProduto[r.produto][r.data] === undefined) return;
+      porDiaProduto[r.produto][r.data] += Number(r.peso_kg);
+    });
+
+    const datasets = produtos.map((p,i)=>{
+      const cor = PRODUTO_COR_PALETTE[i % PRODUTO_COR_PALETTE.length];
+      const valores = datas.map(d => porDiaProduto[p][d] || null); // dia sem apontamento = buraco, não vira 0 artificial
+      return { label:p, data:valores, borderColor:cor, backgroundColor:cor, spanGaps:true, tension:0.25, pointRadius:3 };
+    });
+
+    PRODUCAO_CHART_INSTANCES.push(new Chart(canvas.getContext('2d'), {
+      type:'line',
+      data: { labels: datas.map(fmtDataCurtaBR), datasets },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{ display: produtos.length>1, position:'bottom', labels:{ boxWidth:10, font:{size:9} } },
+          datalabels:{ align:'top', anchor:'end', font:{size:8,weight:'600'}, color: ctx=>ctx.dataset.borderColor, formatter:v=> v==null?'':v.toLocaleString('pt-BR') },
+        },
+        scales:{ y:{ beginAtZero:true, ticks:{font:{size:9}} }, x:{ ticks:{font:{size:9}} } },
+      },
+    }));
+  });
+
+  // Produção de ontem, em destaque — reaproveita os mesmos dados dos últimos 10 dias
+  const ontem = new Date(); ontem.setDate(ontem.getDate() - 1);
+  const ontemISO = ontem.toISOString().slice(0,10);
+  LINHAS.forEach(linha=>{
+    const el = document.getElementById('ontemTotal-'+linha.id);
+    if (!el) return;
+    const totalOntem = registros.filter(r=>r.linha_id===linha.id && r.data===ontemISO).reduce((s,r)=>s+Number(r.peso_kg),0);
+    el.textContent = `${totalOntem.toLocaleString('pt-BR')} kg`;
+  });
+
+  renderProducaoKPIs(registros);
+}
+
+function renderProducaoKPIs(registros){
+  const wrap = document.getElementById('producaoKpiWrap');
+  const totalGeral = registros.reduce((s,r)=>s+Number(r.peso_kg),0);
+  if (!totalGeral){
+    wrap.innerHTML = '<div class="card"><div class="relatorio-vazio">Sem apontamentos suficientes nos últimos 10 dias ainda.</div></div>';
+    return;
+  }
+
+  const porTurno = { 1:0, 2:0 };
+  registros.forEach(r=>{ porTurno[r.turno] = (porTurno[r.turno]||0) + Number(r.peso_kg); });
+  const pct1 = totalGeral ? (porTurno[1]/totalGeral*100) : 0;
+  const pct2 = totalGeral ? (porTurno[2]/totalGeral*100) : 0;
+
+  const porLinha = {};
+  LINHAS.forEach(l=>{ porLinha[l.id] = 0; });
+  registros.forEach(r=>{ porLinha[r.linha_id] = (porLinha[r.linha_id]||0) + Number(r.peso_kg); });
+
+  const comObservacao = registros.filter(r=>r.observacao && r.observacao.trim()).length;
+  const pctObs = registros.length ? (comObservacao/registros.length*100) : 0;
+
+  const porDiaTotal = {};
+  registros.forEach(r=>{ porDiaTotal[r.data] = (porDiaTotal[r.data]||0) + Number(r.peso_kg); });
+  const diasComDado = Object.entries(porDiaTotal);
+  const mediaDiaria = diasComDado.length ? totalGeral/diasComDado.length : 0;
+  const melhorDia = diasComDado.length ? diasComDado.reduce((a,b)=> b[1]>a[1]?b:a) : null;
+
+  wrap.innerHTML = `
+    <div class="producao-kpi-grid">
+      <div class="card producao-kpi-card">
+        <div class="producao-kpi-titulo">Produção por turno</div>
+        <div class="producao-kpi-barra"><div class="producao-kpi-barra-fill" style="width:${pct1}%;"></div></div>
+        <div class="producao-kpi-legenda">
+          <span>Turno 1: <strong>${pct1.toFixed(0)}%</strong> (${porTurno[1].toLocaleString('pt-BR')} kg)</span>
+          <span>Turno 2: <strong>${pct2.toFixed(0)}%</strong> (${porTurno[2].toLocaleString('pt-BR')} kg)</span>
+        </div>
+      </div>
+      <div class="card producao-kpi-card">
+        <div class="producao-kpi-titulo">Participação por linha</div>
+        ${LINHAS.map(l=>`<div class="producao-kpi-linha-row"><span>${l.nome}</span><strong>${totalGeral?(porLinha[l.id]/totalGeral*100).toFixed(0):0}%</strong></div>`).join('')}
+      </div>
+      <div class="card producao-kpi-card">
+        <div class="producao-kpi-titulo">Média diária</div>
+        <div class="producao-kpi-numero">${mediaDiaria.toLocaleString('pt-BR',{maximumFractionDigits:0})} kg</div>
+        <div class="hint">${melhorDia ? `Melhor dia: ${fmtDataCurtaBR(melhorDia[0])} (${melhorDia[1].toLocaleString('pt-BR')} kg)` : ''}</div>
+      </div>
+      <div class="card producao-kpi-card">
+        <div class="producao-kpi-titulo">Apontamentos com observação</div>
+        <div class="producao-kpi-numero">${pctObs.toFixed(0)}%</div>
+        <div class="hint">${comObservacao} de ${registros.length} registros (retrabalho, camada alta, etc.)</div>
+      </div>
+    </div>`;
 }
 
 function renderQuimicos(){
@@ -2826,13 +2994,19 @@ function renderParametros(){
                  value="${LIMITE_SANGRAMENTO[linha.id] ?? ''}" placeholder="200" style="width:90px;">
           <span class="hint">Sangra quando o K2CO3 dessa linha ficar acima deste valor</span>
         </div>
-        ${linha.id !== 'linha2' ? `
         <div class="param-subtitle">Produto/spec atual (produção)</div>
-        <div style="margin-bottom:14px;">
-          <input type="text" class="param-input" data-produto-atual data-linha="${linha.id}"
-                 value="${PRODUTO_ATUAL[linha.id] ?? ''}" placeholder="ex: 0,10mm ou GTQ" style="width:120px;">
-          <span class="hint">Usado na aba Produção — troque quando o spec/código do que está rodando mudar</span>
-        </div>` : ''}
+        <div style="margin-bottom:14px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          ${linha.id === 'linha2' ? `
+            <input type="text" class="param-input" data-produto-atual-linha2 data-indice="0"
+                   value="${PRODUTO_ATUAL_LINHA2[0] ?? ''}" placeholder="ex: Anel" style="width:120px;">
+            <input type="text" class="param-input" data-produto-atual-linha2 data-indice="1"
+                   value="${PRODUTO_ATUAL_LINHA2[1] ?? ''}" placeholder="ex: Núcleo A" style="width:120px;">
+          ` : `
+            <input type="text" class="param-input" data-produto-atual data-linha="${linha.id}"
+                   value="${PRODUTO_ATUAL[linha.id] ?? ''}" placeholder="ex: 0,10mm ou GTQ" style="width:120px;">
+          `}
+        </div>
+        <div class="hint" style="margin:-10px 0 14px;">Usado na aba Produção — troque quando o spec/código do que está rodando mudar</div>
         <div class="param-subtitle">Por banho</div>
         <table class="data-table param-table">
           <thead><tr><th>Banho</th><th>Granalha</th><th>Limpeza de contato</th><th>Coleta de amostra</th><th>Especif. Liga (%)</th></tr></thead>
@@ -2885,6 +3059,15 @@ function renderParametros(){
       if (sb && v){
         sb.from('config_geral').upsert({ chave: 'produto_atual_'+linhaId, valor: v }, { onConflict:'chave' }).then();
       }
+    });
+  });
+  wrap.querySelectorAll('[data-produto-atual-linha2]').forEach(el=>{
+    el.addEventListener('change', ()=>{
+      const v = el.value.trim();
+      const indice = Number(el.dataset.indice);
+      if (!v) return;
+      PRODUTO_ATUAL_LINHA2[indice] = v;
+      if (sb) sb.from('config_geral').upsert({ chave: 'produto_atual_linha2_'+indice, valor: v }, { onConflict:'chave' }).then();
     });
   });
   wrap.querySelectorAll('[data-ativo-pendencia]').forEach(el=>{
