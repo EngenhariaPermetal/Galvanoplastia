@@ -881,7 +881,7 @@ async function carregarDadosIniciais(){
   (producao.data || []).forEach(r=>{ if (r.colaboradores && r.colaboradores.nome) NOME_POR_RE[r.colaborador_re] = r.colaboradores.nome; });
   LINHAS.forEach(l=>{ PRODUTOS_LINHA[l.id] = (produtosLinha.data || []).filter(r=>r.linha_id===l.id).map(r=>({id:r.id, nome:r.nome, liga:r.liga || null})); });
 
-  PENDENCIAS = (pend.data || []).map(r => ({
+  PENDENCIAS = (pend.data || []).filter(r => escopoMonitorado(r.escopo)).map(r => ({
     id: r.id, escopo: r.escopo, banho: r.banho, item: r.item, tanque: r.tanque,
     tipo: r.tipo, limiteHoras: r.limite_horas, descricao: r.descricao, ultima: r.ultima_troca,
     ativo: r.ativo !== false,
@@ -976,6 +976,8 @@ function configurarRealtime(){
       const r = payload.new && Object.keys(payload.new).length ? payload.new : payload.old;
       if (payload.eventType === 'DELETE'){
         PENDENCIAS = PENDENCIAS.filter(p => p.id !== r.id);
+      } else if (!escopoMonitorado(r.escopo)){
+        return; // equipamento fora do monitoramento
       } else {
         const item = {
           id:r.id, escopo:r.escopo, banho:r.banho, item:r.item, tanque:r.tanque,
@@ -1384,12 +1386,15 @@ const LINHAS = [
 const LAYOUT_ORDEM = ['linha3','linha2','linha1'];
 const BANHOS = ['B3','B2','B1']; // ordem visual de cima pra baixo, dentro de cada linha
 
-const EQUIPAMENTOS_APOIO = [
-  { id:'retificadores', nome:'Sala de Retificadores' },
-  { id:'chiller',       nome:'Chiller' },
-  { id:'filtro',        nome:'Filtro' },
-  { id:'estanato',      nome:'Plataforma Estanato' },
-];
+// Equipamentos de apoio monitorados fora das linhas. Sala de Retificadores,
+// Chiller, Filtro e Plataforma Estanato deixaram de ser monitorados (01/10/2026).
+// Para voltar a monitorar algum, é só incluir aqui: { id:'chiller', nome:'Chiller' }
+const EQUIPAMENTOS_APOIO = [];
+// Só entram no painel pendências de escopos conhecidos (linhas + apoio acima) —
+// assim um equipamento removido daqui some do painel mesmo que ainda exista no banco
+function escopoMonitorado(escopo){
+  return LINHAS.some(l=>l.id===escopo) || EQUIPAMENTOS_APOIO.some(e=>e.id===escopo);
+}
 
 function h(horasAtras){ const t=new Date(); t.setMinutes(t.getMinutes() - Math.round(horasAtras*60)); return t.toISOString(); }
 
@@ -2176,6 +2181,7 @@ function renderMobileResumo(){
 
 function renderApoioStrip(){
   const wrap = document.getElementById('apoioStrip');
+  wrap.style.display = EQUIPAMENTOS_APOIO.length ? '' : 'none'; // sem equipamentos de apoio: some a faixa inteira
   wrap.innerHTML = EQUIPAMENTOS_APOIO.map(eq=>{
     const st = piorStatus(pendenciasDoEscopo(eq.id).map(statusDe));
     return `<div class="apoio-chip" data-escopo="${eq.id}"><span class="chip-dot ${st}"></span><span>${eq.nome}</span></div>`;
