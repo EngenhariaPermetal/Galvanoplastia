@@ -9,7 +9,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#F1F2F5;
@@ -119,11 +119,19 @@
   circle.pulse-solo{animation:pulse 2s ease-in-out infinite; transform-box:fill-box; transform-origin:center;}
   .bath-timer{font-family:'IBM Plex Mono',monospace; font-size:12px; fill:var(--ink-soft); font-weight:600;}
   .bath-total-info{font-family:'IBM Plex Mono',monospace; font-size:10.5px; fill:var(--ink-faint); font-weight:600;}
-  .banho-saida{font-family:'Space Grotesk',sans-serif; font-size:12.5px; font-weight:700; fill:var(--brass-deep);}
-  .banho-saida.warn{fill:var(--warn); font-size:13.5px;}
-  .banho-saida.crit{fill:var(--crit); font-size:14px; font-weight:800; animation: blinkCrit .8s steps(1,end) infinite;}
-  .banho-start-hora{font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:600; fill:var(--ink-soft);}
-  .banho-saida-vazio{font-family:'Inter',sans-serif; font-size:10.5px; fill:var(--ink-faint);}
+  /* cápsula da saída projetada — estilo macOS, cor pelo status:
+     ok = azul do sistema · ≤30min = laranja · vencida = vermelho sólido piscando */
+  .banho-saida-cap text{font-family:-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif; font-size:12px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:.01em;}
+  .banho-saida-icone{fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round;}
+  .banho-saida-cap.ok rect{fill:rgba(0,122,255,0.12);}   .banho-saida-cap.ok text{fill:#0060DF;}   .banho-saida-cap.ok .banho-saida-icone{stroke:#007AFF;}
+  .banho-saida-cap.warn rect{fill:rgba(255,149,0,0.18);} .banho-saida-cap.warn text{fill:#B25000;} .banho-saida-cap.warn .banho-saida-icone{stroke:#FF9500;}
+  .banho-saida-cap.crit rect{fill:#FF3B30;} .banho-saida-cap.crit text{fill:#fff;} .banho-saida-cap.crit .banho-saida-icone{stroke:#fff;}
+  .banho-saida-cap.crit{animation: blinkCrit .8s steps(1,end) infinite;}
+  /* cápsula do START — estilo macOS: fundo translúcido cinza do sistema, fonte SF, números tabulares */
+  .banho-start-cap rect{fill:rgba(118,118,128,0.12);}
+  .banho-start-cap text{font-family:-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif; font-size:10.5px; font-weight:600; fill:#1d1d1f; font-variant-numeric:tabular-nums; letter-spacing:.01em;}
+  .banho-start-play{fill:#34C759;}
+  .banho-saida-vazio{font-family:-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif; font-size:10px; fill:var(--ink-faint);}
   .banho-pausado-selo{font-family:'Inter',sans-serif; font-size:9px; font-weight:700; fill:var(--brass-deep);}
   .banho-tag-label{font-family:'Inter',sans-serif; font-size:8.5px; font-weight:700; fill:var(--ink-faint); letter-spacing:.03em;}
   .banho-tag-timer{font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:600; fill:var(--ink-soft);}
@@ -417,6 +425,76 @@
     .mobile-resumo-linha-sub{font-size:12px; color:var(--ink-soft); margin-top:1px;}
     .mobile-resumo-seta{color:var(--ink-faint); font-size:18px; flex:none;}
   }
+</style>
+<style id="tema-macos">
+/* =====================================================================
+   TEMA macOS — sobrescreve a aparência do tema original (acima).
+     fundo #F5F5F7 · superfície #FFFFFF · texto #1D1D1F / #6E6E73
+     status: verde #34C759 · laranja #FF9500 · vermelho #FF3B30 · azul #007AFF
+     fonte: SF Pro (sistema) em tudo, números tabulares nos cronômetros
+   ===================================================================== */
+:root{
+  --sf: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Inter', system-ui, 'Segoe UI', sans-serif;
+  --bg:#F5F5F7; --surface:#FFFFFF; --surface-warm:#FAFAFC;
+  --ink:#1D1D1F; --ink-soft:#6E6E73; --ink-faint:#AEAEB2;
+  --ok:#248A3D;  --ok-bg:#E8F7EC;
+  --warn:#B25000; --warn-bg:#FFF2DE;
+  --crit:#D70015; --crit-bg:#FFE9E7;
+  --hairline:#E5E5EA;
+  --radius:12px;
+  --shadow: 0 0 0 .5px rgba(0,0,0,.04), 0 1px 3px rgba(0,0,0,.06), 0 6px 18px rgba(0,0,0,.04);
+}
+body, body *{ font-family: var(--sf) !important; }
+body{ background:var(--bg); letter-spacing:-.003em; }
+.nav-clock .time, .bath-timer, .etapa-icon-timer, .etapa-timer, .bath-total-info, .mono,
+.producao-hoje-numero, td{ font-variant-numeric: tabular-nums; }
+
+
+.topnav{ background:rgba(255,255,255,.72); backdrop-filter:saturate(180%) blur(20px); -webkit-backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:.5px solid rgba(0,0,0,.12); }
+.brand-text .eyebrow{ text-transform:none; letter-spacing:0; font-size:11.5px; color:var(--ink-soft); font-weight:500; }
+.brand-text .title{ font-weight:700; letter-spacing:-.01em; }
+.tabs{ background:rgba(118,118,128,.12); padding:2px; border-radius:9px; gap:0; }
+.tab-btn{ border-radius:7px; padding:6px 16px; font-weight:500; color:var(--ink); font-size:13px; }
+.tab-btn.active{ background:#fff; box-shadow:0 3px 8px rgba(0,0,0,.12), 0 3px 1px rgba(0,0,0,.04); font-weight:600; }
+.tab-btn.tv-btn{ color:#007AFF; }
+.tab-btn.tv-btn.active{ background:#007AFF; color:#fff; }
+.nav-clock .time{ font-weight:600; font-size:15px; }
+
+h2.section-title{ font-weight:700; font-size:20px; letter-spacing:-.015em; }
+.tv-title{ font-weight:800 !important; letter-spacing:-.025em; }
+
+.card, .andon-strip{ border:none !important; box-shadow:var(--shadow); border-radius:14px; }
+
+.linha-label{ font-weight:700; letter-spacing:-.01em; fill:var(--ink); }
+.apoio-label{ font-weight:500; fill:var(--ink-soft); }
+.farm-label{ font-weight:600; letter-spacing:0; fill:var(--ink-soft); font-size:12px; }
+.tanque-rect{ fill:#FFFFFF; stroke:none; filter: drop-shadow(0 1px 2px rgba(0,0,0,.07)) drop-shadow(0 4px 10px rgba(0,0,0,.04)); }
+.bath-total-info{ fill:var(--ink-faint); font-weight:500; }
+
+.item-pill{ stroke:none !important; }
+.item-pill.ok{ fill:rgba(118,118,128,.10); }
+.item-pill.warn{ fill:rgba(255,149,0,.18); }
+.item-pill.crit{ fill:rgba(255,59,48,.16); animation:none; }
+.item-pill.off{ fill:rgba(118,118,128,.06); }
+.etapa-icon-timer, .bath-timer{ font-weight:700; font-size:12.5px !important; }
+.etapa-icon-timer.ok, .bath-timer.ok{ fill:#248A3D; }
+.etapa-icon-timer.warn, .bath-timer.warn{ fill:#B25000; }
+.etapa-icon-timer.crit, .bath-timer.crit{ fill:#D70015; }
+.etapa-icon-timer.off, .bath-timer.off{ fill:var(--ink-faint); font-style:normal; font-weight:500; }
+
+.etapa-row-bg{ fill:#FFFFFF; stroke:rgba(60,60,67,.12); stroke-width:.5; }
+.etapa-row-bg.warn{ fill:#FFF6EA; } .etapa-row-bg.crit{ fill:#FFF0EF; }
+.etapa-label{ fill:var(--ink); font-weight:400; }
+.etapa-timer{ font-weight:600; }
+.etapa-timer.ok{ fill:#248A3D; } .etapa-timer.warn{ fill:#B25000; } .etapa-timer.crit{ fill:#D70015; }
+
+.plant-dot[data-action="start-banho"] circle{ fill:#34C759; }
+.plant-dot[data-action="pausar-banho"] circle{ fill:#AEAEB2; }
+.plant-dot[data-action="despausar-banho"] circle{ fill:#FF9F0A; }
+.banho-pausado-selo{ fill:#B25000; font-weight:600; }
+
+@media (prefers-reduced-motion: reduce){ *{ animation:none !important; } }
 </style>
 </head>
 <body>
@@ -1602,7 +1680,7 @@ function buildPlantaSVG(){
   const farmRows = TANQUE_FARM.reduce((acc,e)=>acc+(e.qtd||1),0);
   const farmBlockH = farmRows * rowH;
   const H = Math.max(farmStartY + farmBlockH + 10, startY + bathsBlockH + 40);
-  const tanqueMaeW = 140, tanqueMaeGap = 46;
+  const tanqueMaeW = 168, tanqueMaeGap = 40;
   const W = startX + LAYOUT_ORDEM.length*colW + (LAYOUT_ORDEM.length-1)*colGap + tanqueMaeGap + tanqueMaeW + startX;
 
   let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
@@ -1610,13 +1688,10 @@ function buildPlantaSVG(){
   LAYOUT_ORDEM.forEach((linhaId, ci)=>{
     const linha = LINHAS.find(l=>l.id===linhaId);
     const x = startX + ci*(colW+colGap);
-    const stLinha = piorStatus(pendenciasDoEscopo(linhaId).map(statusDe));
-    const colorLinha = STATUS_HEX[stLinha];
 
     // cabeçalho da coluna (só navega — não zera nada, é o resumo da linha inteira)
     svg += `<g class="plant-dot" data-action="nav" data-escopo="${linhaId}">`;
-    svg += `<text class="linha-label" x="${x}" y="18" text-anchor="start">${linha.nome.toUpperCase()}</text>`;
-    svg += `<circle cx="${x+colW-9}" cy="13" r="7" fill="${colorLinha}" class="${stLinha!=='ok'?'pulse':''}"></circle>`;
+    svg += `<text class="linha-label" x="${x}" y="18" text-anchor="start">${linha.nome}</text>`;
     svg += `<text class="apoio-label" x="${x}" y="34" text-anchor="start">${linha.liga}</text>`;
     svg += `</g>`;
     svg += `<g class="plant-dot" data-action="historico-amostras" data-escopo="${linhaId}">
@@ -1642,7 +1717,14 @@ function buildPlantaSVG(){
       // hora em que o START foi dado (real, não deslocada pelas pausas) — acima dos botões
       const startReal = BANHO_START_REAL[linhaId] && BANHO_START_REAL[linhaId][banho];
       if (startReal){
-        svg += `<text class="banho-start-hora" x="${x+btnAreaW/2}" y="${btnCy-17}" text-anchor="middle">▶ ${fmtStartBanho(startReal)}<title>START do banho: ${new Date(startReal).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</title></text>`;
+        const txt = fmtStartBanho(startReal);
+        const capW = 22 + txt.length * 6.3, capH = 17;
+        const capX = btnCx - btnR, capY = btnCy - btnR - capH - 5; // alinhada à esquerda com o botão START
+        svg += `<g class="banho-start-cap"><title>START do banho: ${new Date(startReal).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</title>`;
+        svg += `<rect x="${capX}" y="${capY}" width="${capW}" height="${capH}" rx="${capH/2}"></rect>`;
+        svg += `<path d="M${capX+8} ${capY+5} L${capX+8} ${capY+12} L${capX+14} ${capY+8.5} Z" class="banho-start-play"></path>`;
+        svg += `<text x="${capX+18}" y="${capY+12.2}" text-anchor="start">${txt}</text>`;
+        svg += `</g>`;
       }
       svg += `<g class="plant-dot" data-action="start-banho" data-linha="${linhaId}" data-banho="${banho}">`;
       svg += `<circle cx="${btnCx}" cy="${btnCy}" r="${btnR}" fill="var(--ok)"></circle>`;
@@ -1667,12 +1749,21 @@ function buildPlantaSVG(){
       const saidaIso = BANHO_SAIDA_CALC[linhaId] && BANHO_SAIDA_CALC[linhaId][banho];
       if (saidaIso){
         const stSaida = statusSaida(saidaIso);
-        svg += `<text class="banho-saida ${stSaida}" x="${x+btnAreaW/2}" y="${btnCy+26}" text-anchor="middle">${fmtHoraRelogio(saidaIso)}</text>`;
+        // cápsula estilo macOS, mesma família da do START — a cor segue o status
+        const txtS = fmtHoraRelogio(saidaIso);
+        const sCapH = 20, sCapW = 26 + txtS.length * 7.6;
+        const sCapX = btnCx - btnR, sCapY = btnCy + btnR + 5;
+        const ix = sCapX + 9, iy = sCapY + sCapH/2; // ícone "saída": seta saindo da barra
+        svg += `<g class="banho-saida-cap ${stSaida}"><title>Saída projetada do banho: ${new Date(saidaIso).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</title>`;
+        svg += `<rect x="${sCapX}" y="${sCapY}" width="${sCapW}" height="${sCapH}" rx="${sCapH/2}"></rect>`;
+        svg += `<path class="banho-saida-icone" d="M${ix} ${iy-4.5} L${ix} ${iy+4.5} M${ix+3} ${iy} L${ix+9} ${iy} M${ix+6.5} ${iy-3} L${ix+9.5} ${iy} L${ix+6.5} ${iy+3}"></path>`;
+        svg += `<text x="${sCapX+23}" y="${sCapY+14.2}" text-anchor="start">${txtS}</text>`;
+        svg += `</g>`;
       } else {
-        svg += `<text class="banho-saida-vazio" x="${x+btnAreaW/2}" y="${btnCy+26}" text-anchor="middle">—</text>`;
+        svg += `<text class="banho-saida-vazio" x="${btnCx - btnR + 12}" y="${btnCy+btnR+19}" text-anchor="start">saída —</text>`;
       }
       if (pausaInfo){
-        svg += `<text class="banho-pausado-selo" x="${x+btnAreaW/2}" y="${btnCy+40}" text-anchor="middle">⏸ Manutenção<title>${pausaInfo.motivo.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</title></text>`;
+        svg += `<text class="banho-pausado-selo" x="${btnCx - btnR + 2}" y="${btnCy+btnR+36}" text-anchor="start">⏸ Manutenção<title>${pausaInfo.motivo.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</title></text>`;
       }
 
       // caixa do banho — nome + cronômetro total/amostras + pílula de amostra
@@ -1731,7 +1822,7 @@ function buildPlantaSVG(){
     // no Supabase aparecem neutros, sem clique, até o schema ser atualizado). No Latão, as
     // 3 águas de saída são um caso à parte: sem cronômetro próprio, sem clique — trocam
     // sempre 30min antes da saída projetada mais próxima entre B1/B2/B3.
-    svg += `<text class="farm-label" x="${x}" y="${farmStartY-10}">TANQUES DA LINHA</text>`;
+    svg += `<text class="farm-label" x="${x}" y="${farmStartY-10}">Tanques da linha</text>`;
     let fy = farmStartY;
     const linhaEhLatao = ehLinhaLatao(linhaId);
     const menorSaida = linhaEhLatao ? menorSaidaCalculada(linhaId) : null;
@@ -1785,7 +1876,7 @@ function buildPlantaSVG(){
     const segGap = 10, segW = (tanqueMaeW - segGap*(LAYOUT_ORDEM.length-1)) / LAYOUT_ORDEM.length;
     const statusBarH = 38;
 
-    svg += `<text class="farm-label" x="${tmX0}" y="${tmTop-30}">TANQUE MÃE</text>`;
+    svg += `<text class="farm-label" x="${tmX0}" y="${tmTop-30}">Tanque Mãe</text>`;
 
     LAYOUT_ORDEM.forEach((linhaId, si)=>{
       const linha = LINHAS.find(l=>l.id===linhaId);
@@ -1805,8 +1896,9 @@ function buildPlantaSVG(){
       if (pTanque){
         svg += `<g class="plant-dot" data-action="reset-tanque" data-linha="${linhaId}">`;
         svg += `<rect class="etapa-row-bg ${stTanque==='crit'||stTanque==='warn'?stTanque:''}" x="${tmX}" y="${tmTop+tmH-statusBarH}" width="${segW}" height="${statusBarH}"></rect>`;
-        svg += `<text class="etapa-label" x="${tmX+7}" y="${tmTop+tmH-statusBarH/2-2}" style="font-size:8.5px;">verificado há</text>`;
-        svg += `<text class="etapa-timer ${stTanque}" x="${tmX+7}" y="${tmTop+tmH-statusBarH/2+11}" style="font-size:9.5px;">${fmtCronometro(pTanque.ultima)}</text>`;
+        svg += `<title>Nível verificado há ${fmtCronometro(pTanque.ultima)}</title>`;
+        svg += `<text class="etapa-label" x="${tmX+segW/2}" y="${tmTop+tmH-statusBarH/2-3}" text-anchor="middle" style="font-size:8px;">verificado</text>`;
+        svg += `<text class="etapa-timer ${stTanque}" x="${tmX+segW/2}" y="${tmTop+tmH-statusBarH/2+11}" text-anchor="middle" style="font-size:10.5px;">${fmtCronometroCurto(pTanque.ultima)}</text>`;
         svg += `</g>`;
       }
     });
