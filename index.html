@@ -234,6 +234,43 @@
   .producao-ontem-destaque{display:flex; justify-content:space-between; align-items:baseline; background:var(--surface-warm); border:1px solid var(--hairline); border-radius:10px; padding:10px 14px; margin:10px 0;}
   .producao-ontem-label{font-size:11px; font-weight:700; color:var(--ink-faint); text-transform:uppercase; letter-spacing:.03em;}
   .producao-ontem-numero{font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:800; color:var(--brass-deep);}
+  /* destaque do dia produtivo atual — escuro, número grande, legível de longe */
+  .producao-hoje-box{background:var(--ink); color:#fff; border-radius:12px; padding:14px 16px; margin:10px 0 8px;}
+  .producao-hoje-topo{display:flex; justify-content:space-between; align-items:flex-end; gap:10px; flex-wrap:wrap;}
+  .producao-hoje-label{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--brass-light);}
+  .producao-hoje-sub{font-size:12px; color:#C9CDD4; margin-top:2px;}
+  .producao-hoje-numero{font-family:'Space Grotesk',sans-serif; font-size:34px; font-weight:800; line-height:1; color:#fff; white-space:nowrap;}
+  .producao-hoje-numero small{font-size:16px; font-weight:600; color:var(--brass-light); margin-left:6px;}
+  .producao-hoje-res{margin-top:12px; display:flex; flex-direction:column; gap:6px;}
+  .producao-hoje-re{display:grid; grid-template-columns:minmax(0,1fr) auto; gap:2px 10px; font-size:12px; align-items:center;}
+  .producao-hoje-re .nome{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#E8EAED;}
+  .producao-hoje-re .valor{font-family:'IBM Plex Mono',monospace; font-weight:600; color:#fff; white-space:nowrap;}
+  .producao-hoje-re .barra{grid-column:1 / -1; height:5px; border-radius:3px; background:rgba(255,255,255,.12); overflow:hidden;}
+  .producao-hoje-re .barra > div{height:100%; background:var(--brass); border-radius:3px;}
+  .producao-hoje-re.lider .barra > div{background:#E9C46A;}
+  .producao-produto-resumo{font-size:13px; font-weight:700; color:var(--ink); margin:12px 0 6px;}
+  .producao-produto-resumo span{color:var(--brass-deep);}
+  /* ranking de líderes */
+  .ranking-toolbar{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; font-size:13px; color:var(--ink-soft);}
+  .ranking-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:16px;}
+  .ranking-grid > div > .ranking-card{height:100%;}
+  @media (max-width:1100px){ .ranking-grid{grid-template-columns:1fr;} }
+  .ranking-card{padding:18px;}
+  .ranking-card-titulo{font-family:'Space Grotesk',sans-serif; font-size:16px; font-weight:700;}
+  .ranking-card-periodo{font-size:12px; color:var(--ink-soft); margin:2px 0 14px;}
+  .ranking-item{display:grid; grid-template-columns:36px minmax(0,1fr) auto; gap:4px 12px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hairline);}
+  .ranking-item:last-child{border-bottom:none;}
+  .ranking-pos{font-family:'Space Grotesk',sans-serif; font-size:20px; font-weight:800; color:var(--ink-faint); text-align:center;}
+  .ranking-item.primeiro .ranking-pos{font-size:24px;}
+  .ranking-nome{font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .ranking-detalhe{font-size:11px; color:var(--ink-soft);}
+  .ranking-valor{text-align:right; white-space:nowrap;}
+  .ranking-valor strong{font-family:'Space Grotesk',sans-serif; font-size:20px; font-weight:800; color:var(--brass-deep);}
+  .ranking-valor div{font-size:11px; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace;}
+  .ranking-barra{grid-column:2 / -1; height:6px; border-radius:3px; background:var(--surface-warm); border:1px solid var(--hairline); overflow:hidden;}
+  .ranking-barra > div{height:100%; background:var(--brass);}
+  .ranking-item.primeiro .ranking-barra > div{background:var(--brass-deep);}
+  .ranking-lider-tag{display:inline-block; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; background:var(--ok-bg); color:var(--ok); padding:2px 6px; border-radius:6px; margin-left:6px; vertical-align:middle;}
   .produtos-lista{display:flex; flex-wrap:wrap; gap:8px; min-height:28px;}
   .produto-chip{display:inline-flex; align-items:center; gap:6px; background:rgba(176,141,87,0.1); border:1px solid var(--brass); color:var(--brass-deep); font-size:12.5px; font-weight:600; padding:4px 6px 4px 10px; border-radius:20px;}
   .produto-chip button{background:none; border:none; color:var(--brass-deep); font-size:14px; font-weight:700; cursor:pointer; line-height:1; padding:2px 4px;}
@@ -263,6 +300,14 @@
   .relatorio-delta-abs{font-size:10.5px; font-weight:700; text-align:right; white-space:nowrap; flex:none;}
   .relatorio-sem-registro{font-size:11.5px; color:var(--ink-faint); font-style:italic; margin-top:4px;}
   .quimico-card .param-table td{padding:8px 10px;}
+  /* lista de apontamentos do dia: linhas compactas (sem quebra) e rolagem própria */
+  .apont-scroll{max-height:280px; overflow:auto; border-radius:var(--radius); box-shadow:var(--shadow);}
+  .apont-scroll .data-table{box-shadow:none; border-radius:0;}
+  .apont-table th, .apont-table td{white-space:nowrap;}
+  .quimico-card .apont-table td, .quimico-card .apont-table th{padding:7px 8px; font-size:12px;}
+  .apont-table thead th{position:sticky; top:0; z-index:1; background:var(--surface-warm);}
+  .apont-table td.apont-obs{max-width:120px; overflow:hidden; text-overflow:ellipsis; color:var(--ink-soft);}
+  .apont-table td.apont-num{text-align:right;}
   @media (max-width:900px){ .quimicos-grid{grid-template-columns:1fr;} }
 
   /* ---------- Alertas ativos — em fluxo normal (nunca sobrepõe nada), formato pílula compacta ---------- */
@@ -482,8 +527,10 @@
 
   <!-- ============ VIEW: PRODUÇÃO ============ -->
   <div class="view" id="view-producao">
-    <h2 class="section-title">Produção diária · por linha e turno</h2>
+    <h2 class="section-title">Produção diária · por linha e turno <span style="font-size:13px; font-weight:500; color:var(--ink-soft);">(dia produtivo 07h00 → 07h00)</span></h2>
     <div id="producaoWrap" class="quimicos-grid"></div>
+    <h2 class="section-title" style="margin-top:28px;">Ranking de líderes · mensal e dia anterior</h2>
+    <div id="producaoRankingWrap"></div>
     <h2 class="section-title" style="margin-top:28px;">Histórico de produção · últimos 10 dias</h2>
     <div id="producaoGraficosWrap" class="quimicos-grid"></div>
     <h2 class="section-title" style="margin-top:28px;">KPIs de produtividade · últimos 10 dias</h2>
@@ -674,7 +721,6 @@ const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE
 async function carregarDadosIniciais(){
   if (!sb) return; // sem Supabase configurado — mantém tudo vazio/default
 
-  const hojeISO = new Date().toISOString().slice(0,10);
   const [pend, banho, faixas, leituras, config, intervencoes, producao, produtosLinha] = await Promise.all([
     sb.from('pendencias_rotina').select('*'),
     sb.from('banho_ciclos').select('*'),
@@ -682,10 +728,12 @@ async function carregarDadosIniciais(){
     sb.from('leituras_quimicas').select('*').order('criado_em', { ascending:false }),
     sb.from('config_geral').select('*'),
     sb.from('intervencoes_quimicas').select('*, colaboradores(nome)').order('criado_em', { ascending:false }),
-    sb.from('apontamentos_producao').select('*, colaboradores(nome)').eq('data', hojeISO).order('criado_em', { ascending:true }),
+    sb.from('apontamentos_producao').select('*, colaboradores(nome)').gte('criado_em', inicioDiaProdutivo(diaProdutivoISO()).toISOString()).order('criado_em', { ascending:true }),
     sb.from('produtos_linha').select('*').order('criado_em', { ascending:true }),
   ]);
-  LINHAS.forEach(l=>{ PRODUCAO_HOJE[l.id] = (producao.data || []).filter(r=>r.linha_id===l.id); });
+  PRODUCAO_DIA_ATUAL = diaProdutivoISO();
+  LINHAS.forEach(l=>{ PRODUCAO_HOJE[l.id] = (producao.data || []).filter(r=>r.linha_id===l.id && diaDoRegistro(r)===PRODUCAO_DIA_ATUAL); });
+  (producao.data || []).forEach(r=>{ if (r.colaboradores && r.colaboradores.nome) NOME_POR_RE[r.colaborador_re] = r.colaboradores.nome; });
   LINHAS.forEach(l=>{ PRODUTOS_LINHA[l.id] = (produtosLinha.data || []).filter(r=>r.linha_id===l.id).map(r=>({id:r.id, nome:r.nome})); });
 
   PENDENCIAS = (pend.data || []).map(r => ({
@@ -856,12 +904,19 @@ function configurarRealtime(){
     .on('postgres_changes', { event:'INSERT', schema:'public', table:'apontamentos_producao' }, payload => {
       const r = payload.new;
       if (!r) return;
-      const hojeISO = new Date().toISOString().slice(0,10);
-      if (r.data !== hojeISO) return; // só nos importa o total de hoje
+      if (diaDoRegistro(r) !== diaProdutivoISO()) return; // só nos importa o dia produtivo atual (07h→07h)
       if (!PRODUCAO_HOJE[r.linha_id]) PRODUCAO_HOJE[r.linha_id] = [];
       if (PRODUCAO_HOJE[r.linha_id].some(x=>x.id===r.id)) return; // já temos esse registro (inserido por esta mesma tela) — não duplica
       PRODUCAO_HOJE[r.linha_id].push(r);
       if (document.getElementById('view-producao').classList.contains('active')) renderProducao();
+      // Realtime não traz o join com colaboradores — busca o nome uma vez e re-renderiza
+      if (r.colaborador_re && !NOME_POR_RE[r.colaborador_re]){
+        sb.from('colaboradores').select('nome').eq('re', r.colaborador_re).maybeSingle().then(({ data })=>{
+          if (!data || !data.nome) return;
+          NOME_POR_RE[r.colaborador_re] = data.nome;
+          if (document.getElementById('view-producao').classList.contains('active')) renderProducao();
+        });
+      }
     })
     .subscribe();
 
@@ -1241,6 +1296,65 @@ let PRODUTOS_LINHA = {}; // por linha — array de {id, nome}, carregado do Supa
 LINHAS.forEach(l=>{ PRODUTOS_LINHA[l.id] = []; });
 let PRODUCAO_HOJE = {}; // por linha — lista de apontamentos de hoje (cache local, pra somar sem reconsultar toda hora)
 LINHAS.forEach(l=>{ PRODUCAO_HOJE[l.id] = []; });
+// Estado do formulário de apontamento, por linha. Sobrevive aos re-renders
+// (Realtime, novo registro) — sem isso o produto selecionado voltaria pro 1º
+// da lista toda vez que alguém apontasse em outra tela.
+let PRODUCAO_FORM = {};
+LINHAS.forEach(l=>{ PRODUCAO_FORM[l.id] = { turno:null, produto:null, peso:'', obs:'' }; });
+// Últimos 10 dias de apontamentos (carregado junto com os gráficos), usado
+// pra "Produção de ontem" do produto selecionado sem reconsultar o banco.
+let PRODUCAO_REGISTROS_10D = null;
+// Nome por RE — cache pra mostrar quem apontou mesmo em registros que chegam
+// pelo Realtime (que não traz o join com colaboradores)
+let NOME_POR_RE = {};
+
+// ---- Dia produtivo: vai das 07h00 de um dia até as 07h00 do dia seguinte,
+// sempre em horário LOCAL (não UTC). Um apontamento às 02h do dia 02 conta
+// para o dia produtivo 01. O dia de cada registro sai do criado_em.
+const HORA_VIRADA_PRODUCAO = 7;
+function isoDataLocal(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function diaProdutivoISO(ts){
+  const d = ts ? new Date(ts) : new Date();
+  const ajustado = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours() - HORA_VIRADA_PRODUCAO, d.getMinutes());
+  return isoDataLocal(ajustado);
+}
+function inicioDiaProdutivo(diaISO){ // Date das 07h00 locais daquele dia produtivo
+  const [y,m,dd] = diaISO.split('-').map(Number);
+  return new Date(y, m-1, dd, HORA_VIRADA_PRODUCAO, 0, 0, 0);
+}
+function deslocarDiaISO(diaISO, n){
+  const [y,m,dd] = diaISO.split('-').map(Number);
+  return isoDataLocal(new Date(y, m-1, dd+n));
+}
+function diaProdutivoAnteriorISO(){ return deslocarDiaISO(diaProdutivoISO(), -1); }
+function ultimosNDiasProdutivos(n){
+  const hoje = diaProdutivoISO();
+  const dias = [];
+  for (let i = n-1; i >= 0; i--) dias.push(deslocarDiaISO(hoje, -i));
+  return dias;
+}
+function diaDoRegistro(r){ return r.criado_em ? diaProdutivoISO(r.criado_em) : r.data; }
+function fmtKg(v){ return `${Number(v).toLocaleString('pt-BR',{maximumFractionDigits:1})} kg`; }
+function fmtT(v){ return `${(Number(v)/1000).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2})} t`; }
+let PRODUCAO_DIA_ATUAL = diaProdutivoISO(); // pra detectar a virada das 07h00
+let RANKING_PRODUTO = ''; // '' = todos os produtos
+
+// Ranking por RE: soma o peso por quem apontou (todas as linhas), maior primeiro
+function rankingPorRE(registros, produto){
+  const m = {};
+  (registros || []).filter(r => !produto || r.produto === produto).forEach(r=>{
+    const re = r.colaborador_re || '—';
+    if (!m[re]) m[re] = { re, nome:null, kg:0, n:0, linhas:new Set() };
+    m[re].kg += Number(r.peso_kg);
+    m[re].n += 1;
+    m[re].linhas.add(r.linha_id);
+    const nome = (r.colaboradores && r.colaboradores.nome) || NOME_POR_RE[re];
+    if (nome) m[re].nome = nome;
+  });
+  return Object.values(m).sort((a,b)=> b.kg - a.kg || String(a.re).localeCompare(String(b.re)));
+}
 
 function produtosDaLinha(linhaId){
   return (PRODUTOS_LINHA[linhaId] || []).map(p=>p.nome);
@@ -2620,33 +2734,267 @@ function imprimirRelatorio(nomeLinha, elemento, itens){
 /* =========================================================================
    PRODUÇÃO DIÁRIA
    ========================================================================= */
-function resumoProducaoHoje(linhaId){
+
+function produtoSelecionado(linhaId){
   const produtos = produtosDaLinha(linhaId);
-  const porProduto = {};
-  produtos.forEach(p=>{ porProduto[p] = { 1:0, 2:0 }; });
-  (PRODUCAO_HOJE[linhaId] || []).forEach(r=>{
-    if (!porProduto[r.produto]) porProduto[r.produto] = { 1:0, 2:0 };
-    porProduto[r.produto][r.turno] = (porProduto[r.produto][r.turno] || 0) + Number(r.peso_kg);
-  });
-  return porProduto;
+  const atual = PRODUCAO_FORM[linhaId] && PRODUCAO_FORM[linhaId].produto;
+  return produtos.includes(atual) ? atual : (produtos[0] || null); // produto removido em Parâmetros → cai pro 1º
 }
+
+// apontamentos de HOJE do produto, em ordem cronológica
+function apontamentosHojeDoProduto(linhaId, produto){
+  return (PRODUCAO_HOJE[linhaId] || [])
+    .filter(r => r.produto === produto)
+    .slice()
+    .sort((x,y)=> new Date(x.criado_em) - new Date(y.criado_em));
+}
+
+function totalOntemDoProduto(registros, linhaId, produto){
+  if (!registros) return null; // ainda não carregou
+  const ontemISO = diaProdutivoAnteriorISO(); // dia produtivo anterior: 07h→07h
+  return registros
+    .filter(r => r.linha_id===linhaId && diaDoRegistro(r)===ontemISO && r.produto===produto)
+    .reduce((s,r)=> s + Number(r.peso_kg), 0);
+}
+
+function nomeDoApontamento(r){
+  const nome = (r.colaboradores && r.colaboradores.nome) || NOME_POR_RE[r.colaborador_re];
+  return nome ? `${r.colaborador_re} · ${nome}` : (r.colaborador_re || '—');
+}
+
+function htmlListaApontamentos(linhaId, produto){
+  if (!produto) return '';
+  const itens = apontamentosHojeDoProduto(linhaId, produto);
+  const totalProduto = itens.reduce((s,r)=> s + Number(r.peso_kg), 0);
+  const corpo = itens.length
+    ? itens.map(r=>`<tr>
+        <td class="mono">${r.criado_em ? fmtHoraRelogio(r.criado_em) : '—'}</td>
+        <td class="mono">${r.turno}</td>
+        <td class="mono apont-num"><strong>${Number(r.peso_kg).toLocaleString('pt-BR')} kg</strong></td>
+        <td>${nomeDoApontamento(r)}</td>
+        <td class="apont-obs" title="${r.observacao ? String(r.observacao).replace(/"/g,'&quot;') : ''}">${r.observacao ? r.observacao : ''}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="5" style="text-align:center; color:var(--ink-faint);">Nenhum apontamento de ${produto} hoje.</td></tr>`;
+  return `
+    <div class="producao-produto-resumo">${produto} · hoje: <span>${fmtKg(totalProduto)}</span> <span style="color:var(--ink-soft); font-weight:500;">em ${itens.length} apontamento${itens.length===1?'':'s'}</span></div>
+    <div class="apont-scroll">
+      <table class="data-table param-table apont-table">
+        <thead><tr><th>Hora</th><th>Turno</th><th style="text-align:right;">Peso</th><th>RE</th><th>Obs.</th></tr></thead>
+        <tbody>${corpo}</tbody>
+      </table>
+    </div>`;
+}
+
+function textoOntem(linhaId, produto){
+  const v = totalOntemDoProduto(PRODUCAO_REGISTROS_10D, linhaId, produto);
+  return v==null ? '—' : `${v.toLocaleString('pt-BR')} kg`;
+}
+
+// troca de produto no select: atualiza só a lista e o "ontem" daquele card,
+// sem re-renderizar a aba inteira (não refaz gráficos nem apaga o que foi digitado)
+function atualizarFiltroProduto(linhaId){
+  const card = document.querySelector(`[data-producao-linha="${linhaId}"]`);
+  if (!card) return;
+  const produto = produtoSelecionado(linhaId);
+  card.querySelector('[data-lista-apontamentos]').innerHTML = htmlListaApontamentos(linhaId, produto);
+  card.querySelector('[data-ontem-produto]').textContent = produto ? `· ${produto}` : '';
+  document.getElementById('ontemTotal-'+linhaId).textContent = produto ? textoOntem(linhaId, produto) : '—';
+}
+
+// Bloco escuro do card: total do dia produtivo atual da linha (todos os
+// produtos) + quanto cada RE apontou nessa linha, do maior pro menor
+function htmlHojeLinha(linhaId){
+  const regs = PRODUCAO_HOJE[linhaId] || [];
+  const total = regs.reduce((s,r)=> s + Number(r.peso_kg), 0);
+  const ranking = rankingPorRE(regs, '');
+  const maior = ranking.length ? ranking[0].kg : 0;
+  const porRE = ranking.map((x,i)=>`
+    <div class="producao-hoje-re ${i===0 && ranking.length>1 ? 'lider' : ''}">
+      <span class="nome">${i===0 && ranking.length>1 ? '🏆 ' : ''}${x.re}${x.nome ? ' · '+x.nome : ''}</span>
+      <span class="valor">${fmtT(x.kg)}</span>
+      <div class="barra"><div style="width:${maior ? (x.kg/maior*100) : 0}%;"></div></div>
+    </div>`).join('');
+  return `
+    <div class="producao-hoje-box">
+      <div class="producao-hoje-topo">
+        <div>
+          <div class="producao-hoje-label">Hoje · desde 07h00 de ${fmtDataCurtaBR(PRODUCAO_DIA_ATUAL)}</div>
+          <div class="producao-hoje-sub">todos os produtos · ${regs.length} apontamento${regs.length===1?'':'s'}</div>
+        </div>
+        <div class="producao-hoje-numero">${fmtKg(total)}<small>${fmtT(total)}</small></div>
+      </div>
+      ${porRE ? `<div class="producao-hoje-res">${porRE}</div>` : ''}
+    </div>`;
+}
+
+function htmlRankingCard(titulo, periodo, registros, emAndamento){
+  const ranking = rankingPorRE(registros, RANKING_PRODUTO);
+  if (!ranking.length){
+    return `<div class="card ranking-card"><div class="ranking-card-titulo">${titulo}</div><div class="ranking-card-periodo">${periodo}</div>
+      <div class="relatorio-vazio">Nenhum apontamento${RANKING_PRODUTO ? ' de '+RANKING_PRODUTO : ''} nesse período.</div></div>`;
+  }
+  const lider = ranking[0].kg;
+  const medalhas = ['🥇','🥈','🥉'];
+  const itens = ranking.map((x,i)=>{
+    const linhas = [...x.linhas].map(id => (LINHAS.find(l=>l.id===id)||{}).nome || id).join(', ');
+    const atras = i>0 ? ` · ${fmtT(lider - x.kg)} atrás do 1º` : '';
+    return `
+      <div class="ranking-item ${i===0?'primeiro':''}">
+        <div class="ranking-pos">${medalhas[i] || (i+1)+'º'}</div>
+        <div style="min-width:0;">
+          <div class="ranking-nome">${x.re}${x.nome ? ' · '+x.nome : ''}${i===0 && ranking.length>1 ? `<span class="ranking-lider-tag">${emAndamento?'Liderando':'Mais produziu'}</span>` : ''}</div>
+          <div class="ranking-detalhe">${x.n} apontamento${x.n===1?'':'s'} · ${linhas}${atras}</div>
+        </div>
+        <div class="ranking-valor"><strong>${fmtT(x.kg)}</strong><div>${fmtKg(x.kg)}</div></div>
+        <div class="ranking-barra"><div style="width:${lider ? (x.kg/lider*100) : 0}%;"></div></div>
+      </div>`;
+  }).join('');
+  return `<div class="card ranking-card"><div class="ranking-card-titulo">${titulo}</div><div class="ranking-card-periodo">${periodo}</div>${itens}</div>`;
+}
+
+// ---- Ranking mensal ----
+// Um mês produtivo = todos os dias produtivos daquele mês: o "Agosto" vai de
+// 01/08 07h00 até 01/09 07h00. O mês vigente conta só os dias JÁ FECHADOS
+// (até as 07h00 de hoje) — o dia em andamento não entra, igual ao "dia anterior".
+const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+function mesDoDiaISO(diaISO){ return diaISO.slice(0,7); } // 'YYYY-MM'
+function deslocarMes(mesISO, n){
+  const [y,m] = mesISO.split('-').map(Number);
+  const d = new Date(y, m-1+n, 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function nomeMes(mesISO){ const [y,m] = mesISO.split('-').map(Number); return `${MESES_PT[m-1]}/${y}`; }
+function inicioMesProdutivo(mesISO){ return inicioDiaProdutivo(mesISO+'-01'); }
+let RANKING_MES_SELECIONADO = null; // null = mês anterior ao vigente
+let RANKING_MES_CACHE = {};         // chave → registros (meses fechados não mudam)
+let _rankingRenderToken = 0;
+
+// Supabase devolve no máx. 1000 linhas por consulta — pagina até acabar
+async function buscarApontamentosIntervalo(inicio, fim){
+  if (!sb) return [];
+  const passo = 1000; let de = 0; const todos = [];
+  while (true){
+    let q = sb.from('apontamentos_producao')
+      .select('linha_id,produto,peso_kg,colaborador_re,criado_em,data,colaboradores(nome)')
+      .gte('criado_em', inicio.toISOString())
+      .order('criado_em', { ascending:true })
+      .range(de, de + passo - 1);
+    if (fim) q = q.lt('criado_em', fim.toISOString());
+    const { data, error } = await q;
+    if (error){ console.error('Falha ao buscar apontamentos:', error); break; }
+    (data || []).forEach(r=>{ if (r.colaboradores && r.colaboradores.nome) NOME_POR_RE[r.colaborador_re] = r.colaboradores.nome; });
+    todos.push(...(data || []));
+    if (!data || data.length < passo) break;
+    de += passo;
+  }
+  return todos;
+}
+
+async function registrosDoMes(mesISO, somenteFechados){
+  const fimMes = inicioMesProdutivo(deslocarMes(mesISO, 1));
+  const fimFechado = inicioDiaProdutivo(PRODUCAO_DIA_ATUAL); // 07h00 de hoje
+  const fim = somenteFechados && fimFechado < fimMes ? fimFechado : fimMes;
+  const chave = `${mesISO}|${fim.toISOString()}`;
+  if (!RANKING_MES_CACHE[chave]){
+    const inicio = inicioMesProdutivo(mesISO);
+    RANKING_MES_CACHE[chave] = fim <= inicio ? [] : await buscarApontamentosIntervalo(inicio, fim);
+  }
+  return RANKING_MES_CACHE[chave];
+}
+
+function renderRankingLideres(){
+  const wrap = document.getElementById('producaoRankingWrap');
+  if (!wrap) return;
+  const token = ++_rankingRenderToken;
+  const mesVigente = mesDoDiaISO(PRODUCAO_DIA_ATUAL);
+  const mesAnterior = deslocarMes(mesVigente, -1);
+  if (!RANKING_MES_SELECIONADO || RANKING_MES_SELECIONADO >= mesVigente) RANKING_MES_SELECIONADO = mesAnterior;
+  const mesSel = RANKING_MES_SELECIONADO;
+
+  const anterior = diaProdutivoAnteriorISO();
+  const ontemRegs = (PRODUCAO_REGISTROS_10D || []).filter(r => diaDoRegistro(r) === anterior);
+
+  // produtos: todos os cadastrados (qualquer linha) + os que aparecem nos apontamentos
+  const nomes = new Set();
+  LINHAS.forEach(l => produtosDaLinha(l.id).forEach(p => nomes.add(p)));
+  ontemRegs.forEach(r => nomes.add(r.produto));
+  const esc = v => String(v).replace(/"/g,'&quot;');
+  const opcoesProduto = ['<option value="">Todos os produtos</option>']
+    .concat([...nomes].map(p => `<option value="${esc(p)}" ${p===RANKING_PRODUTO?'selected':''}>${p}</option>`)).join('');
+  // meses fechados: os 24 anteriores ao vigente
+  const opcoesMes = Array.from({length:24}, (_,i)=> deslocarMes(mesVigente, -(i+1)))
+    .map(m => `<option value="${m}" ${m===mesSel?'selected':''}>${nomeMes(m)}${m===mesAnterior?' (mês anterior)':''}</option>`).join('');
+
+  const carregando = (t,p)=> `<div class="card ranking-card"><div class="ranking-card-titulo">${t}</div><div class="ranking-card-periodo">${p}</div><div class="relatorio-vazio">Carregando…</div></div>`;
+  const tituloMesSel = `${mesSel===mesAnterior ? 'Mês anterior' : 'Mês'} · ${nomeMes(mesSel)}`;
+  const periodoMesSel = `fechado · 01/${mesSel.slice(5)} 07h00 → 01/${deslocarMes(mesSel,1).slice(5)} 07h00`;
+  const tituloVigente = `Mês vigente · ${nomeMes(mesVigente)}`;
+  const periodoVigente = `dias fechados · 01/${mesVigente.slice(5)} 07h00 → ${fmtDataCurtaBR(PRODUCAO_DIA_ATUAL)} 07h00`;
+  const cardDia = PRODUCAO_REGISTROS_10D == null
+    ? carregando('Dia anterior · fechado', '')
+    : htmlRankingCard('Dia anterior · fechado', `${fmtDataCurtaBR(anterior)} 07h00 → ${fmtDataCurtaBR(PRODUCAO_DIA_ATUAL)} 07h00`, ontemRegs, false);
+
+  wrap.innerHTML = `
+    <div class="ranking-toolbar">
+      <label style="display:flex; gap:8px; align-items:center;">Produto (taxa)
+        <select class="param-input" id="rankingProdutoSelect" style="width:180px;">${opcoesProduto}</select>
+      </label>
+      <label style="display:flex; gap:8px; align-items:center;">Mês fechado
+        <select class="param-input" id="rankingMesSelect" style="width:260px;">${opcoesMes}</select>
+      </label>
+      <span>Soma de todas as linhas, por RE de quem apontou. Só períodos fechados (07h→07h).</span>
+    </div>
+    <div class="ranking-grid">
+      <div data-ranking-mes-sel>${carregando(tituloMesSel, periodoMesSel)}</div>
+      <div data-ranking-mes-vigente>${carregando(tituloVigente, periodoVigente)}</div>
+      <div>${cardDia}</div>
+    </div>`;
+  document.getElementById('rankingProdutoSelect').addEventListener('change', e=>{ RANKING_PRODUTO = e.target.value; renderRankingLideres(); });
+  document.getElementById('rankingMesSelect').addEventListener('change', e=>{ RANKING_MES_SELECIONADO = e.target.value; renderRankingLideres(); });
+
+  registrosDoMes(mesSel, false).then(regs=>{
+    if (token !== _rankingRenderToken) return; // usuário já trocou o filtro
+    const el = wrap.querySelector('[data-ranking-mes-sel]');
+    if (el) el.innerHTML = htmlRankingCard(tituloMesSel, periodoMesSel, regs, false);
+  });
+  registrosDoMes(mesVigente, true).then(regs=>{
+    if (token !== _rankingRenderToken) return;
+    const el = wrap.querySelector('[data-ranking-mes-vigente]');
+    if (!el) return;
+    el.innerHTML = PRODUCAO_DIA_ATUAL.endsWith('-01')
+      ? `<div class="card ranking-card"><div class="ranking-card-titulo">${tituloVigente}</div><div class="ranking-card-periodo">${periodoVigente}</div>
+         <div class="relatorio-vazio">Primeiro dia do mês ainda em andamento — o ranking começa amanhã às 07h00, quando o dia 01 fechar.</div></div>`
+      : htmlRankingCard(tituloVigente, periodoVigente, regs, true);
+  });
+}
+
+// Virada do dia produtivo às 07h00: zera o "hoje", recarrega e refaz a aba
+async function verificarViradaProducao(){
+  const atual = diaProdutivoISO();
+  if (atual === PRODUCAO_DIA_ATUAL) return;
+  PRODUCAO_DIA_ATUAL = atual;
+  RANKING_MES_CACHE = {}; // mês vigente ganhou um dia fechado — rebusca
+  LINHAS.forEach(l=>{ PRODUCAO_HOJE[l.id] = []; });
+  if (sb){
+    const { data } = await sb.from('apontamentos_producao').select('*, colaboradores(nome)')
+      .gte('criado_em', inicioDiaProdutivo(atual).toISOString()).order('criado_em', { ascending:true });
+    (data || []).forEach(r=>{ if (PRODUCAO_HOJE[r.linha_id] && diaDoRegistro(r)===atual) PRODUCAO_HOJE[r.linha_id].push(r); });
+  }
+  if (document.getElementById('view-producao').classList.contains('active')) renderProducao();
+}
+setInterval(verificarViradaProducao, 60000);
 
 function buildProducaoHTML(){
   const turnoSugerido = new Date().getHours() < 14 ? 1 : 2;
   return LINHAS.map(linha=>{
     const produtos = produtosDaLinha(linha.id);
-    const resumo = resumoProducaoHoje(linha.id);
-
-    const linhasResumo = produtos.map(p=>{
-      const r = resumo[p] || {1:0,2:0};
-      const total = r[1] + r[2];
-      return `<tr><td>${p}</td><td class="mono">${r[1].toLocaleString('pt-BR')} kg</td><td class="mono">${r[2].toLocaleString('pt-BR')} kg</td><td class="mono"><strong>${total.toLocaleString('pt-BR')} kg</strong></td></tr>`;
-    }).join('');
-
-    const totalGeralHoje = produtos.reduce((acc,p)=> acc + (resumo[p]?.[1]||0) + (resumo[p]?.[2]||0), 0);
+    const form = PRODUCAO_FORM[linha.id];
+    const produto = produtoSelecionado(linha.id);
+    const turno = form.turno || turnoSugerido;
+    const esc = v => String(v).replace(/"/g,'&quot;');
 
     const seletorProduto = produtos.length
-      ? `<select class="param-input" data-produto-input style="width:140px;">${produtos.map(p=>`<option value="${p}">${p}</option>`).join('')}</select>`
+      ? `<select class="param-input" data-produto-input style="width:140px;">${produtos.map(p=>`<option value="${esc(p)}" ${p===produto?'selected':''}>${p}</option>`).join('')}</select>`
       : `<span class="hint">Nenhum produto cadastrado — adicione em Parâmetros</span>`;
 
     return `
@@ -2655,29 +3003,26 @@ function buildProducaoHTML(){
           <h3 class="param-card-title">${linha.nome}<span class="param-liga">${linha.liga}</span></h3>
           <button class="interv-btn interv-btn-secundario" data-relatorio-producao data-linha="${linha.id}" title="Relatório por período">📅 Relatório do período</button>
         </div>
+        ${htmlHojeLinha(linha.id)}
         <div class="producao-ontem-destaque">
-          <span class="producao-ontem-label">Produção de ontem</span>
-          <span class="producao-ontem-numero" id="ontemTotal-${linha.id}">—</span>
+          <span class="producao-ontem-label">Dia anterior (07h→07h) <span data-ontem-produto>${produto ? '· '+produto : ''}</span></span>
+          <span class="producao-ontem-numero" id="ontemTotal-${linha.id}">${produto ? textoOntem(linha.id, produto) : '—'}</span>
         </div>
-        <div class="param-subtitle">Hoje, ${new Date().toLocaleDateString('pt-BR')} — total: ${totalGeralHoje.toLocaleString('pt-BR')} kg</div>
-        <table class="data-table param-table">
-          <thead><tr><th>Produto</th><th>Turno 1</th><th>Turno 2</th><th>Total</th></tr></thead>
-          <tbody>${linhasResumo}</tbody>
-        </table>
+        <div data-lista-apontamentos>${htmlListaApontamentos(linha.id, produto)}</div>
         <div class="param-subtitle" style="margin-top:14px;">Apontar produção</div>
         <div class="producao-form">
           <label>Turno
             <select class="param-input" data-turno-input style="width:70px;">
-              <option value="1" ${turnoSugerido===1?'selected':''}>1</option>
-              <option value="2" ${turnoSugerido===2?'selected':''}>2</option>
+              <option value="1" ${turno===1?'selected':''}>1</option>
+              <option value="2" ${turno===2?'selected':''}>2</option>
             </select>
           </label>
           <label>Produto ${seletorProduto}</label>
           <label>Peso (kg)
-            <input type="number" min="0" step="0.5" class="param-input" data-peso-input placeholder="ex: 850" style="width:110px;">
+            <input type="number" min="0" step="0.5" class="param-input" data-peso-input placeholder="ex: 850" style="width:110px;" value="${esc(form.peso)}">
           </label>
           <label style="flex:1; min-width:160px;">Observação (opcional)
-            <input type="text" class="param-input" data-obs-input placeholder="ex: Retrabalho, Camada alta...">
+            <input type="text" class="param-input" data-obs-input placeholder="ex: Retrabalho, Camada alta..." value="${esc(form.obs)}">
           </label>
         </div>
         <button class="btn primary small" data-registrar-producao data-linha="${linha.id}" style="margin-top:10px; width:100%;">Registrar apontamento</button>
@@ -2690,12 +3035,27 @@ function renderProducao(){
   const wrap = document.getElementById('producaoWrap');
   wrap.innerHTML = buildProducaoHTML();
 
+  // guarda o que está no formulário de cada linha, pra sobreviver a re-renders
+  wrap.querySelectorAll('[data-producao-linha]').forEach(card=>{
+    const linhaId = card.dataset.producaoLinha;
+    const form = PRODUCAO_FORM[linhaId];
+    const selProduto = card.querySelector('[data-produto-input]');
+    if (selProduto) selProduto.addEventListener('change', ()=>{ form.produto = selProduto.value; atualizarFiltroProduto(linhaId); });
+    const selTurno = card.querySelector('[data-turno-input]');
+    selTurno.addEventListener('change', ()=>{ form.turno = Number(selTurno.value); });
+    const inPeso = card.querySelector('[data-peso-input]');
+    inPeso.addEventListener('input', ()=>{ form.peso = inPeso.value; });
+    const inObs = card.querySelector('[data-obs-input]');
+    inObs.addEventListener('input', ()=>{ form.obs = inObs.value; });
+  });
+
   wrap.querySelectorAll('[data-registrar-producao]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const linhaId = btn.dataset.linha;
       const card = btn.closest('[data-producao-linha]');
       const turno = Number(card.querySelector('[data-turno-input]').value);
-      const produto = card.querySelector('[data-produto-input]').value;
+      const selProd = card.querySelector('[data-produto-input]');
+      const produto = selProd ? selProd.value : null;
       const pesoKg = parseFloat(card.querySelector('[data-peso-input]').value);
       const observacao = card.querySelector('[data-obs-input]').value.trim();
       const msgEl = document.getElementById('producaoMsg-'+linhaId);
@@ -2706,13 +3066,13 @@ function renderProducao(){
       const nomeLinha = ESCOPOS[linhaId] || linhaId;
       const col = await pedirConfirmacaoRE(`Registrar apontamento de produção — ${nomeLinha}, Turno ${turno}, ${produto}. Digite seu RE:`);
       if (!col) return;
+      if (col.nome) NOME_POR_RE[col.re] = col.nome;
 
-      const hojeISO = new Date().toISOString().slice(0,10);
-      const payload = { data:hojeISO, turno, linha_id:linhaId, produto, peso_kg:pesoKg, observacao: observacao||null, colaborador_re:col.re };
+      const payload = { data:diaProdutivoISO(), turno, linha_id:linhaId, produto, peso_kg:pesoKg, observacao: observacao||null, colaborador_re:col.re };
 
       if (sb){
         try {
-          const { data: inserido } = await sb.from('apontamentos_producao').insert(payload).select().single();
+          const { data: inserido } = await sb.from('apontamentos_producao').insert(payload).select('*, colaboradores(nome)').single();
           // usa o registro de volta (com id real) — o canal de Realtime também vai receber
           // esse INSERT e tenta inserir de novo, mas ele confere o id e pula se já existir
           if (inserido && !PRODUCAO_HOJE[linhaId].some(x=>x.id===inserido.id)) PRODUCAO_HOJE[linhaId].push(inserido);
@@ -2725,6 +3085,8 @@ function renderProducao(){
       }
 
       registrarAcaoSupabase(col.re, 'apontamento_producao', linhaId, null, produto, { turno, peso_kg:pesoKg, observacao });
+      // mantém produto e turno selecionados (o filtro continua no que acabou de apontar); limpa só peso/obs
+      Object.assign(PRODUCAO_FORM[linhaId], { produto, turno, peso:'', obs:'' });
       renderProducao();
       const novoMsgEl = document.getElementById('producaoMsg-'+linhaId);
       if (novoMsgEl){ novoMsgEl.textContent = 'Registrado ✓'; novoMsgEl.style.color = 'var(--ok)'; }
@@ -2741,23 +3103,48 @@ function renderProducao(){
       <div class="tv-grafico-titulo">${linha.nome} · ${linha.liga}</div>
       <div class="tv-grafico-canvas-wrap"><canvas id="chart-producao-${linha.id}"></canvas></div>
     </div>`).join('');
+  renderRankingLideres();
   initProducaoCharts();
 }
 
 const PRODUTO_COR_PALETTE = ['#B08D57','#2AA9A0','#8A5FBF','#C98A00'];
 let PRODUCAO_CHART_INSTANCES = [];
 async function initProducaoCharts(){
+  // dados primeiro (o "ontem", o ranking e os KPIs não dependem do Chart.js)
+  const datas = ultimosNDiasProdutivos(10); // dias produtivos 07h→07h, incluindo o atual
+  let registros = [];
+  if (sb){
+    const passo = 1000; let de = 0;
+    while (true){ // Supabase limita 1000 linhas por consulta — pagina
+      const { data, error } = await sb.from('apontamentos_producao')
+        .select('data,linha_id,produto,turno,peso_kg,observacao,criado_em,colaborador_re,colaboradores(nome)')
+        .gte('criado_em', inicioDiaProdutivo(datas[0]).toISOString())
+        .order('criado_em', { ascending:true }).range(de, de + passo - 1);
+      if (error){ console.error('Falha ao buscar histórico de produção:', error); break; }
+      registros.push(...(data || []));
+      if (!data || data.length < passo) break;
+      de += passo;
+    }
+  }
+  registros.forEach(r=>{
+    r.dia = diaDoRegistro(r);
+    if (r.colaboradores && r.colaboradores.nome) NOME_POR_RE[r.colaborador_re] = r.colaboradores.nome;
+  });
+  PRODUCAO_REGISTROS_10D = registros; // cache pro "ontem" do produto selecionado e pro ranking
+
+  LINHAS.forEach(linha=>{
+    const el = document.getElementById('ontemTotal-'+linha.id);
+    if (!el) return;
+    const produto = produtoSelecionado(linha.id);
+    el.textContent = produto ? textoOntem(linha.id, produto) : '—';
+  });
+  renderRankingLideres();
+  renderProducaoKPIs(registros);
+
   if (typeof Chart === 'undefined') return; // sem internet / biblioteca não carregou
   if (typeof ChartDataLabels !== 'undefined' && !Chart.registry.plugins.get('datalabels')) Chart.register(ChartDataLabels);
   PRODUCAO_CHART_INSTANCES.forEach(c=>c.destroy());
   PRODUCAO_CHART_INSTANCES = [];
-
-  const datas = ultimosNDias(10); // mesma janela fixa usada no histórico químico
-  let registros = [];
-  if (sb){
-    const { data } = await sb.from('apontamentos_producao').select('data,linha_id,produto,turno,peso_kg,observacao').gte('data', datas[0]);
-    registros = data || [];
-  }
 
   // um gráfico por linha, mas com uma série por PRODUTO daquela linha (cor
   // própria) — assim a Linha 2 mostra Anel e Núcleo A separados visualmente
@@ -2769,8 +3156,8 @@ async function initProducaoCharts(){
     produtos.forEach(p=>{ porDiaProduto[p] = {}; datas.forEach(d=> porDiaProduto[p][d]=0); });
     registros.filter(r=>r.linha_id===linha.id).forEach(r=>{
       if (!porDiaProduto[r.produto]) porDiaProduto[r.produto] = {};
-      if (porDiaProduto[r.produto][r.data] === undefined) return;
-      porDiaProduto[r.produto][r.data] += Number(r.peso_kg);
+      if (porDiaProduto[r.produto][r.dia] === undefined) return;
+      porDiaProduto[r.produto][r.dia] += Number(r.peso_kg);
     });
 
     const datasets = produtos.map((p,i)=>{
@@ -2793,17 +3180,6 @@ async function initProducaoCharts(){
     }));
   });
 
-  // Produção de ontem, em destaque — reaproveita os mesmos dados dos últimos 10 dias
-  const ontem = new Date(); ontem.setDate(ontem.getDate() - 1);
-  const ontemISO = ontem.toISOString().slice(0,10);
-  LINHAS.forEach(linha=>{
-    const el = document.getElementById('ontemTotal-'+linha.id);
-    if (!el) return;
-    const totalOntem = registros.filter(r=>r.linha_id===linha.id && r.data===ontemISO).reduce((s,r)=>s+Number(r.peso_kg),0);
-    el.textContent = `${totalOntem.toLocaleString('pt-BR')} kg`;
-  });
-
-  renderProducaoKPIs(registros);
 }
 
 function renderProducaoKPIs(registros){
@@ -2827,7 +3203,7 @@ function renderProducaoKPIs(registros){
   const pctObs = registros.length ? (comObservacao/registros.length*100) : 0;
 
   const porDiaTotal = {};
-  registros.forEach(r=>{ porDiaTotal[r.data] = (porDiaTotal[r.data]||0) + Number(r.peso_kg); });
+  registros.forEach(r=>{ porDiaTotal[r.dia] = (porDiaTotal[r.dia]||0) + Number(r.peso_kg); });
   const diasComDado = Object.entries(porDiaTotal);
   const mediaDiaria = diasComDado.length ? totalGeral/diasComDado.length : 0;
   const melhorDia = diasComDado.length ? diasComDado.reduce((a,b)=> b[1]>a[1]?b:a) : null;
