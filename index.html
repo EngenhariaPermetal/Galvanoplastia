@@ -559,6 +559,10 @@ main:has(#view-producao.active){ max-width:1800px; }
   .producao-destaques .producao-hoje-topo{ flex-direction:column; align-items:flex-start; gap:2px; }
   .producao-destaques .producao-hoje-numero{ font-size:34px; }
 }
+/* banho desligado: caixa esmaecida e selo cinza no lugar do cronômetro */
+.tanque-rect.banho-desligado{ fill:#FAFAFC; filter:none; stroke:rgba(60,60,67,.10); stroke-width:1; stroke-dasharray:4 3; }
+.banho-desligado-txt{ fill:var(--ink-faint) !important; }
+.banho-desligado-tag{ fill:#8E8E93 !important; font-weight:600; letter-spacing:.01em; }
 @media (prefers-reduced-motion: reduce){ *{ animation:none !important; } }
 </style>
 </head>
@@ -1658,6 +1662,15 @@ function ehLinhaLatao(linhaId){
 // 3ª, sem mais alerta de amostra até o próximo START.
 const LATAO_HORAS_AMOSTRA = [5, 7, 9];
 
+// Banho DESLIGADO = amostra, Granalha e Limpeza todos desativados em Parâmetros.
+// Nesse caso não há ciclo rodando: some o tempo corrido, a hora do START e a
+// saída. Ao religar, o operador dá START e começa um ciclo novo.
+function banhoDesligado(linhaId, banho){
+  const amostraOff = BANHO_AMOSTRA_ATIVA[linhaId] && BANHO_AMOSTRA_ATIVA[linhaId][banho] === false;
+  if (!amostraOff) return false;
+  return ETAPAS_POR_BANHO.every(e => { const p = pendenciaDoBanho(linhaId, banho, e.item); return !p || p.ativo === false; });
+}
+
 function statusBanho(linhaId, banho){
   if (BANHO_AMOSTRA_ATIVA[linhaId] && BANHO_AMOSTRA_ATIVA[linhaId][banho] === false) return 'off';
   const agora = agoraDoBanho(linhaId, banho);
@@ -1786,7 +1799,8 @@ function buildPlantaSVG(){
 
       // hora em que o START foi dado (real, não deslocada pelas pausas) — acima dos botões
       const startReal = BANHO_START_REAL[linhaId] && BANHO_START_REAL[linhaId][banho];
-      if (startReal){
+      const desligado = banhoDesligado(linhaId, banho);
+      if (startReal && !desligado){
         const txt = fmtStartBanho(startReal);
         const capW = 22 + txt.length * 6.3, capH = 17;
         const capX = btnCx - btnR, capY = btnCy - btnR - capH - 5; // alinhada à esquerda com o botão START
@@ -1803,7 +1817,9 @@ function buildPlantaSVG(){
 
       // botão de parada de manutenção — pausa (congela) sem resetar; vira "despausar" quando já pausado
       const btnPauseCx = btnCx + 27;
-      if (pausaInfo){
+      if (desligado){
+        // banho desligado: sem botão de pausa
+      } else if (pausaInfo){
         svg += `<g class="plant-dot" data-action="despausar-banho" data-linha="${linhaId}" data-banho="${banho}">`;
         svg += `<circle cx="${btnPauseCx}" cy="${btnCy}" r="${btnR}" fill="var(--brass)"></circle>`;
         svg += `<text x="${btnPauseCx}" y="${btnCy+4}" text-anchor="middle" style="font-size:11px; fill:#241a0d;">▶</text>`;
@@ -1817,7 +1833,9 @@ function buildPlantaSVG(){
 
       // "Saída do banho" calculada — em evidência, abaixo do START, só aparece após a 1ª amostra do ciclo
       const saidaIso = BANHO_SAIDA_CALC[linhaId] && BANHO_SAIDA_CALC[linhaId][banho];
-      if (saidaIso){
+      if (desligado){
+        // banho desligado: sem saída projetada
+      } else if (saidaIso){
         const stSaida = statusSaida(saidaIso);
         // cápsula estilo macOS, mesma família da do START — a cor segue o status
         const txtS = fmtHoraRelogio(saidaIso);
@@ -1838,13 +1856,17 @@ function buildPlantaSVG(){
 
       // caixa do banho — nome + cronômetro total/amostras + pílula de amostra
       const pillH = 26;
-      svg += `<rect class="tanque-rect" x="${boxX}" y="${y}" width="${boxW}" height="${bathH}" rx="8"></rect>`;
-      svg += `<text class="linha-label" x="${boxX+14}" y="${y+26}" text-anchor="start" style="font-size:16px;">${banho}</text>`;
+      svg += `<rect class="tanque-rect ${desligado?'banho-desligado':''}" x="${boxX}" y="${y}" width="${boxW}" height="${bathH}" rx="8"></rect>`;
+      svg += `<text class="linha-label ${desligado?'banho-desligado-txt':''}" x="${boxX+14}" y="${y+26}" text-anchor="start" style="font-size:16px;">${banho}</text>`;
 
       // cronômetro do banho TOTAL (só zera no START) + quantas amostras já foram tiradas nesse banho
       const totalInicio = BANHO_TOTAL_INICIO[linhaId][banho];
       const qtdAmostras = BANHO_AMOSTRAS[linhaId][banho] || 0;
-      svg += `<text class="bath-total-info" x="${boxX+46}" y="${y+25}" text-anchor="start">⏱ ${fmtCronometroCurto(totalInicio, agoraBanho)} · ${qtdAmostras}×</text>`;
+      if (desligado){
+        svg += `<text class="bath-total-info banho-desligado-tag" x="${boxX+46}" y="${y+25}" text-anchor="start">Desligado<title>Amostra, Granalha e Limpeza desativadas em Parâmetros — cronômetro parado. Ao religar, dê START.</title></text>`;
+      } else {
+        svg += `<text class="bath-total-info" x="${boxX+46}" y="${y+25}" text-anchor="start">⏱ ${fmtCronometroCurto(totalInicio, agoraBanho)} · ${qtdAmostras}×</text>`;
+      }
 
       // pílula da retirada de amostra — canto superior direito da caixa
       // (no Latão o relógio exibido é o mesmo que colore a pílula: desde o
