@@ -513,6 +513,13 @@ h2.section-title{ font-weight:700; font-size:20px; letter-spacing:-.015em; }
 .producao-ontem-label{ font-size:13px; font-weight:600; color:#0060DF; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
 .producao-ontem-periodo, .producao-hoje-label, .producao-hoje-sub{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .producao-ontem-copiar{ flex:none; }
+.producao-ontem-refugo{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-top:8px; padding-top:8px;
+  border-top:1px solid rgba(0,96,223,.15); font-size:12.5px; white-space:nowrap; overflow:hidden; }
+.producao-ontem-refugo .rot{ color:#3A6FC4; font-weight:500; }
+.producao-ontem-refugo .val{ font-weight:700; overflow:hidden; text-overflow:ellipsis; font-variant-numeric:tabular-nums; }
+.producao-ontem-refugo.tem .rot{ color:#D70015; }
+.producao-ontem-refugo.tem .val{ color:#D70015; }
+.producao-ontem-refugo.zero .val{ color:#248A3D; font-weight:600; }
 .producao-ontem-numero{ font-size:34px; font-weight:800; letter-spacing:-.02em; color:#0A3A8C; line-height:1.15; margin-top:2px; font-variant-numeric:tabular-nums; }
 .producao-ontem-periodo{ font-size:12px; color:#3A6FC4; margin-top:2px; }
 .producao-ontem-copiar{ border:none; background:#007AFF; color:#fff; font-size:12px; font-weight:600; padding:4px 12px; border-radius:999px; cursor:pointer; }
@@ -538,6 +545,12 @@ h2.section-title{ font-weight:700; font-size:20px; letter-spacing:-.015em; }
 .ranking-barra{ background:rgba(118,118,128,.12); border:none; }
 .ranking-barra > div{ background:#8E8E93; }
 .ranking-item.primeiro .ranking-barra > div{ background:#34C759; }
+.ranking-barra > .ranking-barra-prod{ display:flex; height:100%; background:none !important; border-radius:3px; overflow:hidden; }
+.ranking-barra-boa{ height:100%; background:#8E8E93; }
+.ranking-item.primeiro .ranking-barra-boa{ background:#34C759; }
+.ranking-barra-refugo{ height:100%; background:#FF3B30; }
+.ranking-refugo-txt{ color:#D70015; font-weight:600; }
+.refugo-item .ranking-barra > div{ display:block; }
 .producao-kpi-numero{ color:var(--ink); letter-spacing:-.02em; }
 .producao-kpi-barra{ background:rgba(118,118,128,.12); }
 .producao-kpi-barra-fill{ background:#007AFF; }
@@ -563,6 +576,44 @@ main:has(#view-producao.active){ max-width:1800px; }
 .tanque-rect.banho-desligado{ fill:#FAFAFC; filter:none; stroke:rgba(60,60,67,.10); stroke-width:1; stroke-dasharray:4 3; }
 .banho-desligado-txt{ fill:var(--ink-faint) !important; }
 .banho-desligado-tag{ fill:#8E8E93 !important; font-weight:600; letter-spacing:.01em; }
+/* ---------- não qualidade ---------- */
+.refugo-grid{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.6fr); gap:16px; align-items:start; }
+@media (max-width:1000px){ .refugo-grid{ grid-template-columns:1fr; } }
+.refugo-form-topo{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:12px; }
+.refugo-form{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px 12px; }
+.refugo-form label{ display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:500; color:var(--ink-soft); }
+.refugo-form .param-input{ width:100%; }
+.refugo-link{ border:none; background:none; color:#007AFF; font-size:12.5px; font-weight:500; cursor:pointer; padding:0; }
+.refugo-link:hover{ text-decoration:underline; }
+.refugo-previsao{ font-size:12.5px; color:var(--ink-soft); background:rgba(118,118,128,.08); border-radius:10px; padding:9px 12px; margin:12px 0 10px; min-height:18px; }
+.refugo-previsao:empty{ display:none; }
+.btn.refugo-btn{ background:#FF3B30; border-color:#FF3B30; color:#fff; border-radius:10px; font-weight:600; }
+.btn.refugo-btn:hover{ background:#D70015; border-color:#D70015; }
+.refugo-item .ranking-valor strong{ color:#D70015; }
+.refugo-item .ranking-barra > div{ background:#FF9F99; }
+.refugo-item.primeiro .ranking-barra > div{ background:#FF3B30; }
+.refugo-item.sem-lider{ opacity:.7; }
+.refugo-tag{ display:inline-block; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; background:#FFE9E7; color:#D70015; padding:2px 6px; border-radius:6px; margin-left:6px; vertical-align:middle; }
+.produto-chip.inativo{ opacity:.5; }
+#inspModalOverlay input{ width:100%; }
+.mapa-refugo-card{ padding:18px; }
+.mapa-refugo-topo{ display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+.mapa-seg{ display:inline-flex; background:rgba(118,118,128,.12); padding:2px; border-radius:9px; flex-wrap:wrap; }
+.mapa-seg button{ border:none; background:none; font-size:12.5px; font-weight:500; color:var(--ink); padding:6px 12px; border-radius:7px; cursor:pointer; }
+.mapa-seg button.ativo{ background:#fff; box-shadow:0 3px 8px rgba(0,0,0,.12), 0 3px 1px rgba(0,0,0,.04); font-weight:600; }
+.mapa-refugo-grid{ display:grid; grid-template-columns:minmax(0,2.2fr) minmax(260px,1fr); gap:18px; align-items:start; }
+@media (max-width:1000px){ .mapa-refugo-grid{ grid-template-columns:1fr; } }
+.mapa-refugo-arvore{ width:100%; aspect-ratio: 1000 / 440; }
+.mapa-refugo-svg{ width:100%; height:100%; display:block; }
+.mapa-refugo-svg text{ pointer-events:none; }
+.mapa-motivo{ font-size:12.5px; font-weight:700; }
+.mapa-filho{ font-size:12px; font-weight:600; fill:#fff; }
+.mapa-filho-kg{ font-size:11px; font-weight:500; fill:rgba(255,255,255,.9); font-variant-numeric:tabular-nums; }
+.mapa-abertura{ font-size:12.5px; color:var(--ink-soft); }
+.mapa-total{ font-size:13px; color:var(--ink-soft); margin-bottom:8px; }
+.mapa-total strong{ font-size:22px; color:#D70015; margin-left:6px; letter-spacing:-.02em; }
+.mapa-bolinha{ display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:7px; vertical-align:middle; }
+.mapa-tabela td:first-child{ white-space:normal; }
 @media (prefers-reduced-motion: reduce){ *{ animation:none !important; } }
 </style>
 </head>
@@ -680,6 +731,12 @@ main:has(#view-producao.active){ max-width:1800px; }
     <div id="producaoWrap" class="quimicos-grid"></div>
     <h2 class="section-title" style="margin-top:28px;">Ranking de líderes · mensal e dia anterior</h2>
     <div id="producaoRankingWrap"></div>
+    <h2 class="section-title" style="margin-top:28px;">Não qualidade · refugo apontado pelos inspetores</h2>
+    <div id="refugoWrap"></div>
+    <h2 class="section-title" style="margin-top:28px;">Ranking de refugo · por líder <span style="font-size:13px; font-weight:500; color:var(--ink-soft);">(usa os filtros de produto e mês do ranking acima)</span></h2>
+    <div id="refugoRankingWrap"></div>
+    <h2 class="section-title" style="margin-top:28px;">Mapa de refugo · onde está a maior perda <span style="font-size:13px; font-weight:500; color:var(--ink-soft);">(tamanho = kg refugados)</span></h2>
+    <div id="mapaRefugoWrap"></div>
     <h2 class="section-title" style="margin-top:28px;">Histórico de produção · últimos 10 dias</h2>
     <div id="producaoGraficosWrap" class="quimicos-grid"></div>
     <h2 class="section-title" style="margin-top:28px;">KPIs de produtividade · últimos 10 dias</h2>
@@ -707,6 +764,7 @@ main:has(#view-producao.active){ max-width:1800px; }
       <span class="hint">horas</span>
     </div>
     <div id="parametrosWrap"></div>
+    <div id="paramRefugoWrap"></div>
 
     <h2 class="section-title" style="margin-top:32px;">Controle químico do banho (faixas aceitáveis)</h2>
     <div class="param-note">
@@ -830,6 +888,25 @@ main:has(#view-producao.active){ max-width:1800px; }
   </div>
 </div>
 
+<!-- Modal: login do inspetor (RE + senha própria) — refugo e troca de senha -->
+<div class="modal-overlay" id="inspModalOverlay" style="z-index:650;">
+  <div class="modal-box" style="max-width:400px;">
+    <h3 id="inspModalTitulo">Inspetor</h3>
+    <p class="modal-desc" id="inspModalDesc">—</p>
+    <select id="inspModalLogin" class="param-input" style="width:100%; height:38px;"><option value="">Carregando inspetores…</option></select>
+    <input type="password" id="inspModalSenha" placeholder="Sua senha" autocomplete="off" style="margin-top:8px;">
+    <div id="inspModalNovaWrap" style="display:none;">
+      <input type="password" id="inspModalNova" placeholder="Senha nova (mín. 6 caracteres)" autocomplete="new-password" style="margin-top:8px;">
+      <input type="password" id="inspModalNova2" placeholder="Repita a senha nova" autocomplete="new-password" style="margin-top:8px;">
+    </div>
+    <div class="modal-error" id="inspModalError"></div>
+    <div class="modal-actions">
+      <button class="btn" id="inspModalCancel">Cancelar</button>
+      <button class="btn primary" id="inspModalConfirm">Confirmar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: cofre de 3 senhas pra liberar a aba Parâmetros -->
 <div class="modal-overlay" id="paramGateOverlay">
   <div class="modal-box" style="max-width:440px;">
@@ -870,7 +947,7 @@ const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE
 async function carregarDadosIniciais(){
   if (!sb) return; // sem Supabase configurado — mantém tudo vazio/default
 
-  const [pend, banho, faixas, leituras, config, intervencoes, producao, produtosLinha] = await Promise.all([
+  const [pend, banho, faixas, leituras, config, intervencoes, producao, produtosLinha, motivosRefugo, refugosRecentes] = await Promise.all([
     sb.from('pendencias_rotina').select('*'),
     sb.from('banho_ciclos').select('*'),
     sb.from('parametros_quimicos').select('*'),
@@ -879,7 +956,13 @@ async function carregarDadosIniciais(){
     sb.from('intervencoes_quimicas').select('*, colaboradores(nome)').order('criado_em', { ascending:false }),
     sb.from('apontamentos_producao').select('*, colaboradores(nome)').gte('criado_em', inicioDiaProdutivo(diaProdutivoISO()).toISOString()).order('criado_em', { ascending:true }),
     sb.from('produtos_linha').select('*').order('criado_em', { ascending:true }),
+    sb.from('motivos_refugo').select('*').order('ordem', { ascending:true }).order('nome', { ascending:true }),
+    sb.from('apontamentos_refugo').select('*, colaboradores(nome)').order('criado_em', { ascending:false }).limit(REFUGO_RECENTES_MAX),
   ]);
+  // não qualidade (tabelas novas — se a migration ainda não rodou, só fica vazio)
+  MOTIVOS_REFUGO = (motivosRefugo && motivosRefugo.data) || [];
+  REFUGO_RECENTES = (refugosRecentes && refugosRecentes.data) || [];
+  REFUGO_RECENTES.forEach(r=>{ if (r.colaboradores && r.colaboradores.nome) NOME_POR_RE[r.lider_re] = r.colaboradores.nome; });
   PRODUCAO_DIA_ATUAL = diaProdutivoISO();
   LINHAS.forEach(l=>{ PRODUCAO_HOJE[l.id] = (producao.data || []).filter(r=>r.linha_id===l.id && diaDoRegistro(r)===PRODUCAO_DIA_ATUAL); });
   (producao.data || []).forEach(r=>{ if (r.colaboradores && r.colaboradores.nome) NOME_POR_RE[r.colaborador_re] = r.colaboradores.nome; });
@@ -1072,6 +1155,32 @@ function configurarRealtime(){
           if (document.getElementById('view-producao').classList.contains('active')) renderProducao();
         });
       }
+    })
+    .subscribe();
+
+  sb.channel('realtime-refugo')
+    .on('postgres_changes', { event:'INSERT', schema:'public', table:'apontamentos_refugo' }, payload => {
+      const r = payload.new;
+      if (!r || REFUGO_RECENTES.some(x=>x.id===r.id)) return; // já veio da própria tela — não duplica
+      REFUGO_RECENTES.unshift(r);
+      REFUGO_RECENTES = REFUGO_RECENTES.slice(0, REFUGO_RECENTES_MAX);
+      REFUGO_CACHE = {};
+      if (r.lider_re && !NOME_POR_RE[r.lider_re]){
+        sb.from('colaboradores').select('nome').eq('re', r.lider_re).maybeSingle().then(({ data })=>{
+          if (data && data.nome){ NOME_POR_RE[r.lider_re] = data.nome; if (document.getElementById('view-producao').classList.contains('active')) renderRefugo(); }
+        });
+      }
+      if (document.getElementById('view-producao').classList.contains('active')){ renderRefugo(); renderRankingRefugo(); }
+    })
+    .on('postgres_changes', { event:'*', schema:'public', table:'motivos_refugo' }, payload => {
+      if (payload.eventType === 'DELETE'){ MOTIVOS_REFUGO = MOTIVOS_REFUGO.filter(m=>m.id!==payload.old.id); }
+      else {
+        const r = payload.new; const i = MOTIVOS_REFUGO.findIndex(m=>m.id===r.id);
+        if (i>=0) MOTIVOS_REFUGO[i] = r; else MOTIVOS_REFUGO.push(r);
+        MOTIVOS_REFUGO.sort((a,b)=> (a.ordem-b.ordem) || a.nome.localeCompare(b.nome,'pt-BR'));
+      }
+      if (document.getElementById('view-producao').classList.contains('active')) renderRefugo();
+      if (document.getElementById('view-parametros').classList.contains('active')) renderParamRefugo();
     })
     .subscribe();
 
@@ -3040,6 +3149,31 @@ function textoOntem(linhaId, produto){
 
 // troca de produto no select: atualiza só a lista e o "ontem" daquele card,
 // sem re-renderizar a aba inteira (não refaz gráficos nem apaga o que foi digitado)
+// Refugo do DIA ANTERIOR no card azul: mesma linha, mesmo produto, mesmo período
+// (o "dia produtivo" do refugo é o dia em que o material foi produzido, informado
+// pelo inspetor — então refugo achado hoje de material de ontem entra aqui)
+function textoRefugoOntem(refugos, linhaId, produto, produzidoKg){
+  const kg = (refugos || []).filter(r => r.linha_id === linhaId && r.produto === produto).reduce((s,r)=>s+Number(r.peso_kg), 0);
+  if (!kg) return { kg:0, txt:'Sem refugo apontado', classe:'zero' };
+  const pct = produzidoKg ? ` · ${(kg/produzidoKg*100).toLocaleString('pt-BR',{maximumFractionDigits:1})}% do produzido` : '';
+  return { kg, txt:`${fmtKg(kg)}${pct}`, classe:'tem' };
+}
+function atualizarRefugoOntem(){
+  const anterior = diaProdutivoAnteriorISO();
+  buscarRefugoIntervalo(anterior, PRODUCAO_DIA_ATUAL).then(refugos=>{
+    LINHAS.forEach(linha=>{
+      const el = document.querySelector(`[data-refugo-ontem="${linha.id}"]`);
+      if (!el) return;
+      const produto = produtoSelecionado(linha.id);
+      if (!produto){ el.querySelector('.val').textContent = '—'; return; }
+      const produzido = totalOntemDoProduto(PRODUCAO_REGISTROS_10D, linha.id, produto) || 0;
+      const r = textoRefugoOntem(refugos, linha.id, produto, produzido);
+      el.className = 'producao-ontem-refugo ' + r.classe;
+      el.querySelector('.val').textContent = r.txt;
+    });
+  });
+}
+
 function atualizarFiltroProduto(linhaId){
   const card = document.querySelector(`[data-producao-linha="${linhaId}"]`);
   if (!card) return;
@@ -3049,6 +3183,7 @@ function atualizarFiltroProduto(linhaId){
   const ligaEl = card.querySelector('[data-liga-produto]');
   if (ligaEl) ligaEl.textContent = produto ? ligaDoProduto(linhaId, produto) : ((LINHAS.find(l=>l.id===linhaId)||{}).liga || '');
   document.getElementById('ontemTotal-'+linhaId).textContent = produto ? textoOntem(linhaId, produto) : '—';
+  atualizarRefugoOntem();
 }
 
 // Bloco escuro do card: total do dia produtivo atual da linha (todos os
@@ -3077,8 +3212,23 @@ function htmlHojeLinha(linhaId){
     </div>`;
 }
 
-function htmlRankingCard(titulo, periodo, registros, emAndamento){
+// kg refugado por líder no período (mesmo filtro de produto)
+function refugoPorLider(refugos, produto){
+  const m = {};
+  (refugos || []).filter(r => r.lider_re && (!produto || r.produto === produto))
+    .forEach(r => { m[r.lider_re] = (m[r.lider_re] || 0) + Number(r.peso_kg); });
+  return m;
+}
+// barra do ranking: comprimento = produção bruta; a ponta vermelha "empurra de volta" o que foi refugado
+function partesBarraRanking(kg, lider, refugoKg){
+  const total = lider ? kg / lider * 100 : 0;
+  const ref = Math.min(refugoKg || 0, kg);          // refugo nunca passa do que foi produzido
+  const pctRef = kg ? ref / kg * 100 : 0;
+  return { total, boa: 100 - pctRef, refugo: pctRef };
+}
+function htmlRankingCard(titulo, periodo, registros, emAndamento, refugos){
   const ranking = rankingPorRE(registros, RANKING_PRODUTO);
+  const refPorRE = refugos ? refugoPorLider(refugos, RANKING_PRODUTO) : {};
   if (!ranking.length){
     return `<div class="card ranking-card"><div class="ranking-card-titulo">${titulo}</div><div class="ranking-card-periodo">${periodo}</div>
       <div class="relatorio-vazio">Nenhum apontamento${RANKING_PRODUTO ? ' de '+RANKING_PRODUTO : ''} nesse período.</div></div>`;
@@ -3088,15 +3238,20 @@ function htmlRankingCard(titulo, periodo, registros, emAndamento){
   const itens = ranking.map((x,i)=>{
     const linhas = [...x.linhas].map(id => (LINHAS.find(l=>l.id===id)||{}).nome || id).join(', ');
     const atras = i>0 ? ` · ${fmtT(lider - x.kg)} atrás do 1º` : '';
+    const refKg = refPorRE[x.re] || 0;
+    const b = partesBarraRanking(x.kg, lider, refKg);
+    const txtRef = refKg ? ` · <span class="ranking-refugo-txt">refugo ${fmtT(refKg)} (${(refKg/x.kg*100).toLocaleString('pt-BR',{maximumFractionDigits:1})}%)</span>` : '';
     return `
       <div class="ranking-item ${i===0?'primeiro':''}">
         <div class="ranking-pos">${medalhas[i] || (i+1)+'º'}</div>
         <div style="min-width:0;">
           <div class="ranking-nome">${x.re}${x.nome ? ' · '+x.nome : ''}${i===0 && ranking.length>1 ? `<span class="ranking-lider-tag">${emAndamento?'Liderando':'Mais produziu'}</span>` : ''}</div>
-          <div class="ranking-detalhe">${x.n} apontamento${x.n===1?'':'s'} · ${linhas}${atras}</div>
+          <div class="ranking-detalhe">${x.n} apontamento${x.n===1?'':'s'} · ${linhas}${atras}${txtRef}</div>
         </div>
         <div class="ranking-valor"><strong>${fmtT(x.kg)}</strong><div>${fmtKg(x.kg)}</div></div>
-        <div class="ranking-barra"><div style="width:${lider ? (x.kg/lider*100) : 0}%;"></div></div>
+        <div class="ranking-barra"><div class="ranking-barra-prod" style="width:${b.total}%;" title="${refKg ? `Produziu ${fmtKg(x.kg)} · refugou ${fmtKg(refKg)} · boa ${fmtKg(x.kg-refKg)}` : `Produziu ${fmtKg(x.kg)}`}">
+          <div class="ranking-barra-boa" style="width:${b.boa}%;"></div>${b.refugo ? `<div class="ranking-barra-refugo" style="width:${b.refugo}%;"></div>` : ''}
+        </div></div>
       </div>`;
   }).join('');
   return `<div class="card ranking-card"><div class="ranking-card-titulo">${titulo}</div><div class="ranking-card-periodo">${periodo}</div>${itens}</div>`;
@@ -3155,6 +3310,7 @@ async function registrosDoMes(mesISO, somenteFechados){
 function renderRankingLideres(){
   const wrap = document.getElementById('producaoRankingWrap');
   if (!wrap) return;
+  setTimeout(renderRankingRefugo, 0); // mesmo filtro de produto/mês
   const token = ++_rankingRenderToken;
   const mesVigente = mesDoDiaISO(PRODUCAO_DIA_ATUAL);
   const mesAnterior = deslocarMes(mesVigente, -1);
@@ -3180,9 +3336,9 @@ function renderRankingLideres(){
   const periodoMesSel = `fechado · 01/${mesSel.slice(5)} ${rotuloVirada(mesSel+'-01')} → 01/${deslocarMes(mesSel,1).slice(5)} ${rotuloVirada(deslocarMes(mesSel,1)+'-01')}`;
   const tituloVigente = `Mês vigente · ${nomeMes(mesVigente)}`;
   const periodoVigente = `dias fechados · 01/${mesVigente.slice(5)} ${rotuloVirada(mesVigente+'-01')} → ${fmtDataCurtaBR(PRODUCAO_DIA_ATUAL)} ${rotuloVirada(PRODUCAO_DIA_ATUAL)}`;
-  const cardDia = PRODUCAO_REGISTROS_10D == null
-    ? carregando('Dia anterior · fechado', '')
-    : htmlRankingCard('Dia anterior · fechado', `${fmtDataCurtaBR(anterior)} ${rotuloVirada(anterior)} → ${fmtDataCurtaBR(PRODUCAO_DIA_ATUAL)} ${rotuloVirada(PRODUCAO_DIA_ATUAL)}`, ontemRegs, false);
+  const tituloDia = 'Dia anterior · fechado';
+  const periodoDia = `${fmtDataCurtaBR(anterior)} ${rotuloVirada(anterior)} → ${fmtDataCurtaBR(PRODUCAO_DIA_ATUAL)} ${rotuloVirada(PRODUCAO_DIA_ATUAL)}`;
+  const cardDia = carregando(tituloDia, periodoDia);
 
   wrap.innerHTML = `
     <div class="ranking-toolbar">
@@ -3197,25 +3353,576 @@ function renderRankingLideres(){
     <div class="ranking-grid">
       <div data-ranking-mes-sel>${carregando(tituloMesSel, periodoMesSel)}</div>
       <div data-ranking-mes-vigente>${carregando(tituloVigente, periodoVigente)}</div>
-      <div>${cardDia}</div>
+      <div data-ranking-dia>${cardDia}</div>
     </div>`;
   document.getElementById('rankingProdutoSelect').addEventListener('change', e=>{ RANKING_PRODUTO = e.target.value; renderRankingLideres(); });
   document.getElementById('rankingMesSelect').addEventListener('change', e=>{ RANKING_MES_SELECIONADO = e.target.value; renderRankingLideres(); });
 
-  registrosDoMes(mesSel, false).then(regs=>{
+  Promise.all([registrosDoMes(mesSel, false), buscarRefugoIntervalo(mesSel+'-01', deslocarMes(mesSel,1)+'-01')]).then(([regs, ref])=>{
     if (token !== _rankingRenderToken) return; // usuário já trocou o filtro
     const el = wrap.querySelector('[data-ranking-mes-sel]');
-    if (el) el.innerHTML = htmlRankingCard(tituloMesSel, periodoMesSel, regs, false);
+    if (el) el.innerHTML = htmlRankingCard(tituloMesSel, periodoMesSel, regs, false, ref);
   });
-  registrosDoMes(mesVigente, true).then(regs=>{
+  if (PRODUCAO_REGISTROS_10D != null){
+    buscarRefugoIntervalo(anterior, PRODUCAO_DIA_ATUAL).then(ref=>{
+      if (token !== _rankingRenderToken) return;
+      const el = wrap.querySelector('[data-ranking-dia]');
+      if (el) el.innerHTML = htmlRankingCard(tituloDia, periodoDia, ontemRegs, false, ref);
+    });
+  }
+  Promise.all([registrosDoMes(mesVigente, true), buscarRefugoIntervalo(mesVigente+'-01', PRODUCAO_DIA_ATUAL)]).then(([regs, ref])=>{
     if (token !== _rankingRenderToken) return;
     const el = wrap.querySelector('[data-ranking-mes-vigente]');
     if (!el) return;
     el.innerHTML = PRODUCAO_DIA_ATUAL.endsWith('-01')
       ? `<div class="card ranking-card"><div class="ranking-card-titulo">${tituloVigente}</div><div class="ranking-card-periodo">${periodoVigente}</div>
          <div class="relatorio-vazio">Primeiro dia do mês ainda em andamento — o ranking começa amanhã às ${rotuloVirada(deslocarDiaISO(PRODUCAO_DIA_ATUAL,1))}, quando o dia 01 fechar.</div></div>`
-      : htmlRankingCard(tituloVigente, periodoVigente, regs, true);
+      : htmlRankingCard(tituloVigente, periodoVigente, regs, true, ref);
   });
+}
+
+// =========================================================================
+// NÃO QUALIDADE (refugo) — o inspetor aponta com RE + senha própria; o
+// banco confere a senha e atribui o refugo ao LÍDER do turno (quem mais
+// apontou aquele produto na linha/turno/dia produtivo). Ranking por líder.
+// =========================================================================
+const REFUGO_RECENTES_MAX = 30;
+let MOTIVOS_REFUGO = [];      // [{id, nome, ativo, ordem}]
+let REFUGO_RECENTES = [];     // últimos apontamentos (mais novo primeiro)
+let REFUGO_CACHE = {};        // chave de período → registros
+let REFUGO_FORM = { dia:null, turno:null, linha:null, produto:null, peso:'', motivo:null };
+let _refugoRankToken = 0;
+
+const escHtml = v => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+// MESMA regra da função lider_do_turno do banco (o banco é quem decide; isto é só a prévia na tela):
+// quem mais apontou AQUELE produto; se ninguém, quem mais produziu no turno; se não houve produção, ninguém
+function liderPrevisto(registros, dia, turno, linhaId, produto){
+  const doTurno = (registros || []).filter(r => r.data === dia && Number(r.turno) === Number(turno) && r.linha_id === linhaId && r.colaborador_re);
+  if (!doTurno.length) return null;
+  const soma = {};
+  doTurno.forEach(r=>{
+    const s = soma[r.colaborador_re] || (soma[r.colaborador_re] = { re:r.colaborador_re, prod:0, total:0 });
+    s.total += Number(r.peso_kg);
+    if (r.produto === produto) s.prod += Number(r.peso_kg);
+  });
+  return Object.values(soma).sort((a,b)=> (b.prod-a.prod) || (b.total-a.total) || String(a.re).localeCompare(String(b.re)))[0].re;
+}
+function registrosDoDiaProdutivo(dia){
+  if (dia === PRODUCAO_DIA_ATUAL) return LINHAS.flatMap(l => PRODUCAO_HOJE[l.id] || []);
+  return (PRODUCAO_REGISTROS_10D || []).filter(r => r.data === dia);
+}
+function nomeLider(re){ return re ? `${re}${NOME_POR_RE[re] ? ' · '+NOME_POR_RE[re] : ''}` : 'Sem líder identificado'; }
+function nomeLinhaId(id){ return (LINHAS.find(l=>l.id===id) || {}).nome || id; }
+
+function diasRefugoOpcoes(){
+  const dias = [];
+  for (let i = 0; i < 7; i++) dias.push(deslocarDiaISO(PRODUCAO_DIA_ATUAL, -i));
+  return dias;
+}
+
+function renderRefugo(){
+  const wrap = document.getElementById('refugoWrap');
+  if (!wrap) return;
+  const f = REFUGO_FORM;
+  const dias = diasRefugoOpcoes();
+  if (!f.dia || !dias.includes(f.dia)) f.dia = PRODUCAO_DIA_ATUAL;
+  if (!f.turno) f.turno = 1;
+  if (!f.linha || !LINHAS.some(l=>l.id===f.linha)) f.linha = LINHAS[0].id;
+  const produtos = produtosDaLinha(f.linha);
+  if (!produtos.includes(f.produto)) f.produto = produtos[0] || null;
+  const motivos = MOTIVOS_REFUGO.filter(m => m.ativo !== false);
+  if (!motivos.some(m=>m.nome===f.motivo)) f.motivo = null;
+
+  const rotDia = d => d === PRODUCAO_DIA_ATUAL ? `Hoje · ${fmtDataCurtaBR(d)}` : d === deslocarDiaISO(PRODUCAO_DIA_ATUAL,-1) ? `Ontem · ${fmtDataCurtaBR(d)}` : fmtDataCurtaBR(d);
+  let previsao;
+  if (!f.produto) previsao = '';
+  else if (f.dia !== PRODUCAO_DIA_ATUAL && PRODUCAO_REGISTROS_10D == null) previsao = 'Procurando o líder do turno…';
+  else {
+    const lid = liderPrevisto(registrosDoDiaProdutivo(f.dia), f.dia, f.turno, f.linha, f.produto);
+    previsao = lid
+      ? `Vai ser atribuído a <strong>${escHtml(nomeLider(lid))}</strong> — líder do turno ${f.turno} da ${escHtml(nomeLinhaId(f.linha))} em ${fmtDataCurtaBR(f.dia)}.`
+      : `<span style="color:var(--warn);">Não há produção apontada no turno ${f.turno} da ${escHtml(nomeLinhaId(f.linha))} em ${fmtDataCurtaBR(f.dia)} — o refugo fica sem líder.</span>`;
+  }
+
+  const recentes = REFUGO_RECENTES.slice(0, 15);
+  const linhasTabela = recentes.length ? recentes.map(r=>`
+      <tr>
+        <td class="mono">${fmtDataCurtaBR(String(r.data).slice(0,10))} · T${r.turno}</td>
+        <td>${escHtml(nomeLinhaId(r.linha_id))}</td>
+        <td>${escHtml(r.produto)}</td>
+        <td class="mono apont-num"><strong>${fmtKg(r.peso_kg)}</strong></td>
+        <td>${escHtml(r.motivo)}</td>
+        <td>${escHtml(nomeLider(r.lider_re))}</td>
+        <td style="color:var(--ink-soft);">${escHtml(r.inspetor_login)}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="7" style="text-align:center; color:var(--ink-faint);">Nenhum refugo apontado ainda.</td></tr>`;
+
+  wrap.innerHTML = `
+    <div class="refugo-grid">
+      <div class="card quimico-card refugo-form-card">
+        <div class="refugo-form-topo">
+          <h3 class="param-card-title" style="margin:0;">Apontar refugo</h3>
+          <button type="button" class="refugo-link" data-refugo-trocar-senha>Trocar minha senha</button>
+        </div>
+        <div class="refugo-form">
+          <label>Dia produtivo (quando foi produzido)
+            <select class="param-input" data-refugo="dia">${dias.map(d=>`<option value="${d}" ${d===f.dia?'selected':''}>${rotDia(d)}</option>`).join('')}</select>
+          </label>
+          <label>Turno
+            <select class="param-input" data-refugo="turno"><option value="1" ${f.turno==1?'selected':''}>1</option><option value="2" ${f.turno==2?'selected':''}>2</option></select>
+          </label>
+          <label>Linha
+            <select class="param-input" data-refugo="linha">${LINHAS.map(l=>`<option value="${l.id}" ${l.id===f.linha?'selected':''}>${l.nome}</option>`).join('')}</select>
+          </label>
+          <label>Produto (taxa)
+            ${produtos.length
+              ? `<select class="param-input" data-refugo="produto">${produtos.map(p=>`<option value="${escHtml(p)}" ${p===f.produto?'selected':''}>${escHtml(p)}</option>`).join('')}</select>`
+              : `<span class="hint">Nenhum produto cadastrado nessa linha</span>`}
+          </label>
+          <label>Peso refugado (kg)
+            <input type="number" min="0" step="0.5" class="param-input" data-refugo="peso" placeholder="ex: 350" value="${escHtml(f.peso)}">
+          </label>
+          <label>Motivo
+            ${motivos.length
+              ? `<select class="param-input" data-refugo="motivo"><option value="">Escolha o motivo…</option>${motivos.map(m=>`<option value="${escHtml(m.nome)}" ${m.nome===f.motivo?'selected':''}>${escHtml(m.nome)}</option>`).join('')}</select>`
+              : `<span class="hint">Cadastre os motivos em Parâmetros</span>`}
+          </label>
+        </div>
+        <div class="refugo-previsao" data-refugo-previsao>${previsao}</div>
+        <button class="btn refugo-btn" data-refugo-registrar style="width:100%;">Registrar refugo</button>
+        <div class="quimico-save-msg" id="refugoMsg"></div>
+      </div>
+      <div class="card quimico-card">
+        <h3 class="param-card-title" style="margin:0 0 10px;">Últimos refugos apontados</h3>
+        <div class="apont-scroll">
+          <table class="data-table param-table apont-table">
+            <thead><tr><th>Produzido</th><th>Linha</th><th>Produto</th><th style="text-align:right;">Peso</th><th>Motivo</th><th>Líder</th><th>Inspetor</th></tr></thead>
+            <tbody>${linhasTabela}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+
+  wrap.querySelectorAll('[data-refugo]').forEach(el=>{
+    const campo = el.dataset.refugo;
+    el.addEventListener(campo === 'peso' ? 'input' : 'change', ()=>{
+      f[campo] = campo === 'turno' ? Number(el.value) : el.value;
+      if (campo === 'peso') return;            // não re-renderiza enquanto digita
+      if (campo === 'linha') f.produto = null; // produtos mudam com a linha
+      renderRefugo();
+    });
+  });
+  wrap.querySelector('[data-refugo-registrar]').addEventListener('click', registrarRefugoClique);
+  atualizarRefugoOntem();
+  wrap.querySelector('[data-refugo-trocar-senha]').addEventListener('click', trocarSenhaInspetor);
+}
+
+async function registrarRefugoClique(){
+  const f = REFUGO_FORM;
+  const msg = document.getElementById('refugoMsg');
+  msg.style.color = 'var(--crit)';
+  const peso = parseFloat(String(f.peso).replace(',', '.'));
+  if (!f.produto){ msg.textContent = 'Escolha o produto.'; return; }
+  if (!peso || peso <= 0){ msg.textContent = 'Informe o peso refugado em kg.'; return; }
+  if (!f.motivo){ msg.textContent = 'Escolha o motivo.'; return; }
+  if (!sb){ msg.textContent = 'Sem conexão com o banco — não é possível registrar.'; return; }
+  msg.textContent = '';
+
+  const resumo = `${fmtKg(peso)} de ${f.produto} · ${nomeLinhaId(f.linha)} · turno ${f.turno} · produzido em ${fmtDataCurtaBR(f.dia)} · ${f.motivo}`;
+  const res = await pedirLoginInspetor({
+    titulo: 'Confirmar refugo',
+    descricao: resumo,
+    aoConfirmar: async (login, senha)=>{
+      const { data, error } = await sb.rpc('registrar_refugo', {
+        p_login: login, p_senha: senha, p_data: f.dia, p_turno: f.turno, p_linha_id: f.linha,
+        p_produto: f.produto, p_peso_kg: peso, p_motivo: f.motivo,
+      });
+      if (error) return { ok:false, erro:'Falha ao registrar: ' + error.message };
+      return data;
+    }
+  });
+  if (!res) return; // cancelou
+  if (res.lider_re && res.lider_nome) NOME_POR_RE[res.lider_re] = res.lider_nome;
+  if (!REFUGO_RECENTES.some(x=>x.id===res.id)){ // o Realtime pode ter chegado antes da resposta
+    REFUGO_RECENTES.unshift({ id:res.id, criado_em:new Date().toISOString(), data:f.dia, turno:f.turno, linha_id:f.linha,
+      produto:f.produto, peso_kg:peso, motivo:f.motivo, inspetor_login:res.inspetor_login || res._login, lider_re:res.lider_re });
+    REFUGO_RECENTES = REFUGO_RECENTES.slice(0, REFUGO_RECENTES_MAX);
+  }
+  REFUGO_CACHE = {};
+  f.peso = ''; f.motivo = null;
+  renderRefugo();
+  renderRankingRefugo();
+  const m2 = document.getElementById('refugoMsg');
+  m2.style.color = 'var(--ok)';
+  m2.textContent = `Registrado ✓ — ${res.lider_re ? 'atribuído a ' + nomeLider(res.lider_re) : 'sem líder identificado (não havia produção apontada nesse turno)'}.`;
+}
+
+async function trocarSenhaInspetor(){
+  if (!sb) return;
+  const ok = await pedirLoginInspetor({
+    titulo: 'Trocar minha senha',
+    descricao: 'Escolha seu nome e digite a senha atual e a nova.',
+    pedirNova: true,
+    aoConfirmar: async (login, senha, nova)=>{
+      const { data, error } = await sb.rpc('alterar_senha_inspetor', { p_login: login, p_senha_atual: senha, p_senha_nova: nova });
+      if (error) return { ok:false, erro:'Falha: ' + error.message };
+      return data;
+    }
+  });
+  if (ok){ const m = document.getElementById('refugoMsg'); if (m){ m.style.color='var(--ok)'; m.textContent = 'Senha alterada ✓'; } }
+}
+
+// Modal do inspetor: fica aberto mostrando o erro (senha errada, bloqueio…) até dar certo ou cancelar
+let _inspModal = null;
+function pedirLoginInspetor({ titulo, descricao, pedirNova, aoConfirmar }){
+  return new Promise(resolve=>{
+    _inspModal = { resolve, aoConfirmar, pedirNova:!!pedirNova };
+    document.getElementById('inspModalTitulo').textContent = titulo;
+    document.getElementById('inspModalDesc').textContent = descricao;
+    ['inspModalSenha','inspModalNova','inspModalNova2'].forEach(id=>document.getElementById(id).value='');
+    carregarListaInspetoresModal();
+    document.getElementById('inspModalNovaWrap').style.display = pedirNova ? 'block' : 'none';
+    document.getElementById('inspModalSenha').placeholder = pedirNova ? 'Senha atual' : 'Sua senha';
+    document.getElementById('inspModalError').textContent = '';
+    document.getElementById('inspModalConfirm').disabled = false;
+    document.getElementById('inspModalOverlay').style.display = 'flex';
+    setTimeout(()=>document.getElementById('inspModalLogin').focus(), 50);
+  });
+}
+// login do inspetor = NOME, escolhido numa lista (sem erro de digitação/acento)
+let INSPETORES_ATIVOS = null;
+async function carregarListaInspetoresModal(){
+  const sel = document.getElementById('inspModalLogin');
+  const preencher = () => {
+    const lista = INSPETORES_ATIVOS || [];
+    sel.innerHTML = lista.length
+      ? `<option value="">Quem é você?</option>` + lista.map(n=>`<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('')
+      : `<option value="">Nenhum inspetor cadastrado</option>`;
+  };
+  if (INSPETORES_ATIVOS){ preencher(); return; }
+  sel.innerHTML = `<option value="">Carregando inspetores…</option>`;
+  if (!sb){ INSPETORES_ATIVOS = []; preencher(); return; }
+  const { data, error } = await sb.rpc('listar_inspetores');
+  INSPETORES_ATIVOS = error ? [] : (data || []).filter(i=>i.ativo).map(i=>i.login);
+  preencher();
+}
+function fecharInspModal(resultado){
+  document.getElementById('inspModalOverlay').style.display = 'none';
+  // limpa a senha da memória da tela
+  ['inspModalSenha','inspModalNova','inspModalNova2'].forEach(id=>document.getElementById(id).value='');
+  if (_inspModal){ _inspModal.resolve(resultado); _inspModal = null; }
+}
+document.getElementById('inspModalCancel').addEventListener('click', ()=>fecharInspModal(null));
+document.getElementById('inspModalConfirm').addEventListener('click', async ()=>{
+  if (!_inspModal) return;
+  const login = document.getElementById('inspModalLogin').value;
+  const senha = document.getElementById('inspModalSenha').value;
+  const err = document.getElementById('inspModalError');
+  if (!login){ err.textContent = 'Escolha o seu nome na lista.'; return; }
+  if (!senha){ err.textContent = 'Digite sua senha.'; return; }
+  let nova = null;
+  if (_inspModal.pedirNova){
+    nova = document.getElementById('inspModalNova').value;
+    if (nova.length < 6){ err.textContent = 'A senha nova precisa ter pelo menos 6 caracteres.'; return; }
+    if (nova !== document.getElementById('inspModalNova2').value){ err.textContent = 'As duas senhas novas não são iguais.'; return; }
+  }
+  const btn = document.getElementById('inspModalConfirm');
+  btn.disabled = true; err.textContent = 'Verificando…';
+  let r;
+  try { r = await _inspModal.aoConfirmar(login, senha, nova); }
+  catch(e){ r = { ok:false, erro:'Falha de conexão. Tente de novo.' }; }
+  btn.disabled = false;
+  if (!r || !r.ok){ err.textContent = (r && r.erro) || 'Não foi possível confirmar.'; document.getElementById('inspModalSenha').value=''; return; }
+  fecharInspModal({ ...r, _login: login });
+});
+['inspModalSenha','inspModalNova','inspModalNova2'].forEach(id=>{
+  document.getElementById(id).addEventListener('keydown', e=>{ if (e.key==='Enter') document.getElementById('inspModalConfirm').click(); });
+});
+
+// ---------- ranking de refugo por líder ----------
+async function buscarRefugoIntervalo(deISO, ateExclusivoISO){
+  const chave = `${deISO}|${ateExclusivoISO}`;
+  if (REFUGO_CACHE[chave]) return REFUGO_CACHE[chave];
+  if (!sb || deISO >= ateExclusivoISO) return (REFUGO_CACHE[chave] = []);
+  const passo = 1000; let de = 0; const todos = [];
+  while (true){
+    const { data, error } = await sb.from('apontamentos_refugo').select('*')
+      .gte('data', deISO).lt('data', ateExclusivoISO).order('id', { ascending:true }).range(de, de + passo - 1);
+    if (error){ console.error('Falha ao buscar refugo:', error); break; }
+    todos.push(...(data || []));
+    if (!data || data.length < passo) break;
+    de += passo;
+  }
+  return (REFUGO_CACHE[chave] = todos);
+}
+
+// junta refugo e produção do período por líder
+function rankingRefugoPorLider(refugos, producao, produto){
+  const m = {};
+  (refugos || []).filter(r => !produto || r.produto === produto).forEach(r=>{
+    const re = r.lider_re || '—';
+    const x = m[re] || (m[re] = { re, kg:0, n:0, motivos:{} });
+    x.kg += Number(r.peso_kg); x.n += 1;
+    x.motivos[r.motivo] = (x.motivos[r.motivo] || 0) + Number(r.peso_kg);
+  });
+  const prod = {};
+  (producao || []).filter(r => !produto || r.produto === produto).forEach(r=>{
+    if (r.colaborador_re) prod[r.colaborador_re] = (prod[r.colaborador_re] || 0) + Number(r.peso_kg);
+  });
+  return Object.values(m).map(x=>{
+    const [motivoTop, motivoKg] = Object.entries(x.motivos).sort((a,b)=>b[1]-a[1])[0];
+    const produzido = x.re === '—' ? null : (prod[x.re] || 0);
+    return { ...x, motivoTop, motivoKg, produzido, pct: produzido ? x.kg / produzido * 100 : null };
+  }).sort((a,b)=> (a.re==='—') - (b.re==='—') || b.kg - a.kg); // "sem líder" sempre por último
+}
+
+function htmlRefugoCard(titulo, periodo, ranking){
+  if (!ranking.length){
+    return `<div class="card ranking-card"><div class="ranking-card-titulo">${titulo}</div><div class="ranking-card-periodo">${periodo}</div>
+      <div class="relatorio-vazio">Nenhum refugo${RANKING_PRODUTO ? ' de '+escHtml(RANKING_PRODUTO) : ''} nesse período.</div></div>`;
+  }
+  const maior = Math.max(...ranking.map(x=>x.kg));
+  const total = ranking.reduce((s,x)=>s+x.kg, 0);
+  const itens = ranking.map((x,i)=>{
+    const semLider = x.re === '—';
+    const pos = semLider ? '—' : `${ranking.filter(y=>y.re!=='—').indexOf(x)+1}º`;
+    const pct = x.pct == null ? (semLider ? 'sem produção apontada no turno' : 'sem produção apontada no período') : `${x.pct.toLocaleString('pt-BR',{maximumFractionDigits:1})}% do que produziu (${fmtT(x.produzido)})`;
+    return `
+      <div class="ranking-item refugo-item ${i===0 && !semLider ? 'primeiro' : ''} ${semLider ? 'sem-lider' : ''}">
+        <div class="ranking-pos">${pos}</div>
+        <div style="min-width:0;">
+          <div class="ranking-nome">${escHtml(nomeLider(semLider ? null : x.re))}</div>
+          <div class="ranking-detalhe">${x.n} apontamento${x.n===1?'':'s'} · principal: ${escHtml(x.motivoTop)} (${fmtKg(x.motivoKg)}) · ${pct}</div>
+        </div>
+        <div class="ranking-valor"><strong>${fmtT(x.kg)}</strong><div>${fmtKg(x.kg)}</div></div>
+        <div class="ranking-barra"><div style="width:${maior ? x.kg/maior*100 : 0}%;"></div></div>
+      </div>`;
+  }).join('');
+  return `<div class="card ranking-card"><div class="ranking-card-titulo">${titulo}</div><div class="ranking-card-periodo">${periodo} · total ${fmtT(total)}</div>${itens}</div>`;
+}
+
+// ---------- mapa de refugo (treemap) — motivo → produto (ou linha, se filtrar produto) ----------
+let MAPA_REFUGO_PERIODO = 'mes'; // 'mes' (mês fechado do filtro) | 'vig' (mês vigente) | 'dia' (dia anterior)
+let _mapaRefugoToken = 0;
+// cores pela ORDEM DE TAMANHO no gráfico (maior = vermelho), em sequência bem contrastante
+// para blocos vizinhos nunca ficarem parecidos; a tabela ao lado repete a cor de cada motivo
+const MOTIVO_CORES = ['#FF3B30','#007AFF','#FF9500','#AF52DE','#34C759','#5856D6','#30B0C7','#A2845E','#FF2D55','#8E8E93'];
+let _coresMotivo = {};
+function corDoMotivo(nome){ return _coresMotivo[nome] || '#8E8E93'; }
+
+// treemap "squarified": retângulos o mais quadrados possível, área proporcional ao valor
+function squarify(itens, x, y, w, h){
+  const total = itens.reduce((s,i)=>s+i.valor, 0);
+  if (!total || w <= 0 || h <= 0) return [];
+  const fila = itens.filter(i=>i.valor>0).sort((a,b)=>b.valor-a.valor).map(i=>({ ...i, area: i.valor / total * w * h }));
+  const out = []; let r = { x, y, w, h }; let linha = [];
+  const pior = (row, lado) => {
+    const s = row.reduce((a,b)=>a+b.area,0), mx = Math.max(...row.map(i=>i.area)), mn = Math.min(...row.map(i=>i.area));
+    return Math.max(lado*lado*mx/(s*s), (s*s)/(lado*lado*mn));
+  };
+  const assentar = row => {
+    const s = row.reduce((a,b)=>a+b.area,0);
+    if (r.w >= r.h){ const cw = s / r.h; let yy = r.y; row.forEach(i=>{ const hh = i.area / cw; out.push({ ...i, x:r.x, y:yy, w:cw, h:hh }); yy += hh; }); r = { x:r.x+cw, y:r.y, w:r.w-cw, h:r.h }; }
+    else { const rh = s / r.w; let xx = r.x; row.forEach(i=>{ const ww = i.area / rh; out.push({ ...i, x:xx, y:r.y, w:ww, h:rh }); xx += ww; }); r = { x:r.x, y:r.y+rh, w:r.w, h:r.h-rh }; }
+  };
+  while (fila.length){
+    const lado = Math.min(r.w, r.h);
+    if (!linha.length || pior([...linha, fila[0]], lado) <= pior(linha, lado)) linha.push(fila.shift());
+    else { assentar(linha); linha = []; }
+  }
+  if (linha.length) assentar(linha);
+  return out;
+}
+
+function agruparRefugo(refugos, produto){
+  const porMotivo = {};
+  (refugos || []).filter(r => !produto || r.produto === produto).forEach(r=>{
+    const m = porMotivo[r.motivo] || (porMotivo[r.motivo] = { nome:r.motivo, valor:0, filhos:{} });
+    m.valor += Number(r.peso_kg);
+    const chave = produto ? nomeLinhaId(r.linha_id) : r.produto; // filtrou produto → abre por linha
+    m.filhos[chave] = (m.filhos[chave] || 0) + Number(r.peso_kg);
+  });
+  return Object.values(porMotivo).map(m=>({ ...m, filhos: Object.entries(m.filhos).map(([nome,valor])=>({ nome, valor })) }))
+    .sort((a,b)=>b.valor-a.valor);
+}
+
+function svgTreemapRefugo(grupos){
+  _coresMotivo = {}; grupos.forEach((g,i)=>{ _coresMotivo[g.nome] = MOTIVO_CORES[i % MOTIVO_CORES.length]; });
+  const W = 1000, H = 440, CAB = 22, total = grupos.reduce((s,g)=>s+g.valor,0);
+  const pct = v => `${(v/total*100).toLocaleString('pt-BR',{maximumFractionDigits:1})}%`;
+  let svg = `<svg class="mapa-refugo-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Mapa de refugo por motivo">`;
+  squarify(grupos, 0, 0, W, H).forEach(g=>{
+    const cor = corDoMotivo(g.nome), pad = 2;
+    const gx = g.x+pad, gy = g.y+pad, gw = Math.max(0, g.w-pad*2), gh = Math.max(0, g.h-pad*2);
+    svg += `<g><title>${escHtml(g.nome)} · ${fmtKg(g.valor)} · ${pct(g.valor)} do refugo</title>`;
+    svg += `<rect x="${gx}" y="${gy}" width="${gw}" height="${gh}" rx="8" fill="${cor}" fill-opacity=".16"></rect>`;
+    const temCab = gh > CAB + 16 && gw > 60;
+    if (temCab){
+      const maxCh = Math.floor((gw - 16) / 7.6);
+      let rot = `${g.nome} · ${fmtT(g.valor)} · ${pct(g.valor)}`;
+      if (rot.length > maxCh) rot = g.nome.length > maxCh ? g.nome.slice(0, Math.max(3,maxCh-1)) + '…' : g.nome;
+      svg += `<text class="mapa-motivo" x="${gx+8}" y="${gy+15}" fill="${cor}">${escHtml(rot)}</text>`;
+    }
+    const top = temCab ? CAB : 0;
+    squarify(g.filhos, gx+3, gy+top+2, gw-6, gh-top-5).forEach((f,i)=>{
+      const op = Math.max(.45, .9 - i*.12);
+      svg += `<g><title>${escHtml(g.nome)} → ${escHtml(f.nome)} · ${fmtKg(f.valor)} (${pct(f.valor)} do refugo)</title>`;
+      svg += `<rect x="${f.x+1}" y="${f.y+1}" width="${Math.max(0,f.w-2)}" height="${Math.max(0,f.h-2)}" rx="6" fill="${cor}" fill-opacity="${op}"></rect>`;
+      if (f.w > 64 && f.h > 34){
+        const maxCh = Math.floor((f.w - 14) / 7.4);
+        const nome = f.nome.length > maxCh ? f.nome.slice(0, Math.max(2,maxCh-1)) + '…' : f.nome;
+        svg += `<text class="mapa-filho" x="${f.x+8}" y="${f.y+18}">${escHtml(nome)}</text>`;
+        svg += `<text class="mapa-filho-kg" x="${f.x+8}" y="${f.y+33}">${fmtKg(f.valor)}</text>`;
+      }
+      svg += `</g>`;
+    });
+    svg += `</g>`;
+  });
+  return svg + `</svg>`;
+}
+
+function renderMapaRefugo(){
+  const wrap = document.getElementById('mapaRefugoWrap');
+  if (!wrap) return;
+  const token = ++_mapaRefugoToken;
+  const mesVigente = mesDoDiaISO(PRODUCAO_DIA_ATUAL);
+  const mesSel = RANKING_MES_SELECIONADO && RANKING_MES_SELECIONADO < mesVigente ? RANKING_MES_SELECIONADO : deslocarMes(mesVigente, -1);
+  const anterior = diaProdutivoAnteriorISO();
+  const periodos = {
+    mes: { rot:`Mês fechado · ${nomeMes(mesSel)}`, de: mesSel+'-01', ate: deslocarMes(mesSel,1)+'-01' },
+    vig: { rot:`Mês vigente · ${nomeMes(mesVigente)}`, de: mesVigente+'-01', ate: PRODUCAO_DIA_ATUAL },
+    dia: { rot:`Dia anterior · ${fmtDataCurtaBR(anterior)}`, de: anterior, ate: PRODUCAO_DIA_ATUAL },
+  };
+  const p = periodos[MAPA_REFUGO_PERIODO] || periodos.mes;
+  const abertura = RANKING_PRODUTO ? `${escHtml(RANKING_PRODUTO)} · blocos por linha` : 'todos os produtos · blocos por produto';
+  wrap.innerHTML = `
+    <div class="card mapa-refugo-card">
+      <div class="mapa-refugo-topo">
+        <div class="mapa-seg" role="tablist">
+          ${Object.entries(periodos).map(([k,v])=>`<button type="button" class="${k===MAPA_REFUGO_PERIODO?'ativo':''}" data-mapa-periodo="${k}">${v.rot}</button>`).join('')}
+        </div>
+        <span class="mapa-abertura">${abertura}</span>
+      </div>
+      <div class="mapa-refugo-corpo"><div class="relatorio-vazio">Carregando…</div></div>
+    </div>`;
+  wrap.querySelectorAll('[data-mapa-periodo]').forEach(b=>b.addEventListener('click', ()=>{ MAPA_REFUGO_PERIODO = b.dataset.mapaPeriodo; renderMapaRefugo(); }));
+
+  buscarRefugoIntervalo(p.de, p.ate).then(refugos=>{
+    if (token !== _mapaRefugoToken) return;
+    const corpo = wrap.querySelector('.mapa-refugo-corpo');
+    const grupos = agruparRefugo(refugos, RANKING_PRODUTO);
+    if (!grupos.length){ corpo.innerHTML = `<div class="relatorio-vazio">Nenhum refugo${RANKING_PRODUTO ? ' de '+escHtml(RANKING_PRODUTO) : ''} nesse período.</div>`; return; }
+    _coresMotivo = {}; grupos.forEach((g,i)=>{ _coresMotivo[g.nome] = MOTIVO_CORES[i % MOTIVO_CORES.length]; }); // antes da tabela
+    const total = grupos.reduce((s,g)=>s+g.valor,0);
+    let acum = 0;
+    const lista = grupos.map(g=>{
+      acum += g.valor;
+      return `<tr><td><span class="mapa-bolinha" style="background:${corDoMotivo(g.nome)};"></span>${escHtml(g.nome)}</td>
+        <td class="mono apont-num">${fmtKg(g.valor)}</td>
+        <td class="mono apont-num">${(g.valor/total*100).toLocaleString('pt-BR',{maximumFractionDigits:1})}%</td>
+        <td class="mono apont-num" style="color:var(--ink-soft);">${(acum/total*100).toLocaleString('pt-BR',{maximumFractionDigits:0})}%</td></tr>`;
+    }).join('');
+    corpo.innerHTML = `
+      <div class="mapa-refugo-grid">
+        <div class="mapa-refugo-arvore">${svgTreemapRefugo(grupos)}</div>
+        <div>
+          <div class="mapa-total">Total refugado <strong>${fmtT(total)}</strong></div>
+          <table class="data-table param-table apont-table mapa-tabela">
+            <thead><tr><th>Motivo</th><th style="text-align:right;">Peso</th><th style="text-align:right;">%</th><th style="text-align:right;" title="Percentual acumulado (Pareto)">Acum.</th></tr></thead>
+            <tbody>${lista}</tbody>
+          </table>
+        </div>
+      </div>`;
+  });
+}
+
+function renderRankingRefugo(){
+  const wrap = document.getElementById('refugoRankingWrap');
+  if (!wrap) return;
+  renderMapaRefugo(); // mesmo filtro de produto/mês
+  const token = ++_refugoRankToken;
+  const mesVigente = mesDoDiaISO(PRODUCAO_DIA_ATUAL);
+  const mesSel = RANKING_MES_SELECIONADO && RANKING_MES_SELECIONADO < mesVigente ? RANKING_MES_SELECIONADO : deslocarMes(mesVigente, -1);
+  const anterior = diaProdutivoAnteriorISO();
+  const carregando = t => `<div class="card ranking-card"><div class="ranking-card-titulo">${t}</div><div class="relatorio-vazio">Carregando…</div></div>`;
+  const tMes = `${mesSel === deslocarMes(mesVigente,-1) ? 'Mês anterior' : 'Mês'} · ${nomeMes(mesSel)}`;
+  const tVig = `Mês vigente · ${nomeMes(mesVigente)}`;
+  const tDia = 'Dia anterior · fechado';
+  wrap.innerHTML = `<div class="ranking-grid">
+      <div data-rr="mes">${carregando(tMes)}</div><div data-rr="vig">${carregando(tVig)}</div><div data-rr="dia">${carregando(tDia)}</div>
+    </div>`;
+  const por = (sel, html) => { if (token === _refugoRankToken){ const el = wrap.querySelector(`[data-rr="${sel}"]`); if (el) el.innerHTML = html; } };
+
+  Promise.all([buscarRefugoIntervalo(mesSel+'-01', deslocarMes(mesSel,1)+'-01'), registrosDoMes(mesSel, false)])
+    .then(([ref, prod]) => por('mes', htmlRefugoCard(tMes, `produzido de 01/${mesSel.slice(5)} a ${fmtDataCurtaBR(deslocarDiaISO(deslocarMes(mesSel,1)+'-01',-1))}`, rankingRefugoPorLider(ref, prod, RANKING_PRODUTO))));
+  Promise.all([buscarRefugoIntervalo(mesVigente+'-01', PRODUCAO_DIA_ATUAL), registrosDoMes(mesVigente, true)])
+    .then(([ref, prod]) => por('vig', PRODUCAO_DIA_ATUAL.endsWith('-01')
+      ? `<div class="card ranking-card"><div class="ranking-card-titulo">${tVig}</div><div class="relatorio-vazio">Primeiro dia do mês ainda em andamento.</div></div>`
+      : htmlRefugoCard(tVig, `dias fechados · 01/${mesVigente.slice(5)} a ${fmtDataCurtaBR(anterior)}`, rankingRefugoPorLider(ref, prod, RANKING_PRODUTO))));
+  buscarRefugoIntervalo(anterior, PRODUCAO_DIA_ATUAL).then(ref=>{
+    const prod = (PRODUCAO_REGISTROS_10D || []).filter(r => diaDoRegistro(r) === anterior);
+    por('dia', htmlRefugoCard(tDia, `produzido em ${fmtDataCurtaBR(anterior)}`, rankingRefugoPorLider(ref, prod, RANKING_PRODUTO)));
+  });
+}
+
+// ---------- Parâmetros: motivos de refugo + inspetores ----------
+async function renderParamRefugo(){
+  const wrap = document.getElementById('paramRefugoWrap');
+  if (!wrap) return;
+  wrap.innerHTML = `
+    <h2 class="section-title" style="margin-top:32px;">Não qualidade · motivos de refugo e inspetores</h2>
+    <div class="refugo-grid">
+      <div class="card param-card">
+        <div class="param-subtitle">Motivos de refugo (aparecem para o inspetor escolher)</div>
+        <div class="produtos-lista">
+          ${MOTIVOS_REFUGO.map(m=>`<span class="produto-chip">${escHtml(m.nome)}<button type="button" data-remover-motivo data-id="${m.id}" title="Remover">×</button></span>`).join('') || '<span class="hint">Nenhum motivo cadastrado ainda</span>'}
+        </div>
+        <div style="display:flex; gap:8px; margin:10px 0 6px;">
+          <input type="text" class="param-input" id="novoMotivoRefugo" placeholder="ex: Rebarba, Peça amassada…" style="width:240px;">
+          <button type="button" class="btn small" id="addMotivoRefugo">+ Adicionar</button>
+        </div>
+        <div class="hint">Remover um motivo não apaga os refugos já apontados com ele.</div>
+      </div>
+      <div class="card param-card">
+        <div class="param-subtitle">Inspetores cadastrados</div>
+        <div id="listaInspetores" class="hint">Carregando…</div>
+        <div class="hint" style="margin-top:10px;">Por segurança, o cadastro e a senha inicial são feitos só pelo SQL Editor do Supabase:<br>
+          <code>select public.cadastrar_inspetor('Nome', 'senha-inicial');</code><br>
+          Depois o próprio inspetor troca a senha em Produção → “Trocar minha senha”.</div>
+      </div>
+    </div>`;
+  document.getElementById('addMotivoRefugo').addEventListener('click', async ()=>{
+    const input = document.getElementById('novoMotivoRefugo');
+    const nome = input.value.trim();
+    if (!nome) return;
+    if (MOTIVOS_REFUGO.some(m=>m.nome.toLowerCase()===nome.toLowerCase())){ input.value=''; return; }
+    if (sb){
+      const ordem = Math.max(0, ...MOTIVOS_REFUGO.filter(m=>m.ordem<99).map(m=>m.ordem)) + 1;
+      const { data, error } = await sb.from('motivos_refugo').insert({ nome, ordem }).select().single();
+      if (error){ console.error('Falha ao cadastrar motivo:', error); return; }
+      if (!MOTIVOS_REFUGO.some(m=>m.id===data.id)) MOTIVOS_REFUGO.push(data);
+      MOTIVOS_REFUGO.sort((a,b)=> (a.ordem-b.ordem) || a.nome.localeCompare(b.nome,'pt-BR'));
+    }
+    renderParamRefugo();
+  });
+  document.getElementById('novoMotivoRefugo').addEventListener('keydown', e=>{ if (e.key==='Enter') document.getElementById('addMotivoRefugo').click(); });
+  wrap.querySelectorAll('[data-remover-motivo]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = Number(btn.dataset.id);
+      MOTIVOS_REFUGO = MOTIVOS_REFUGO.filter(m=>m.id!==id);
+      if (sb) sb.from('motivos_refugo').delete().eq('id', id).then(({error})=>{ if (error) console.error('Falha ao remover motivo:', error); });
+      renderParamRefugo();
+    });
+  });
+  const lista = document.getElementById('listaInspetores');
+  if (!sb){ lista.textContent = 'Sem conexão com o banco.'; return; }
+  const { data, error } = await sb.rpc('listar_inspetores');
+  if (!document.body.contains(lista)) return;
+  if (error){ lista.textContent = 'Rode a migration supabase_nao_qualidade.sql para habilitar.'; return; }
+  lista.innerHTML = (data || []).length
+    ? (data || []).map(i=>`<span class="produto-chip ${i.ativo?'':'inativo'}">${escHtml(i.login)}${i.ativo?'':' (inativo)'}</span>`).join(' ')
+    : 'Nenhum inspetor cadastrado ainda.';
 }
 
 // Virada do dia produtivo às 07h00: zera o "hoje", recarrega e refaz a aba
@@ -3263,6 +3970,7 @@ function buildProducaoHTML(){
           </div>
           <div class="producao-ontem-numero" id="ontemTotal-${linha.id}">${produto ? textoOntem(linha.id, produto) : '—'}</div>
           <div class="producao-ontem-periodo">${fmtDataCurtaBR(diaProdutivoAnteriorISO())} ${rotuloVirada(diaProdutivoAnteriorISO())} → ${fmtDataCurtaBR(PRODUCAO_DIA_ATUAL)} ${rotuloVirada(PRODUCAO_DIA_ATUAL)} · fechado</div>
+          <div class="producao-ontem-refugo" data-refugo-ontem="${linha.id}"><span class="rot">Refugou</span><span class="val">…</span></div>
         </div>
         ${htmlHojeLinha(linha.id)}
         </div>
@@ -3374,6 +4082,7 @@ function renderProducao(){
       <div class="tv-grafico-canvas-wrap"><canvas id="chart-producao-${linha.id}"></canvas></div>
     </div>`).join('');
   renderRankingLideres();
+  renderRefugo();
   initProducaoCharts();
 }
 
@@ -3415,6 +4124,7 @@ async function initProducaoCharts(){
     el.textContent = produto ? textoOntem(linha.id, produto) : '—';
   });
   renderRankingLideres();
+  renderRefugo();
   renderProducaoKPIs(registros);
 
   if (typeof Chart === 'undefined') return; // sem internet / biblioteca não carregou
@@ -3607,6 +4317,7 @@ function renderFullTable(){
    RENDER — Parametrização
    ========================================================================= */
 function renderParametros(){
+  renderParamRefugo();
   if (!PENDENCIAS.length) return; // ainda carregando do Supabase
   document.getElementById('paramLimiteBanho').value = LIMITE_BANHO_HORAS;
   const pTanqueRef = pendenciaDaLinha(LINHAS[0].id, 'Verificar nível do tanque mãe');
