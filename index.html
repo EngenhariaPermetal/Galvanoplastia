@@ -583,6 +583,7 @@ main:has(#view-producao.active){ max-width:1800px; }
 .refugo-form{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px 12px; }
 .refugo-form label{ display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:500; color:var(--ink-soft); }
 .refugo-form .param-input{ width:100%; }
+.refugo-form .refugo-lider{ grid-column:1 / -1; }
 .refugo-link{ border:none; background:none; color:#007AFF; font-size:12.5px; font-weight:500; cursor:pointer; padding:0; }
 .refugo-link:hover{ text-decoration:underline; }
 .refugo-previsao{ font-size:12.5px; color:var(--ink-soft); background:rgba(118,118,128,.08); border-radius:10px; padding:9px 12px; margin:12px 0 10px; min-height:18px; }
@@ -947,7 +948,7 @@ const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE
 async function carregarDadosIniciais(){
   if (!sb) return; // sem Supabase configurado — mantém tudo vazio/default
 
-  const [pend, banho, faixas, leituras, config, intervencoes, producao, produtosLinha, motivosRefugo, refugosRecentes] = await Promise.all([
+  const [pend, banho, faixas, leituras, config, intervencoes, producao, produtosLinha, motivosRefugo, refugosRecentes, colabAtivos] = await Promise.all([
     sb.from('pendencias_rotina').select('*'),
     sb.from('banho_ciclos').select('*'),
     sb.from('parametros_quimicos').select('*'),
@@ -958,7 +959,10 @@ async function carregarDadosIniciais(){
     sb.from('produtos_linha').select('*').order('criado_em', { ascending:true }),
     sb.from('motivos_refugo').select('*').order('ordem', { ascending:true }).order('nome', { ascending:true }),
     sb.from('apontamentos_refugo').select('*, colaboradores(nome)').order('criado_em', { ascending:false }).limit(REFUGO_RECENTES_MAX),
+    sb.from('colaboradores').select('re,nome').eq('ativo', true).order('nome', { ascending:true }),
   ]);
+  LIDERES = (colabAtivos && colabAtivos.data) || [];
+  LIDERES.forEach(c=>{ if (c.nome) NOME_POR_RE[c.re] = c.nome; });
   // não qualidade (tabelas novas — se a migration ainda não rodou, só fica vazio)
   MOTIVOS_REFUGO = (motivosRefugo && motivosRefugo.data) || [];
   REFUGO_RECENTES = (refugosRecentes && refugosRecentes.data) || [];
@@ -3390,15 +3394,16 @@ const REFUGO_RECENTES_MAX = 30;
 let MOTIVOS_REFUGO = [];      // [{id, nome, ativo, ordem}]
 let REFUGO_RECENTES = [];     // últimos apontamentos (mais novo primeiro)
 let REFUGO_CACHE = {};        // chave de período → registros
-let REFUGO_FORM = { dia:null, turno:null, linha:null, produto:null, peso:'', motivo:null };
+let REFUGO_FORM = { dia:null, linha:null, produto:null, peso:'', motivo:null, lider:null, liderManual:false };
+let LIDERES = []; // colaboradores ativos [{re, nome}] — o inspetor escolhe o líder responsável
 let _refugoRankToken = 0;
 
 const escHtml = v => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
-// MESMA regra da função lider_do_turno do banco (o banco é quem decide; isto é só a prévia na tela):
-// quem mais apontou AQUELE produto; se ninguém, quem mais produziu no turno; se não houve produção, ninguém
-function liderPrevisto(registros, dia, turno, linhaId, produto){
-  const doTurno = (registros || []).filter(r => r.data === dia && Number(r.turno) === Number(turno) && r.linha_id === linhaId && r.colaborador_re);
+// SUGESTÃO de líder (o inspetor confirma ou troca — no 12x36 o turno não define o líder):
+// quem mais apontou AQUELE produto na linha/dia; se ninguém, quem mais produziu na linha/dia
+function liderSugerido(registros, dia, linhaId, produto){
+  const doTurno = (registros || []).filter(r => r.data === dia && r.linha_id === linhaId && r.colaborador_re);
   if (!doTurno.length) return null;
   const soma = {};
   doTurno.forEach(r=>{
@@ -3427,7 +3432,6 @@ function renderRefugo(){
   const f = REFUGO_FORM;
   const dias = diasRefugoOpcoes();
   if (!f.dia || !dias.includes(f.dia)) f.dia = PRODUCAO_DIA_ATUAL;
-  if (!f.turno) f.turno = 1;
   if (!f.linha || !LINHAS.some(l=>l.id===f.linha)) f.linha = LINHAS[0].id;
   const produtos = produtosDaLinha(f.linha);
   if (!produtos.includes(f.produto)) f.produto = produtos[0] || null;
@@ -3435,20 +3439,28 @@ function renderRefugo(){
   if (!motivos.some(m=>m.nome===f.motivo)) f.motivo = null;
 
   const rotDia = d => d === PRODUCAO_DIA_ATUAL ? `Hoje · ${fmtDataCurtaBR(d)}` : d === deslocarDiaISO(PRODUCAO_DIA_ATUAL,-1) ? `Ontem · ${fmtDataCurtaBR(d)}` : fmtDataCurtaBR(d);
+  // sugestão de líder: pré-seleciona enquanto o inspetor não escolher outro
+  const carregandoSug = f.dia !== PRODUCAO_DIA_ATUAL && PRODUCAO_REGISTROS_10D == null;
+  const sugerido = (!f.produto || carregandoSug) ? null : liderSugerido(registrosDoDiaProdutivo(f.dia), f.dia, f.linha, f.produto);
+  if (!f.liderManual) f.lider = sugerido;
+  if (f.lider && !LIDERES.some(l=>l.re===f.lider)) LIDERES = [...LIDERES, { re:f.lider, nome:NOME_POR_RE[f.lider] || '' }];
   let previsao;
   if (!f.produto) previsao = '';
-  else if (f.dia !== PRODUCAO_DIA_ATUAL && PRODUCAO_REGISTROS_10D == null) previsao = 'Procurando o líder do turno…';
-  else {
-    const lid = liderPrevisto(registrosDoDiaProdutivo(f.dia), f.dia, f.turno, f.linha, f.produto);
-    previsao = lid
-      ? `Vai ser atribuído a <strong>${escHtml(nomeLider(lid))}</strong> — líder do turno ${f.turno} da ${escHtml(nomeLinhaId(f.linha))} em ${fmtDataCurtaBR(f.dia)}.`
-      : `<span style="color:var(--warn);">Não há produção apontada no turno ${f.turno} da ${escHtml(nomeLinhaId(f.linha))} em ${fmtDataCurtaBR(f.dia)} — o refugo fica sem líder.</span>`;
-  }
+  else if (carregandoSug) previsao = 'Procurando quem apontou essa produção…';
+  else if (sugerido && f.lider === sugerido)
+    previsao = `Sugerido: <strong>${escHtml(nomeLider(sugerido))}</strong> — quem mais apontou ${escHtml(f.produto)} na ${escHtml(nomeLinhaId(f.linha))} em ${fmtDataCurtaBR(f.dia)}. Se o líder foi outro, troque acima.`;
+  else if (sugerido && f.lider)
+    previsao = `Você escolheu <strong>${escHtml(nomeLider(f.lider))}</strong>. (O sugerido pela produção apontada era ${escHtml(nomeLider(sugerido))}.)`;
+  else if (f.lider)
+    previsao = `Atribuído a <strong>${escHtml(nomeLider(f.lider))}</strong>.`;
+  else
+    previsao = `<span style="color:var(--warn);">Ninguém apontou produção de ${escHtml(f.produto)} na ${escHtml(nomeLinhaId(f.linha))} em ${fmtDataCurtaBR(f.dia)} — escolha o líder responsável.</span>`;
+  const lideresOrd = [...LIDERES].sort((a,b)=> (b.re===sugerido)-(a.re===sugerido) || String(a.nome).localeCompare(String(b.nome),'pt-BR'));
 
   const recentes = REFUGO_RECENTES.slice(0, 15);
   const linhasTabela = recentes.length ? recentes.map(r=>`
       <tr>
-        <td class="mono">${fmtDataCurtaBR(String(r.data).slice(0,10))} · T${r.turno}</td>
+        <td class="mono">${fmtDataCurtaBR(String(r.data).slice(0,10))}${r.turno ? ' · T'+r.turno : ''}</td>
         <td>${escHtml(nomeLinhaId(r.linha_id))}</td>
         <td>${escHtml(r.produto)}</td>
         <td class="mono apont-num"><strong>${fmtKg(r.peso_kg)}</strong></td>
@@ -3469,9 +3481,6 @@ function renderRefugo(){
           <label>Dia produtivo (quando foi produzido)
             <select class="param-input" data-refugo="dia">${dias.map(d=>`<option value="${d}" ${d===f.dia?'selected':''}>${rotDia(d)}</option>`).join('')}</select>
           </label>
-          <label>Turno
-            <select class="param-input" data-refugo="turno"><option value="1" ${f.turno==1?'selected':''}>1</option><option value="2" ${f.turno==2?'selected':''}>2</option></select>
-          </label>
           <label>Linha
             <select class="param-input" data-refugo="linha">${LINHAS.map(l=>`<option value="${l.id}" ${l.id===f.linha?'selected':''}>${l.nome}</option>`).join('')}</select>
           </label>
@@ -3482,6 +3491,12 @@ function renderRefugo(){
           </label>
           <label>Peso refugado (kg)
             <input type="number" min="0" step="0.5" class="param-input" data-refugo="peso" placeholder="ex: 350" value="${escHtml(f.peso)}">
+          </label>
+          <label class="refugo-lider">Líder responsável pela produção
+            <select class="param-input" data-refugo="lider">
+              <option value="">Escolha o líder…</option>
+              ${lideresOrd.map(l=>`<option value="${escHtml(l.re)}" ${l.re===f.lider?'selected':''}>${escHtml(l.re)}${l.nome ? ' · '+escHtml(l.nome) : ''}${l.re===sugerido ? ' (sugerido)' : ''}</option>`).join('')}
+            </select>
           </label>
           <label>Motivo
             ${motivos.length
@@ -3507,8 +3522,10 @@ function renderRefugo(){
   wrap.querySelectorAll('[data-refugo]').forEach(el=>{
     const campo = el.dataset.refugo;
     el.addEventListener(campo === 'peso' ? 'input' : 'change', ()=>{
-      f[campo] = campo === 'turno' ? Number(el.value) : el.value;
-      if (campo === 'peso') return;            // não re-renderiza enquanto digita
+      f[campo] = el.value || null;
+      if (campo === 'peso'){ f.peso = el.value; return; } // não re-renderiza enquanto digita
+      if (campo === 'lider') f.liderManual = !!el.value;   // escolheu na mão: não sobrescreve mais
+      else if (campo === 'dia' || campo === 'linha' || campo === 'produto') f.liderManual = false; // volta a sugerir
       if (campo === 'linha') f.produto = null; // produtos mudam com a linha
       renderRefugo();
     });
@@ -3526,17 +3543,18 @@ async function registrarRefugoClique(){
   if (!f.produto){ msg.textContent = 'Escolha o produto.'; return; }
   if (!peso || peso <= 0){ msg.textContent = 'Informe o peso refugado em kg.'; return; }
   if (!f.motivo){ msg.textContent = 'Escolha o motivo.'; return; }
+  if (!f.lider){ msg.textContent = 'Escolha o líder responsável pela produção.'; return; }
   if (!sb){ msg.textContent = 'Sem conexão com o banco — não é possível registrar.'; return; }
   msg.textContent = '';
 
-  const resumo = `${fmtKg(peso)} de ${f.produto} · ${nomeLinhaId(f.linha)} · turno ${f.turno} · produzido em ${fmtDataCurtaBR(f.dia)} · ${f.motivo}`;
+  const resumo = `${fmtKg(peso)} de ${f.produto} · ${nomeLinhaId(f.linha)} · produzido em ${fmtDataCurtaBR(f.dia)} · ${f.motivo} · líder ${nomeLider(f.lider)}`;
   const res = await pedirLoginInspetor({
     titulo: 'Confirmar refugo',
     descricao: resumo,
     aoConfirmar: async (login, senha)=>{
       const { data, error } = await sb.rpc('registrar_refugo', {
-        p_login: login, p_senha: senha, p_data: f.dia, p_turno: f.turno, p_linha_id: f.linha,
-        p_produto: f.produto, p_peso_kg: peso, p_motivo: f.motivo,
+        p_login: login, p_senha: senha, p_data: f.dia, p_linha_id: f.linha,
+        p_produto: f.produto, p_peso_kg: peso, p_motivo: f.motivo, p_lider_re: f.lider,
       });
       if (error) return { ok:false, erro:'Falha ao registrar: ' + error.message };
       return data;
@@ -3545,17 +3563,17 @@ async function registrarRefugoClique(){
   if (!res) return; // cancelou
   if (res.lider_re && res.lider_nome) NOME_POR_RE[res.lider_re] = res.lider_nome;
   if (!REFUGO_RECENTES.some(x=>x.id===res.id)){ // o Realtime pode ter chegado antes da resposta
-    REFUGO_RECENTES.unshift({ id:res.id, criado_em:new Date().toISOString(), data:f.dia, turno:f.turno, linha_id:f.linha,
+    REFUGO_RECENTES.unshift({ id:res.id, criado_em:new Date().toISOString(), data:f.dia, turno:null, linha_id:f.linha,
       produto:f.produto, peso_kg:peso, motivo:f.motivo, inspetor_login:res.inspetor_login || res._login, lider_re:res.lider_re });
     REFUGO_RECENTES = REFUGO_RECENTES.slice(0, REFUGO_RECENTES_MAX);
   }
   REFUGO_CACHE = {};
-  f.peso = ''; f.motivo = null;
+  f.peso = ''; f.motivo = null; f.liderManual = false;
   renderRefugo();
   renderRankingRefugo();
   const m2 = document.getElementById('refugoMsg');
   m2.style.color = 'var(--ok)';
-  m2.textContent = `Registrado ✓ — ${res.lider_re ? 'atribuído a ' + nomeLider(res.lider_re) : 'sem líder identificado (não havia produção apontada nesse turno)'}.`;
+  m2.textContent = `Registrado ✓ — atribuído a ${nomeLider(res.lider_re)}.`;
 }
 
 async function trocarSenhaInspetor(){
