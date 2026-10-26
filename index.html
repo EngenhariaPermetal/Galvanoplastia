@@ -760,6 +760,11 @@ main:has(#view-producao.active){ max-width:1800px; }
       <span class="hint">horas — vale pra todos os banhos (B1, B2, B3) de todas as linhas</span>
     </div>
     <div class="card param-global">
+      <label for="paramTempoAnalise">Tempo de análise da amostra (medição + registro no portal)</label>
+      <input type="number" min="0" max="240" step="1" id="paramTempoAnalise" class="param-input" style="width:80px;">
+      <span class="hint">minutos — descontado da hora em que a coleta é confirmada no portal para achar a hora real em que a amostra saiu do banho (é ela que entra no cálculo da saída). Vale para todas as linhas.</span>
+    </div>
+    <div class="card param-global">
       <label for="paramTanqueMae">Frequência de verificação do nível do Tanque Mãe</label>
       <input type="number" min="0" step="0.5" id="paramTanqueMae" class="param-input" style="width:80px;">
       <span class="hint">horas</span>
@@ -1030,6 +1035,7 @@ async function carregarDadosIniciais(){
 
   (config.data || []).forEach(r => {
     if (r.chave === 'limite_banho_horas') LIMITE_BANHO_HORAS = Number(r.valor);
+    if (r.chave === 'tempo_analise_amostra_min') TEMPO_ANALISE_AMOSTRA_MIN = Number(r.valor);
     if (r.chave.startsWith('especificacao_disco_')){
       const linhaId = r.chave.replace('especificacao_disco_', '');
       ESPECIFICACAO_DISCO[linhaId] = Number(r.valor);
@@ -1193,6 +1199,10 @@ function configurarRealtime(){
       const r = payload.new;
       if (!r) return;
       if (r.chave === 'limite_banho_horas'){ LIMITE_BANHO_HORAS = Number(r.valor); renderAll(); }
+      else if (r.chave === 'tempo_analise_amostra_min'){
+        TEMPO_ANALISE_AMOSTRA_MIN = Number(r.valor);
+        const el = document.getElementById('paramTempoAnalise'); if (el && document.activeElement !== el) el.value = TEMPO_ANALISE_AMOSTRA_MIN;
+      }
       else if (r.chave.startsWith('especificacao_disco_')){
         ESPECIFICACAO_DISCO[r.chave.replace('especificacao_disco_','')] = Number(r.valor);
       }
@@ -1540,6 +1550,11 @@ const TANQUE_FARM = [
 // Supabase em carregarDadosIniciais(). Ficam vazios/default até lá.
 let PENDENCIAS = [];
 let LIMITE_BANHO_HORAS = 4;
+// Tempo de análise da amostra (medição + digitação no portal), em minutos. É
+// descontado da hora em que o colaborador CONFIRMA a coleta para chegar na hora
+// REAL em que a amostra saiu do banho — é essa hora que entra na conta da saída.
+// Configurável em Parâmetros (config_geral: tempo_analise_amostra_min).
+let TEMPO_ANALISE_AMOSTRA_MIN = 30;
 let BANHO_INICIO = {};
 let BANHO_TOTAL_INICIO = {};
 let BANHO_AMOSTRAS = {};
@@ -1673,6 +1688,21 @@ function ligaDoProduto(linhaId, nome){
 // Enquanto um banho está em parada de manutenção, os cronômetros ligados a
 // ele (Granalha/Limpeza/Amostra/Total) usam esse "agora" congelado no
 // instante da pausa, em vez do relógio de verdade — é isso que trava tudo.
+// Hora REAL em que a amostra saiu do banho = hora do registro − tempo de análise.
+// t (minutos do START até a coleta) para no início de uma manutenção em andamento,
+// e nunca fica negativo (coleta registrada logo após o START).
+function calcularColetaReal(registro, totalInicioIso, pausadoDesdeIso, analiseMin){
+  const horaColeta = new Date(registro.getTime() - analiseMin * 60000);
+  let fim = horaColeta;
+  if (pausadoDesdeIso && new Date(pausadoDesdeIso) < fim) fim = new Date(pausadoDesdeIso); // banho parado não deposita
+  const minutosDecorridos = Math.max(0, (fim.getTime() - new Date(totalInicioIso).getTime()) / 60000);
+  return { registro, horaColeta, analiseMin, minutosDecorridos };
+}
+function horaRealDaColeta(linhaId, banho, registro){
+  const pausa = BANHO_PAUSADO[linhaId] && BANHO_PAUSADO[linhaId][banho];
+  return calcularColetaReal(registro, BANHO_TOTAL_INICIO[linhaId][banho], pausa ? pausa.desde : null, TEMPO_ANALISE_AMOSTRA_MIN || 0);
+}
+
 function agoraDoBanho(linhaId, banho){
   const p = BANHO_PAUSADO[linhaId] && BANHO_PAUSADO[linhaId][banho];
   return p ? new Date(p.desde) : new Date();
@@ -2148,7 +2178,7 @@ async function resetBanhoPorClique(linhaId, banho){
   const nome = LINHAS.find(l=>l.id===linhaId)?.nome || linhaId;
   const latao = ehLinhaLatao(linhaId);
   const ehPrimeiraAmostra = (BANHO_AMOSTRAS[linhaId][banho] || 0) === 0;
-  const col = await pedirConfirmacaoRE(`Confirmar coleta de amostra do banho ${banho} (${nome}) — digite seu RE:`, { pedirCamada: true });
+  const col = await pedirConfirmacaoRE(`Confirmar coleta de amostra do banho ${banho} (${nome}) — digite seu RE. A saída do banho será calculada considerando a coleta ${TEMPO_ANALISE_AMOSTRA_MIN} min antes desta confirmação (tempo de análise em Parâmetros).`, { pedirCamada: true });
   if (!col) return;
   const agora = new Date().toISOString();
 
@@ -2159,8 +2189,9 @@ async function resetBanhoPorClique(linhaId, banho){
   // cronômetro de amostra reseta a cada coleta, então usar ele aqui faria a
   // conta enxergar só o tempo desde a coleta anterior, não desde o início
   // real do banho — subestimando bastante o tempo decorrido.
+  const coleta = horaRealDaColeta(linhaId, banho, new Date());
   {
-    const minutosDecorridos = horasDesde(BANHO_TOTAL_INICIO[linhaId][banho]) * 60;
+    const minutosDecorridos = coleta.minutosDecorridos;
     const especificacao = ESPECIFICACAO_DISCO[linhaId];
     if (especificacao && col.camada){
       const tempoFinalMin = (especificacao * minutosDecorridos) / col.camada;
@@ -2176,7 +2207,9 @@ async function resetBanhoPorClique(linhaId, banho){
     amostras_contador: BANHO_AMOSTRAS[linhaId][banho],
     saida_calculada: BANHO_SAIDA_CALC[linhaId][banho],
   }).eq('linha_id', linhaId).eq('banho', banho).then();
-  registrarAcaoSupabase(col.re, 'coleta_amostra', linhaId, banho, null, col.camada ? { camada_media: col.camada, camada_valores: col.camadaValores, camada_grid: col.camadaGrid, liga_media: col.liga, liga_valores: col.ligaValores, liga_grid: col.ligaGrid, primeira_amostra: ehPrimeiraAmostra } : null);
+  registrarAcaoSupabase(col.re, 'coleta_amostra', linhaId, banho, null, col.camada ? {
+    hora_registro: coleta.registro.toISOString(), hora_coleta_considerada: coleta.horaColeta.toISOString(), tempo_analise_min: coleta.analiseMin,
+    saida_calculada: BANHO_SAIDA_CALC[linhaId][banho], camada_media: col.camada, camada_valores: col.camadaValores, camada_grid: col.camadaGrid, liga_media: col.liga, liga_valores: col.ligaValores, liga_grid: col.ligaGrid, primeira_amostra: ehPrimeiraAmostra } : null);
   renderAll();
 }
 async function iniciarBanhoPorClique(linhaId, banho){
@@ -4338,6 +4371,7 @@ function renderParametros(){
   renderParamRefugo();
   if (!PENDENCIAS.length) return; // ainda carregando do Supabase
   document.getElementById('paramLimiteBanho').value = LIMITE_BANHO_HORAS;
+  document.getElementById('paramTempoAnalise').value = TEMPO_ANALISE_AMOSTRA_MIN;
   const pTanqueRef = pendenciaDaLinha(LINHAS[0].id, 'Verificar nível do tanque mãe');
   if (pTanqueRef) document.getElementById('paramTanqueMae').value = pTanqueRef.limiteHoras;
 
@@ -4544,6 +4578,12 @@ document.getElementById('paramLimiteBanho').addEventListener('change', (e)=>{
     if (sb) sb.from('config_geral').update({ valor: String(v) }).eq('chave', 'limite_banho_horas').then();
     renderAll();
   }
+});
+document.getElementById('paramTempoAnalise').addEventListener('change', (e)=>{
+  const v = parseInt(e.target.value, 10);
+  if (isNaN(v) || v < 0 || v > 240){ e.target.value = TEMPO_ANALISE_AMOSTRA_MIN; return; } // 0 a 4 h
+  TEMPO_ANALISE_AMOSTRA_MIN = v;
+  if (sb) sb.from('config_geral').upsert({ chave: 'tempo_analise_amostra_min', valor: String(v) }, { onConflict:'chave' }).then();
 });
 document.getElementById('paramTanqueMae').addEventListener('change', (e)=>{
   const v = parseFloat(e.target.value);
