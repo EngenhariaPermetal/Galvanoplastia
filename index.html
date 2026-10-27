@@ -520,6 +520,18 @@ h2.section-title{ font-weight:700; font-size:20px; letter-spacing:-.015em; }
 .producao-ontem-refugo.tem .rot{ color:#D70015; }
 .producao-ontem-refugo.tem .val{ color:#D70015; }
 .producao-ontem-refugo.zero .val{ color:#248A3D; font-weight:600; }
+.producao-hoje-refugo{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-top:10px; padding-top:8px;
+  border-top:1px solid rgba(60,60,67,.14); font-size:12.5px; white-space:nowrap; overflow:hidden; }
+.producao-hoje-refugo .rot{ color:var(--ink-soft); font-weight:500; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.producao-hoje-refugo .val{ font-weight:700; flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; font-variant-numeric:tabular-nums; }
+.producao-destaques > *{ min-width:0; }          /* card nunca passa da largura da coluna */
+.producao-hoje-box, .producao-ontem-destaque{ overflow:hidden; }
+.producao-hoje-refugo .rot{ flex:0 0 auto; }
+.producao-hoje-refugo.tem .rot, .producao-hoje-refugo.tem .val{ color:#D70015; }
+.producao-hoje-refugo.zero .val{ color:#248A3D; font-weight:600; }
+.producao-hoje-box{ display:flex; flex-direction:column; }
+.producao-hoje-box .refugo-espaco{ flex:1; min-height:10px; } /* empurra a linha do refugo para o rodapé, alinhada com a do card azul */
+.producao-hoje-refugo{ margin-top:0; }
 .producao-ontem-numero{ font-size:34px; font-weight:800; letter-spacing:-.02em; color:#0A3A8C; line-height:1.15; margin-top:2px; font-variant-numeric:tabular-nums; }
 .producao-ontem-periodo{ font-size:12px; color:#3A6FC4; margin-top:2px; }
 .producao-ontem-copiar{ border:none; background:#007AFF; color:#fff; font-size:12px; font-weight:600; padding:4px 12px; border-radius:999px; cursor:pointer; }
@@ -584,6 +596,10 @@ main:has(#view-producao.active){ max-width:1800px; }
 .refugo-form label{ display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:500; color:var(--ink-soft); }
 .refugo-form .param-input{ width:100%; }
 .refugo-form .refugo-lider{ grid-column:1 / -1; }
+.refugo-obs-label{ display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:500; color:var(--ink-soft); margin-top:10px; }
+.refugo-obs-label .hint{ font-weight:400; }
+textarea.refugo-obs{ width:100%; height:auto; min-height:52px; resize:vertical; text-align:left; font-family:inherit; line-height:1.35; padding:8px 10px; }
+.refugo-obs-cel{ max-width:200px !important; }
 .refugo-link{ border:none; background:none; color:#007AFF; font-size:12.5px; font-weight:500; cursor:pointer; padding:0; }
 .refugo-link:hover{ text-decoration:underline; }
 .refugo-previsao{ font-size:12.5px; color:var(--ink-soft); background:rgba(118,118,128,.08); border-radius:10px; padding:9px 12px; margin:12px 0 10px; min-height:18px; }
@@ -3193,10 +3209,10 @@ function textoOntem(linhaId, produto){
 // Refugo do DIA ANTERIOR no card azul: mesma linha, mesmo produto, mesmo período
 // (o "dia produtivo" do refugo é o dia em que o material foi produzido, informado
 // pelo inspetor — então refugo achado hoje de material de ontem entra aqui)
-function textoRefugoOntem(refugos, linhaId, produto, produzidoKg){
+function textoRefugoOntem(refugos, linhaId, produto, produzidoKg, curto){
   const kg = (refugos || []).filter(r => r.linha_id === linhaId && r.produto === produto).reduce((s,r)=>s+Number(r.peso_kg), 0);
-  if (!kg) return { kg:0, txt:'Sem refugo apontado', classe:'zero' };
-  const pct = produzidoKg ? ` · ${(kg/produzidoKg*100).toLocaleString('pt-BR',{maximumFractionDigits:1})}% do produzido` : '';
+  if (!kg) return { kg:0, txt: curto ? 'Nenhum' : 'Sem refugo apontado', classe:'zero' };
+  const pct = produzidoKg ? ` · ${(kg/produzidoKg*100).toLocaleString('pt-BR',{maximumFractionDigits:1})}%${curto ? '' : ' do produzido'}` : '';
   return { kg, txt:`${fmtKg(kg)}${pct}`, classe:'tem' };
 }
 function atualizarRefugoOntem(){
@@ -3210,6 +3226,21 @@ function atualizarRefugoOntem(){
       const produzido = totalOntemDoProduto(PRODUCAO_REGISTROS_10D, linha.id, produto) || 0;
       const r = textoRefugoOntem(refugos, linha.id, produto, produzido);
       el.className = 'producao-ontem-refugo ' + r.classe;
+      el.querySelector('.val').textContent = r.txt;
+    });
+  });
+  // HOJE (dia produtivo atual, ainda em andamento): mesma taxa do card, % sobre o produzido dela hoje
+  buscarRefugoIntervalo(PRODUCAO_DIA_ATUAL, deslocarDiaISO(PRODUCAO_DIA_ATUAL, 1)).then(refugos=>{
+    LINHAS.forEach(linha=>{
+      const el = document.querySelector(`[data-refugo-hoje="${linha.id}"]`);
+      if (!el) return;
+      const produto = produtoSelecionado(linha.id);
+      el.querySelector('[data-refugo-hoje-produto]').textContent = produto || '—';
+      if (!produto){ el.querySelector('.val').textContent = '—'; return; }
+      const produzido = (PRODUCAO_HOJE[linha.id] || []).filter(r => r.produto === produto).reduce((s,r)=>s+Number(r.peso_kg), 0);
+      const r = textoRefugoOntem(refugos, linha.id, produto, produzido, true);
+      el.className = 'producao-hoje-refugo ' + r.classe;
+      el.title = r.kg ? `Refugo de hoje de ${produto}: ${fmtKg(r.kg)}${produzido ? ` — ${(r.kg/produzido*100).toLocaleString('pt-BR',{maximumFractionDigits:1})}% de ${fmtKg(produzido)} produzidos hoje` : ''}` : `Nenhum refugo de ${produto} apontado hoje`;
       el.querySelector('.val').textContent = r.txt;
     });
   });
@@ -3250,6 +3281,8 @@ function htmlHojeLinha(linhaId){
         <div class="producao-hoje-numero">${fmtKg(total)}<small>${fmtT(total)}</small></div>
       </div>
       ${porRE ? `<div class="producao-hoje-res">${porRE}</div>` : ''}
+      <div class="refugo-espaco"></div>
+      <div class="producao-hoje-refugo" data-refugo-hoje="${linhaId}"><span class="rot">Refugou · <span data-refugo-hoje-produto>${escHtml(produtoSelecionado(linhaId) || '—')}</span></span><span class="val">…</span></div>
     </div>`;
 }
 
@@ -3431,7 +3464,18 @@ const REFUGO_RECENTES_MAX = 30;
 let MOTIVOS_REFUGO = [];      // [{id, nome, ativo, ordem}]
 let REFUGO_RECENTES = [];     // últimos apontamentos (mais novo primeiro)
 let REFUGO_CACHE = {};        // chave de período → registros
-let REFUGO_FORM = { dia:null, linha:null, produto:null, peso:'', motivo:null, lider:null, liderManual:false };
+let REFUGO_FORM = { dia:null, linha:null, produto:null, peso:'', motivo:null, lider:null, liderManual:false, obs:'' };
+// exemplo do campo de observação muda conforme o motivo (o texto é livre)
+const EXEMPLO_OBS_REFUGO = {
+  'Camada baixa': 'ex: camada média 6,8 µm (especificação 10 µm), tambor 3',
+  'Camada alta': 'ex: camada média 12,4 µm (especificação 10 µm)',
+  'Liga fora da especificação': 'ex: liga 82% Cu / 18% Sn (especificação 88 / 12)',
+  'Manchado / oxidado': 'ex: manchas escuras em cerca de 30% das peças',
+  'Queimado': 'ex: peças escurecidas nas bordas, amostra do tambor 2',
+  'Bolha / descascamento': 'ex: descascando após dobra, cerca de 15% das peças',
+  'Peças grudadas': 'ex: blocos de peças coladas no fundo do tambor',
+};
+function exemploObsRefugo(motivo){ return EXEMPLO_OBS_REFUGO[motivo] || 'Descreva o que foi encontrado: valores medidos, quantidade, onde apareceu…'; }
 let LIDERES = []; // colaboradores ativos [{re, nome}] — o inspetor escolhe o líder responsável
 let _refugoRankToken = 0;
 
@@ -3502,10 +3546,11 @@ function renderRefugo(){
         <td>${escHtml(r.produto)}</td>
         <td class="mono apont-num"><strong>${fmtKg(r.peso_kg)}</strong></td>
         <td>${escHtml(r.motivo)}</td>
+        <td class="apont-obs refugo-obs-cel" title="${escHtml(r.observacao || '')}">${escHtml(r.observacao || '')}</td>
         <td>${escHtml(nomeLider(r.lider_re))}</td>
         <td style="color:var(--ink-soft);">${escHtml(r.inspetor_login)}</td>
       </tr>`).join('')
-    : `<tr><td colspan="7" style="text-align:center; color:var(--ink-faint);">Nenhum refugo apontado ainda.</td></tr>`;
+    : `<tr><td colspan="8" style="text-align:center; color:var(--ink-faint);">Nenhum refugo apontado ainda.</td></tr>`;
 
   wrap.innerHTML = `
     <div class="refugo-grid">
@@ -3541,6 +3586,9 @@ function renderRefugo(){
               : `<span class="hint">Cadastre os motivos em Parâmetros</span>`}
           </label>
         </div>
+        <label class="refugo-obs-label"><span>Observação <span class="hint">(opcional — valores medidos, o que foi encontrado)</span></span>
+          <textarea class="param-input refugo-obs" data-refugo-obs maxlength="500" rows="2" placeholder="${escHtml(exemploObsRefugo(f.motivo))}">${escHtml(f.obs)}</textarea>
+        </label>
         <div class="refugo-previsao" data-refugo-previsao>${previsao}</div>
         <button class="btn refugo-btn" data-refugo-registrar style="width:100%;">Registrar refugo</button>
         <div class="quimico-save-msg" id="refugoMsg"></div>
@@ -3549,7 +3597,7 @@ function renderRefugo(){
         <h3 class="param-card-title" style="margin:0 0 10px;">Últimos refugos apontados</h3>
         <div class="apont-scroll">
           <table class="data-table param-table apont-table">
-            <thead><tr><th>Produzido</th><th>Linha</th><th>Produto</th><th style="text-align:right;">Peso</th><th>Motivo</th><th>Líder</th><th>Inspetor</th></tr></thead>
+            <thead><tr><th>Produzido</th><th>Linha</th><th>Produto</th><th style="text-align:right;">Peso</th><th>Motivo</th><th>Observação</th><th>Líder</th><th>Inspetor</th></tr></thead>
             <tbody>${linhasTabela}</tbody>
           </table>
         </div>
@@ -3567,6 +3615,7 @@ function renderRefugo(){
       renderRefugo();
     });
   });
+  wrap.querySelector('[data-refugo-obs]').addEventListener('input', e=>{ f.obs = e.target.value; }); // sem re-render enquanto digita
   wrap.querySelector('[data-refugo-registrar]').addEventListener('click', registrarRefugoClique);
   atualizarRefugoOntem();
   wrap.querySelector('[data-refugo-trocar-senha]').addEventListener('click', trocarSenhaInspetor);
@@ -3584,14 +3633,15 @@ async function registrarRefugoClique(){
   if (!sb){ msg.textContent = 'Sem conexão com o banco — não é possível registrar.'; return; }
   msg.textContent = '';
 
-  const resumo = `${fmtKg(peso)} de ${f.produto} · ${nomeLinhaId(f.linha)} · produzido em ${fmtDataCurtaBR(f.dia)} · ${f.motivo} · líder ${nomeLider(f.lider)}`;
+  const obs = String(f.obs || '').trim().slice(0, 500);
+  const resumo = `${fmtKg(peso)} de ${f.produto} · ${nomeLinhaId(f.linha)} · produzido em ${fmtDataCurtaBR(f.dia)} · ${f.motivo}${obs ? ' (' + (obs.length > 60 ? obs.slice(0,60) + '…' : obs) + ')' : ''} · líder ${nomeLider(f.lider)}`;
   const res = await pedirLoginInspetor({
     titulo: 'Confirmar refugo',
     descricao: resumo,
     aoConfirmar: async (login, senha)=>{
       const { data, error } = await sb.rpc('registrar_refugo', {
         p_login: login, p_senha: senha, p_data: f.dia, p_linha_id: f.linha,
-        p_produto: f.produto, p_peso_kg: peso, p_motivo: f.motivo, p_lider_re: f.lider,
+        p_produto: f.produto, p_peso_kg: peso, p_motivo: f.motivo, p_lider_re: f.lider, p_observacao: obs || null,
       });
       if (error) return { ok:false, erro:'Falha ao registrar: ' + error.message };
       return data;
@@ -3601,11 +3651,11 @@ async function registrarRefugoClique(){
   if (res.lider_re && res.lider_nome) NOME_POR_RE[res.lider_re] = res.lider_nome;
   if (!REFUGO_RECENTES.some(x=>x.id===res.id)){ // o Realtime pode ter chegado antes da resposta
     REFUGO_RECENTES.unshift({ id:res.id, criado_em:new Date().toISOString(), data:f.dia, turno:null, linha_id:f.linha,
-      produto:f.produto, peso_kg:peso, motivo:f.motivo, inspetor_login:res.inspetor_login || res._login, lider_re:res.lider_re });
+      produto:f.produto, peso_kg:peso, motivo:f.motivo, observacao: obs || null, inspetor_login:res.inspetor_login || res._login, lider_re:res.lider_re });
     REFUGO_RECENTES = REFUGO_RECENTES.slice(0, REFUGO_RECENTES_MAX);
   }
   REFUGO_CACHE = {};
-  f.peso = ''; f.motivo = null; f.liderManual = false;
+  f.peso = ''; f.motivo = null; f.liderManual = false; f.obs = '';
   renderRefugo();
   renderRankingRefugo();
   const m2 = document.getElementById('refugoMsg');
