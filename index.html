@@ -1858,7 +1858,8 @@ const STATUS_LABEL = { ok:'Em dia', warn:'Atenção', crit:'Vencida', evento:'Po
 
 function fmtCronometro(iso, agora){
   agora = agora || new Date();
-  const totalMin = Math.floor((agora.getTime() - new Date(iso).getTime()) / 60000);
+  // nunca negativo: item feito DURANTE uma manutenção é mais novo que o relógio congelado do banho
+  const totalMin = Math.max(0, Math.floor((agora.getTime() - new Date(iso).getTime()) / 60000));
   const dias = Math.floor(totalMin / 1440);
   const horas = Math.floor((totalMin % 1440) / 60);
   const min = totalMin % 60;
@@ -1867,7 +1868,7 @@ function fmtCronometro(iso, agora){
 }
 function fmtCronometroCurto(iso, agora){
   agora = agora || new Date();
-  const totalMin = Math.floor((agora.getTime() - new Date(iso).getTime()) / 60000);
+  const totalMin = Math.max(0, Math.floor((agora.getTime() - new Date(iso).getTime()) / 60000));
   const horas = Math.floor(totalMin / 60);
   const min = totalMin % 60;
   return `${horas}h${String(min).padStart(2,'0')}`;
@@ -2259,13 +2260,16 @@ async function despausarBanhoPorClique(linhaId, banho){
   // desloca todas as referências desse banho pra frente pela duração da pausa —
   // é isso que faz continuar "de onde parou" em vez de resetar
   const empurra = iso => iso ? new Date(new Date(iso).getTime() + duracaoMs).toISOString() : iso;
-  BANHO_INICIO[linhaId][banho] = empurra(BANHO_INICIO[linhaId][banho]);
+  // item feito DURANTE a manutenção (ex.: Limpeza de contato com a linha parada): não empurra —
+  // empurrar jogaria a hora para o futuro. Ele começa a contar a partir de agora, quando o banho volta.
+  const ajusta = iso => !iso ? iso : (new Date(iso) >= new Date(pausa.desde) ? agora.toISOString() : empurra(iso));
+  BANHO_INICIO[linhaId][banho] = ajusta(BANHO_INICIO[linhaId][banho]);
   BANHO_TOTAL_INICIO[linhaId][banho] = empurra(BANHO_TOTAL_INICIO[linhaId][banho]);
   BANHO_SAIDA_CALC[linhaId][banho] = empurra(BANHO_SAIDA_CALC[linhaId][banho]);
   const pGranalha = pendenciaDoBanho(linhaId, banho, 'Granalha');
   const pLimpeza = pendenciaDoBanho(linhaId, banho, 'Limpeza de contato');
-  if (pGranalha) pGranalha.ultima = empurra(pGranalha.ultima);
-  if (pLimpeza) pLimpeza.ultima = empurra(pLimpeza.ultima);
+  if (pGranalha) pGranalha.ultima = ajusta(pGranalha.ultima);
+  if (pLimpeza) pLimpeza.ultima = ajusta(pLimpeza.ultima);
   BANHO_PAUSADO[linhaId][banho] = null;
 
   if (sb){
