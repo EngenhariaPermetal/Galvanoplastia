@@ -669,6 +669,45 @@ textarea.refugo-obs{ width:100%; height:auto; min-height:52px; resize:vertical; 
 .nq-rank-retrabalho .refugo-item .ranking-valor strong{ color:#B25000; }
 .nq-rank-retrabalho .refugo-item .ranking-barra > div{ background:#FFC680; }
 .nq-rank-retrabalho .refugo-item.primeiro .ranking-barra > div{ background:#FF9500; }
+
+/* ---------- aba Qualidade ---------- */
+main:has(#view-qualidade.active){ max-width:1800px; }
+.q-filtros{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+.q-imprimir{ margin-left:auto; }
+.q-base{ font-size:12.5px; color:var(--ink-soft); margin:2px 0 14px; }
+.q-kpis{ display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:14px; margin-bottom:16px; }
+@media (max-width:1300px){ .q-kpis{ grid-template-columns:repeat(3, minmax(0,1fr)); } }
+@media (max-width:700px){ .q-kpis{ grid-template-columns:repeat(2, minmax(0,1fr)); } }
+.qk{ padding:16px 18px; border-top:4px solid var(--qk) !important; }
+.qk-titulo{ font-size:12.5px; font-weight:600; color:var(--ink-soft); }
+.qk-valor{ font-size:32px; font-weight:800; letter-spacing:-.025em; color:var(--qk); line-height:1.15; margin-top:4px; font-variant-numeric:tabular-nums; }
+.qk-sub{ font-size:12px; color:var(--ink-soft); margin-top:2px; }
+.qk-delta{ display:inline-block; margin-top:8px; font-size:11.5px; font-weight:700; padding:2px 8px; border-radius:6px; }
+.qk-delta.bom{ background:#E8F7EC; color:#248A3D; } .qk-delta.ruim{ background:#FFE9E7; color:#D70015; } .qk-delta.neutro{ background:rgba(118,118,128,.1); color:var(--ink-soft); font-weight:500; }
+.q-card{ padding:18px; margin-bottom:16px; }
+.q-card-titulo{ font-size:15px; font-weight:700; margin:0 0 12px; letter-spacing:-.01em; }
+.q-dica{ font-size:12px; font-weight:400; color:var(--ink-soft); }
+.q-grid2{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:16px; }
+.q-grid2 > .q-card{ margin-bottom:16px; }
+@media (max-width:1100px){ .q-grid2{ grid-template-columns:1fr; } }
+.q-chart{ position:relative; height:300px; }
+.q-insights ul{ margin:0; padding:0; list-style:none; display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px 24px; }
+@media (max-width:1000px){ .q-insights ul{ grid-template-columns:1fr; } }
+.q-insights li{ font-size:13.5px; line-height:1.4; padding-left:16px; position:relative; }
+.q-insights li::before{ content:''; position:absolute; left:0; top:6px; width:8px; height:8px; border-radius:50%; background:#8E8E93; }
+.q-insights li.bom::before{ background:#34C759; } .q-insights li.ruim::before{ background:#FF3B30; }
+.q-tabela th.num, .q-tabela td.num{ text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.q-barra-cel{ min-width:170px; }
+.q-barra-cel span{ font-size:12px; font-weight:700; margin-left:8px; font-variant-numeric:tabular-nums; }
+.q-barra{ display:inline-flex; vertical-align:middle; width:110px; height:8px; border-radius:4px; background:rgba(118,118,128,.14); overflow:hidden; }
+.q-barra > div{ height:100%; }
+@media print{
+  .topnav, .q-filtros, .tab-btn{ display:none !important; }
+  body{ background:#fff; } .card{ box-shadow:none !important; border:1px solid #E5E5EA !important; break-inside:avoid; }
+  main{ max-width:none !important; padding:0 !important; }
+  .view:not(#view-qualidade){ display:none !important; }
+  .q-chart{ height:240px; }
+}
 @media (prefers-reduced-motion: reduce){ *{ animation:none !important; } }
 </style>
 </head>
@@ -688,6 +727,7 @@ textarea.refugo-obs{ width:100%; height:auto; min-height:52px; resize:vertical; 
     <button class="tab-btn active" data-view="painel">Painel</button>
     <button class="tab-btn" data-view="pendencias">Pendências</button>
     <button class="tab-btn" data-view="producao">Produção</button>
+    <button class="tab-btn" data-view="qualidade">Qualidade</button>
     <button class="tab-btn" data-view="parametros">Parâmetros</button>
     <button class="tab-btn tv-btn" data-view="tv">▶ Modo TV</button>
   </div>
@@ -781,6 +821,11 @@ textarea.refugo-obs{ width:100%; height:auto; min-height:52px; resize:vertical; 
   </div>
 
   <!-- ============ VIEW: PRODUÇÃO ============ -->
+  <div class="view" id="view-qualidade">
+    <h2 class="section-title">Indicadores de qualidade <span style="font-size:13px; font-weight:500; color:var(--ink-soft);">(produção × não qualidade apontada pelos inspetores · refugo, retrabalho e aprovação condicional)</span></h2>
+    <div id="qualidadeWrap"></div>
+  </div>
+
   <div class="view" id="view-producao">
     <h2 class="section-title">Produção diária · por linha e turno <span style="font-size:13px; font-weight:500; color:var(--ink-soft);">(dia produtivo <span id="producaoViradaTxt">07h30 → 07h30</span>)</span></h2>
     <div id="producaoWrap" class="quimicos-grid"></div>
@@ -1206,6 +1251,7 @@ function configurarRealtime(){
     .on('postgres_changes', { event:'INSERT', schema:'public', table:'apontamentos_producao' }, payload => {
       const r = payload.new;
       if (!r) return;
+      agendarRenderQualidade(); // aba Qualidade aberta: atualiza os indicadores
       if (diaDoRegistro(r) !== diaProdutivoISO()) return; // só nos importa o dia produtivo atual (07h→07h)
       if (!PRODUCAO_HOJE[r.linha_id]) PRODUCAO_HOJE[r.linha_id] = [];
       if (PRODUCAO_HOJE[r.linha_id].some(x=>x.id===r.id)) return; // já temos esse registro (inserido por esta mesma tela) — não duplica
@@ -1235,6 +1281,8 @@ function configurarRealtime(){
         });
       }
       if (document.getElementById('view-producao').classList.contains('active')){ renderRefugo(); renderRankingRefugo(); }
+      if (QUAL_INICIO === null || (QUAL_INICIO && String(r.data).slice(0,10) < QUAL_INICIO)) QUAL_INICIO = undefined; // recalcula o início
+      agendarRenderQualidade();
     })
     .on('postgres_changes', { event:'*', schema:'public', table:'motivos_refugo' }, payload => {
       if (payload.eventType === 'DELETE'){ MOTIVOS_REFUGO = MOTIVOS_REFUGO.filter(m=>m.id!==payload.old.id); }
@@ -4132,6 +4180,371 @@ async function renderParamRefugo(){
     : 'Nenhum inspetor cadastrado ainda.';
 }
 
+// =========================================================================
+// INDICADORES DE QUALIDADE — cálculo (funções puras, testadas em node)
+// Base: produção apontada × não qualidade apontada pelos inspetores
+// (refugo, retrabalho, aprovação condicional), por DIA PRODUTIVO.
+// =========================================================================
+
+// Agrupa tudo o que a tela precisa a partir dos registros brutos.
+// prod: [{dia, linha_id, produto, peso_kg, colaborador_re}]  (produção)
+// nq:   [{data, linha_id, produto, peso_kg, categoria, motivo, lider_re, inspetor_login}]
+// filtro: {linha, produto} ('' = todos) · base: {de, ate} (dias produtivos ISO, ate exclusivo)
+function calcularQualidade(prod, nq, filtro, base){
+  filtro = filtro || {};
+  const dentro = d => d >= base.de && d < base.ate;
+  const passa = r => (!filtro.linha || r.linha_id === filtro.linha) && (!filtro.produto || r.produto === filtro.produto);
+  const P = (prod || []).filter(r => dentro(r.dia) && passa(r));
+  const N = (nq || []).filter(r => dentro(String(r.data).slice(0,10)) && passa(r));
+  const soma = (arr) => arr.reduce((s,r)=>s+Number(r.peso_kg), 0);
+  const cat = r => r.categoria || 'refugo';
+
+  const produzido = soma(P);
+  const porCat = { refugo:0, retrabalho:0, condicional:0 };
+  N.forEach(r => { porCat[cat(r)] += Number(r.peso_kg); });
+  const nqTotal = porCat.refugo + porCat.retrabalho + porCat.condicional;
+  const pct = v => produzido ? v / produzido * 100 : null;
+
+  // por dimensão (linha / produto / líder): produzido × não qualidade
+  function porDimensao(chaveProd, chaveNq){
+    const m = {};
+    const pega = k => m[k] || (m[k] = { chave:k, produzido:0, refugo:0, retrabalho:0, condicional:0 });
+    P.forEach(r => { const k = r[chaveProd]; if (k) pega(k).produzido += Number(r.peso_kg); });
+    N.forEach(r => { const k = r[chaveNq]; if (k) pega(k)[cat(r)] += Number(r.peso_kg); });
+    return Object.values(m).map(x => {
+      const nqx = x.refugo + x.retrabalho + x.condicional;
+      return { ...x, nq: nqx, pctNq: x.produzido ? nqx / x.produzido * 100 : null,
+               fpy: x.produzido ? Math.max(0, (x.produzido - nqx) / x.produzido * 100) : null };
+    });
+  }
+
+  // por dia (tendência)
+  const dias = [];
+  for (let d = base.de; d < base.ate; d = proximoDiaISO(d)) dias.push(d);
+  const porDia = dias.map(d => {
+    const pd = soma(P.filter(r => r.dia === d));
+    const nd = N.filter(r => String(r.data).slice(0,10) === d);
+    const c = { refugo:0, retrabalho:0, condicional:0 }; nd.forEach(r => { c[cat(r)] += Number(r.peso_kg); });
+    const t = c.refugo + c.retrabalho + c.condicional;
+    return { dia:d, produzido:pd, ...c, nq:t, pctNq: pd ? t / pd * 100 : null };
+  });
+
+  // motivos (Pareto) — total e por categoria
+  const mot = {};
+  N.forEach(r => {
+    const x = mot[r.motivo] || (mot[r.motivo] = { motivo:r.motivo, total:0, refugo:0, retrabalho:0, condicional:0, produtos:{}, linhas:{} });
+    x.total += Number(r.peso_kg); x[cat(r)] += Number(r.peso_kg);
+    x.produtos[r.produto] = (x.produtos[r.produto] || 0) + Number(r.peso_kg);
+    x.linhas[r.linha_id] = (x.linhas[r.linha_id] || 0) + Number(r.peso_kg);
+  });
+  let acum = 0;
+  const pareto = Object.values(mot).sort((a,b)=>b.total-a.total).map(x => {
+    acum += x.total;
+    return { ...x, pctDoNq: nqTotal ? x.total / nqTotal * 100 : 0, acumulado: nqTotal ? acum / nqTotal * 100 : 0 };
+  });
+
+  // inspetores (atividade)
+  const insp = {};
+  N.forEach(r => { const k = r.inspetor_login || '—'; const x = insp[k] || (insp[k] = { inspetor:k, n:0, kg:0 }); x.n++; x.kg += Number(r.peso_kg); });
+
+  return {
+    produzido, ...porCat, nqTotal, nApont: N.length,
+    pctRefugo: pct(porCat.refugo), pctRetrabalho: pct(porCat.retrabalho), pctCondicional: pct(porCat.condicional),
+    pctNq: pct(nqTotal), fpy: produzido ? Math.max(0, (produzido - nqTotal) / produzido * 100) : null,
+    porDia, pareto,
+    porLinha: porDimensao('linha_id', 'linha_id'),
+    porProduto: porDimensao('produto', 'produto'),
+    porLider: porDimensao('colaborador_re', 'lider_re'),
+    porInspetor: Object.values(insp).sort((a,b)=>b.n-a.n),
+    diasComProducao: porDia.filter(d => d.produzido > 0).length,
+  };
+}
+function proximoDiaISO(d){ const [y,m,dd] = d.split('-').map(Number); const x = new Date(Date.UTC(y, m-1, dd+1)); return x.toISOString().slice(0,10); }
+
+// variação em pontos percentuais (pp) entre dois índices; null se não há base
+function deltaPP(atual, anterior){ return (atual == null || anterior == null) ? null : atual - anterior; }
+
+// "leitura para a diretoria": frases geradas a partir dos números
+// minShare: participação mínima na produção para um item entrar em "pior linha/taxa" (evita base pequena)
+function gerarInsights(q, qAnt, nomeLinha, minShare){
+  minShare = minShare == null ? 0.05 : minShare;
+  const f1 = v => v.toLocaleString('pt-BR', { maximumFractionDigits:1 });
+  const out = [];
+  if (!q.produzido){ out.push({ tipo:'neutro', txt:'Sem produção apontada no período/filtro escolhido.' }); return out; }
+  // 1) FPY e variação
+  const dFpy = qAnt ? deltaPP(q.fpy, qAnt.fpy) : null;
+  out.push({ tipo: dFpy == null ? 'neutro' : dFpy >= 0 ? 'bom' : 'ruim',
+    txt: `Aprovado de primeira (FPY) em ${f1(q.fpy)}%` + (dFpy == null ? ' — sem período anterior com inspeção para comparar.' :
+      ` — ${dFpy >= 0 ? 'melhora' : 'piora'} de ${f1(Math.abs(dFpy))} pp sobre o período anterior.`) });
+  if (!q.nqTotal){ out.push({ tipo:'bom', txt:'Nenhuma não qualidade apontada no período.' }); return out; }
+  // 2) categoria predominante
+  const cats = [['refugo','refugo'],['retrabalho','retrabalho'],['condicional','aprovação condicional']].map(([k,n])=>({k,n,v:q[k]})).sort((a,b)=>b.v-a.v);
+  out.push({ tipo:'neutro', txt:`${cats[0].n[0].toUpperCase()+cats[0].n.slice(1)} é a maior parcela: ${f1(cats[0].v/q.nqTotal*100)}% de toda a não qualidade (${f1(cats[0].v/1000)} t).` });
+  // 3) maior ofensor (motivo) e onde se concentra
+  const top = q.pareto[0];
+  const prodTop = Object.entries(top.produtos).sort((a,b)=>b[1]-a[1])[0];
+  const linTop = Object.entries(top.linhas).sort((a,b)=>b[1]-a[1])[0];
+  out.push({ tipo:'ruim', txt:`Maior ofensor: "${top.motivo}" — ${f1(top.pctDoNq)}% da não qualidade, ${f1(prodTop[1]/top.total*100)}% dela em ${prodTop[0]} (${nomeLinha(linTop[0])}).` });
+  // 4) Pareto: quantos motivos explicam 80%
+  const n80 = q.pareto.findIndex(x => x.acumulado >= 80) + 1;
+  if (q.pareto.length > 3 && n80 > 0 && n80 < q.pareto.length) out.push({ tipo:'neutro', txt:`${n80} de ${q.pareto.length} motivos explicam 80% da perda — atacar esses primeiro.` });
+  // 5) pior linha / taxa (com base mínima de produção)
+  const pior = (lista, rotulo, nome) => {
+    const ok = lista.filter(x => x.produzido >= q.produzido * minShare && x.pctNq != null).sort((a,b)=>b.pctNq-a.pctNq);
+    if (ok.length > 1 && ok[0].pctNq > 0) out.push({ tipo:'ruim', txt:`${rotulo} com maior índice: ${nome(ok[0].chave)}, ${f1(ok[0].pctNq)}% de não qualidade (média geral ${f1(q.pctNq)}%).` });
+  };
+  pior(q.porLinha, 'Linha', nomeLinha);
+  pior(q.porProduto, 'Taxa', x => x);
+  // 6) tendência recente: últimos 7 dias × período
+  const ult = q.porDia.slice(-7).filter(d => d.produzido > 0);
+  const p7 = ult.reduce((s,d)=>s+d.produzido,0), n7 = ult.reduce((s,d)=>s+d.nq,0);
+  if (q.porDia.length > 10 && p7){
+    const i7 = n7 / p7 * 100, dif = i7 - q.pctNq;
+    if (Math.abs(dif) >= 0.5) out.push({ tipo: dif > 0 ? 'ruim' : 'bom', txt:`Últimos 7 dias: índice de ${f1(i7)}%, ${dif > 0 ? 'acima' : 'abaixo'} da média do período (${f1(q.pctNq)}%).` });
+  }
+  return out;
+}
+
+// =========================================================================
+// INDICADORES DE QUALIDADE — tela
+// =========================================================================
+let QUAL = { periodo:'mes', linha:'', produto:'' };
+let QUAL_INICIO = undefined;          // 1º dia com apontamento de qualidade (null = nenhum ainda)
+let QUAL_CHARTS = [];
+let _qualToken = 0, _qualTimer = null;
+
+async function inicioApontamentoQualidade(){
+  if (QUAL_INICIO !== undefined) return QUAL_INICIO;
+  if (!sb) return (QUAL_INICIO = null);
+  const { data, error } = await sb.from('apontamentos_refugo').select('data').order('data', { ascending:true }).limit(1);
+  QUAL_INICIO = (!error && data && data[0]) ? String(data[0].data).slice(0,10) : null;
+  return QUAL_INICIO;
+}
+
+// produção por intervalo de DIAS PRODUTIVOS (ate exclusivo), paginada
+async function buscarProducaoIntervalo(deISO, ateISO){
+  if (!sb || deISO >= ateISO) return [];
+  const passo = 1000; let de = 0; const todos = [];
+  while (true){
+    const { data, error } = await sb.from('apontamentos_producao')
+      .select('data,linha_id,produto,peso_kg,colaborador_re,criado_em')
+      .gte('criado_em', inicioDiaProdutivo(deISO).toISOString())
+      .lt('criado_em', inicioDiaProdutivo(ateISO).toISOString())
+      .order('criado_em', { ascending:true }).range(de, de + passo - 1);
+    if (error){ console.error('Falha ao buscar produção:', error); break; }
+    (data || []).forEach(r => { r.dia = diaDoRegistro(r); });
+    todos.push(...(data || []));
+    if (!data || data.length < passo) break;
+    de += passo;
+  }
+  return todos;
+}
+
+function periodosQualidade(){
+  const hoje = PRODUCAO_DIA_ATUAL, amanha = deslocarDiaISO(hoje, 1);
+  const mesVig = mesDoDiaISO(hoje), mesAnt = deslocarMes(mesVig, -1);
+  return {
+    mes:    { rot:`Mês vigente · ${nomeMes(mesVig)}`, de: mesVig+'-01', ate: amanha },
+    mesant: { rot:`Mês anterior · ${nomeMes(mesAnt)}`, de: mesAnt+'-01', ate: mesVig+'-01' },
+    d30:    { rot:'Últimos 30 dias', de: deslocarDiaISO(hoje, -29), ate: amanha },
+    d90:    { rot:'Últimos 90 dias', de: deslocarDiaISO(hoje, -89), ate: amanha },
+  };
+}
+function diasEntre(de, ate){ let n = 0; for (let d = de; d < ate; d = proximoDiaISO(d)) n++; return n; }
+
+const qF1 = v => v == null ? '—' : v.toLocaleString('pt-BR', { maximumFractionDigits:1 });
+const qPct = v => v == null ? '—' : `${qF1(v)}%`;
+
+function htmlKpi(titulo, valor, sub, delta, menorMelhor, cor){
+  let dHtml = '<span class="qk-delta neutro">sem base anterior</span>';
+  if (delta != null){
+    const bom = menorMelhor ? delta <= 0 : delta >= 0;
+    const seta = Math.abs(delta) < 0.05 ? '→' : delta > 0 ? '▲' : '▼';
+    dHtml = `<span class="qk-delta ${Math.abs(delta) < 0.05 ? 'neutro' : bom ? 'bom' : 'ruim'}">${seta} ${qF1(Math.abs(delta))} pp vs anterior</span>`;
+  }
+  return `<div class="card qk" style="--qk:${cor || 'var(--ink)'}">
+    <div class="qk-titulo">${titulo}</div>
+    <div class="qk-valor">${valor}</div>
+    <div class="qk-sub">${sub}</div>
+    ${delta === undefined ? '' : dHtml}
+  </div>`;
+}
+
+function htmlTabelaDim(titulo, lista, nome, vazio){
+  const ord = lista.filter(x => x.produzido > 0 || x.nq > 0).sort((a,b)=> (b.pctNq ?? -1) - (a.pctNq ?? -1) || b.nq - a.nq);
+  if (!ord.length) return `<div class="card q-card"><h3 class="q-card-titulo">${titulo}</h3><div class="relatorio-vazio">${vazio}</div></div>`;
+  const maxPct = Math.max(1, ...ord.map(x => x.pctNq || 0));
+  const linhas = ord.map(x => {
+    const p = x.pctNq;
+    const seg = c => x.produzido ? `<div style="width:${x[c]/x.produzido*100/maxPct*100}%; background:${catNQ(c).cor};"></div>` : '';
+    return `<tr>
+      <td><strong>${escHtml(nome(x.chave))}</strong></td>
+      <td class="num">${fmtT(x.produzido)}</td>
+      <td class="num" style="color:#D70015;">${x.refugo ? fmtKg(x.refugo) : '—'}</td>
+      <td class="num" style="color:#B25000;">${x.retrabalho ? fmtKg(x.retrabalho) : '—'}</td>
+      <td class="num" style="color:#8A6500;">${x.condicional ? fmtKg(x.condicional) : '—'}</td>
+      <td class="q-barra-cel"><div class="q-barra">${seg('refugo')}${seg('retrabalho')}${seg('condicional')}</div><span>${x.produzido ? qPct(p) : 'sem produção'}</span></td>
+      <td class="num"><strong>${x.fpy == null ? '—' : qPct(x.fpy)}</strong></td>
+    </tr>`;
+  }).join('');
+  return `<div class="card q-card"><h3 class="q-card-titulo">${titulo}</h3>
+    <div class="apont-scroll" style="max-height:none;"><table class="data-table param-table q-tabela">
+      <thead><tr><th></th><th class="num">Produzido</th><th class="num">Refugo</th><th class="num">Retrabalho</th><th class="num">Cond.</th><th>Índice NQ</th><th class="num">FPY</th></tr></thead>
+      <tbody>${linhas}</tbody></table></div></div>`;
+}
+
+// mapa de árvore: categoria (cor da categoria) → motivo (tons dela)
+function svgTreemapQualidade(q){
+  const W = 1000, H = 380, CAB = 22;
+  const grupos = CATEGORIAS_NQ.map(c => ({ nome:c.nome, id:c.id, valor:q[c.id],
+    filhos: q.pareto.filter(m => m[c.id] > 0).map(m => ({ nome:m.motivo, valor:m[c.id] })) })).filter(g => g.valor > 0);
+  const pct = v => `${(v/q.nqTotal*100).toLocaleString('pt-BR',{maximumFractionDigits:1})}%`;
+  let svg = `<svg class="mapa-refugo-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Mapa de não qualidade por categoria e motivo">`;
+  squarify(grupos, 0, 0, W, H).forEach(g => {
+    const c = catNQ(g.id), pal = PALETAS_NQ[g.id], pad = 2;
+    const txtCab = g.id === 'condicional' ? '#6B4F00' : c.texto, txtFilho = g.id === 'condicional' ? '#3D2E00' : '#fff';
+    const gx = g.x+pad, gy = g.y+pad, gw = Math.max(0, g.w-pad*2), gh = Math.max(0, g.h-pad*2);
+    svg += `<g><title>${escHtml(g.nome)} · ${fmtKg(g.valor)} · ${pct(g.valor)} da não qualidade</title>`;
+    svg += `<rect x="${gx}" y="${gy}" width="${gw}" height="${gh}" rx="8" fill="${c.cor}" fill-opacity=".14"></rect>`;
+    const temCab = gh > CAB + 16 && gw > 60;
+    if (temCab){
+      const maxCh = Math.floor((gw - 16) / 7.6);
+      let rot = `${g.nome} · ${fmtT(g.valor)} · ${pct(g.valor)}`;
+      if (rot.length > maxCh) rot = g.nome.length > maxCh ? g.nome.slice(0, Math.max(3,maxCh-1)) + '…' : g.nome;
+      svg += `<text class="mapa-motivo" x="${gx+8}" y="${gy+15}" fill="${txtCab}">${escHtml(rot)}</text>`;
+    }
+    const top = temCab ? CAB : 0;
+    squarify(g.filhos, gx+3, gy+top+2, gw-6, gh-top-5).forEach((f, i) => {
+      svg += `<g><title>${escHtml(g.nome)} → ${escHtml(f.nome)} · ${fmtKg(f.valor)} (${pct(f.valor)} da não qualidade)</title>`;
+      svg += `<rect x="${f.x+1}" y="${f.y+1}" width="${Math.max(0,f.w-2)}" height="${Math.max(0,f.h-2)}" rx="6" fill="${pal[i % pal.length]}"></rect>`;
+      if (f.w > 64 && f.h > 34){
+        const maxCh = Math.floor((f.w - 14) / 7.4);
+        const nome = f.nome.length > maxCh ? f.nome.slice(0, Math.max(2,maxCh-1)) + '…' : f.nome;
+        svg += `<text class="mapa-filho" x="${f.x+8}" y="${f.y+18}" style="fill:${txtFilho}">${escHtml(nome)}</text>`;
+        svg += `<text class="mapa-filho-kg" x="${f.x+8}" y="${f.y+33}" style="fill:${txtFilho}; opacity:.9">${fmtKg(f.valor)}</text>`;
+      }
+      svg += `</g>`;
+    });
+    svg += `</g>`;
+  });
+  return svg + `</svg>`;
+}
+
+function agendarRenderQualidade(){ // tempo real: junta várias mudanças seguidas num redesenho só
+  if (!document.getElementById('view-qualidade') || !document.getElementById('view-qualidade').classList.contains('active')) return;
+  clearTimeout(_qualTimer); _qualTimer = setTimeout(renderQualidade, 1500);
+}
+
+async function renderQualidade(){
+  const wrap = document.getElementById('qualidadeWrap');
+  if (!wrap) return;
+  const token = ++_qualToken;
+  const periodos = periodosQualidade();
+  const p = periodos[QUAL.periodo] || periodos.mes;
+  const produtos = [...new Set(LINHAS.flatMap(l => produtosDaLinha(l.id)))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  const filtrosHtml = `
+    <div class="q-filtros">
+      <div class="mapa-seg">${Object.entries(periodos).map(([k,v])=>`<button type="button" class="${k===QUAL.periodo?'ativo':''}" data-q-periodo="${k}">${v.rot}</button>`).join('')}</div>
+      <select class="param-input" data-q-filtro="linha" style="width:150px;"><option value="">Todas as linhas</option>${LINHAS.map(l=>`<option value="${l.id}" ${l.id===QUAL.linha?'selected':''}>${l.nome}</option>`).join('')}</select>
+      <select class="param-input" data-q-filtro="produto" style="width:170px;"><option value="">Todas as taxas</option>${produtos.map(x=>`<option value="${escHtml(x)}" ${x===QUAL.produto?'selected':''}>${escHtml(x)}</option>`).join('')}</select>
+      <button type="button" class="btn small q-imprimir" data-q-imprimir>Imprimir / PDF</button>
+    </div>`;
+  if (!wrap.querySelector('.q-filtros')) wrap.innerHTML = filtrosHtml + `<div class="q-corpo"><div class="relatorio-vazio">Carregando indicadores…</div></div>`;
+  else { wrap.querySelector('.q-filtros').outerHTML = filtrosHtml; }
+  wrap.querySelectorAll('[data-q-periodo]').forEach(b=>b.addEventListener('click', ()=>{ QUAL.periodo = b.dataset.qPeriodo; renderQualidade(); }));
+  wrap.querySelectorAll('[data-q-filtro]').forEach(s=>s.addEventListener('change', ()=>{ QUAL[s.dataset.qFiltro] = s.value; renderQualidade(); }));
+  wrap.querySelector('[data-q-imprimir]').addEventListener('click', ()=>window.print());
+  const corpo = wrap.querySelector('.q-corpo');
+
+  const inicio = await inicioApontamentoQualidade();
+  if (token !== _qualToken) return;
+  if (!inicio){ corpo.innerHTML = `<div class="card q-card"><div class="relatorio-vazio">Ainda não há apontamentos de qualidade. Os indicadores aparecem a partir do primeiro apontamento dos inspetores.</div></div>`; return; }
+
+  // base: só produção a partir do 1º apontamento de qualidade (antes não havia inspeção registrada)
+  const de = p.de > inicio ? p.de : inicio, ate = p.ate;
+  if (de >= ate){ corpo.innerHTML = `<div class="card q-card"><div class="relatorio-vazio">O apontamento de qualidade começou em ${fmtDataCurtaBR(inicio)} — esse período é anterior e não tem inspeção registrada.</div></div>`; return; }
+  const n = diasEntre(de, ate);
+  const deAnt = deslocarDiaISO(de, -n) > inicio ? deslocarDiaISO(de, -n) : inicio, ateAnt = de;
+  const temAnt = deAnt < ateAnt;
+
+  const [prod, nq, prodAnt, nqAnt] = await Promise.all([
+    buscarProducaoIntervalo(de, ate), buscarRefugoIntervalo(de, ate),
+    temAnt ? buscarProducaoIntervalo(deAnt, ateAnt) : [], temAnt ? buscarRefugoIntervalo(deAnt, ateAnt) : [],
+  ]);
+  if (token !== _qualToken) return;
+  const filtro = { linha:QUAL.linha, produto:QUAL.produto };
+  const q = calcularQualidade(prod, nq, filtro, { de, ate });
+  const qa = temAnt ? calcularQualidade(prodAnt, nqAnt, filtro, { de:deAnt, ate:ateAnt }) : null;
+  const qaOk = qa && qa.produzido > 0 ? qa : null;
+  const d = (a, b) => qaOk ? deltaPP(a, b) : null;
+  const insights = gerarInsights(q, qaOk, nomeLinhaId);
+  const baseTxt = `Base: ${fmtDataCurtaBR(de)} a ${fmtDataCurtaBR(deslocarDiaISO(ate,-1))} (${n} dia${n>1?'s':''} produtivo${n>1?'s':''}${de > p.de ? `, a partir do início dos apontamentos de qualidade em ${fmtDataCurtaBR(inicio)}` : ''})` +
+    (qaOk ? ` · comparado com ${fmtDataCurtaBR(deAnt)} a ${fmtDataCurtaBR(deslocarDiaISO(ateAnt,-1))}` : ' · sem período anterior com inspeção para comparar') +
+    `${QUAL.linha ? ' · ' + nomeLinhaId(QUAL.linha) : ''}${QUAL.produto ? ' · ' + escHtml(QUAL.produto) : ''}`;
+
+  corpo.innerHTML = `
+    <div class="q-base">${baseTxt}</div>
+    <div class="q-kpis">
+      ${htmlKpi('Produzido', fmtT(q.produzido), `${fmtKg(q.produzido)} em ${q.diasComProducao} dia${q.diasComProducao===1?'':'s'} com produção`, undefined)}
+      ${htmlKpi('Aprovado de primeira (FPY)', qPct(q.fpy), `${fmtT(Math.max(0, q.produzido - q.nqTotal))} sem nenhum desvio`, d(q.fpy, qaOk && qaOk.fpy), false, '#248A3D')}
+      ${htmlKpi('Índice de não qualidade', qPct(q.pctNq), `${fmtT(q.nqTotal)} em ${q.nApont} apontamento${q.nApont===1?'':'s'}`, d(q.pctNq, qaOk && qaOk.pctNq), true, '#1D1D1F')}
+      ${htmlKpi('Refugo', qPct(q.pctRefugo), fmtT(q.refugo), d(q.pctRefugo, qaOk && qaOk.pctRefugo), true, catNQ('refugo').texto)}
+      ${htmlKpi('Retrabalho', qPct(q.pctRetrabalho), fmtT(q.retrabalho), d(q.pctRetrabalho, qaOk && qaOk.pctRetrabalho), true, catNQ('retrabalho').texto)}
+      ${htmlKpi('Aprovação condicional', qPct(q.pctCondicional), fmtT(q.condicional), d(q.pctCondicional, qaOk && qaOk.pctCondicional), true, catNQ('condicional').texto)}
+    </div>
+    <div class="card q-card q-insights">
+      <h3 class="q-card-titulo">Leitura para a diretoria</h3>
+      <ul>${insights.map(i => `<li class="${i.tipo}">${escHtml(i.txt)}</li>`).join('')}</ul>
+    </div>
+    <div class="q-grid2">
+      <div class="card q-card"><h3 class="q-card-titulo">Tendência diária · não qualidade (kg) e índice (%)</h3><div class="q-chart"><canvas id="qChartTendencia"></canvas></div></div>
+      <div class="card q-card"><h3 class="q-card-titulo">Pareto de motivos · kg e % acumulado</h3><div class="q-chart"><canvas id="qChartPareto"></canvas></div></div>
+    </div>
+    <div class="card q-card"><h3 class="q-card-titulo">Mapa da não qualidade · categoria → motivo <span class="q-dica">(tamanho = kg)</span></h3>
+      ${q.nqTotal ? `<div class="mapa-refugo-arvore" style="aspect-ratio:1000/380;">${svgTreemapQualidade(q)}</div>` : '<div class="relatorio-vazio">Nenhuma não qualidade apontada no período.</div>'}
+    </div>
+    <div class="q-grid2">
+      ${htmlTabelaDim('Qualidade por linha', q.porLinha, nomeLinhaId, 'Sem dados.')}
+      ${htmlTabelaDim('Qualidade por taxa (produto)', q.porProduto, x => x, 'Sem dados.')}
+    </div>
+    <div class="q-grid2">
+      ${htmlTabelaDim('Qualidade por líder <span class="q-dica">(não qualidade atribuída × o que o líder produziu)</span>', q.porLider, nomeLider, 'Sem dados.')}
+      <div class="card q-card"><h3 class="q-card-titulo">Atividade dos inspetores</h3>
+        ${q.porInspetor.length ? `<table class="data-table param-table q-tabela"><thead><tr><th>Inspetor</th><th class="num">Apontamentos</th><th class="num">Peso apontado</th></tr></thead>
+        <tbody>${q.porInspetor.map(i=>`<tr><td><strong>${escHtml(i.inspetor)}</strong></td><td class="num">${i.n}</td><td class="num">${fmtKg(i.kg)}</td></tr>`).join('')}</tbody></table>` : '<div class="relatorio-vazio">Sem apontamentos no período.</div>'}
+        <div class="q-dica" style="margin-top:8px;">Quantos desvios cada inspetor registrou — ajuda a ver se a inspeção está acontecendo nos dois turnos.</div>
+      </div>
+    </div>`;
+
+  // gráficos (Chart.js)
+  QUAL_CHARTS.forEach(c => c.destroy()); QUAL_CHARTS = [];
+  if (typeof Chart === 'undefined') return;
+  const fonte = { family: getComputedStyle(document.body).fontFamily, size: 11 };
+  const ds = c => ({ type:'bar', label:catNQ(c).nome, backgroundColor:catNQ(c).cor, stack:'nq', yAxisID:'y', borderRadius:3, order:2 });
+  const tend = document.getElementById('qChartTendencia');
+  if (tend) QUAL_CHARTS.push(new Chart(tend, {
+    data: { labels: q.porDia.map(x => fmtDataCurtaBR(x.dia)), datasets: [
+      ...['refugo','retrabalho','condicional'].map(c => ({ ...ds(c), data: q.porDia.map(x => x[c] || 0) })),
+      { type:'line', label:'Índice NQ (%)', data: q.porDia.map(x => x.pctNq == null ? null : +x.pctNq.toFixed(2)), borderColor:'#1D1D1F', backgroundColor:'#1D1D1F', yAxisID:'y2', tension:.25, spanGaps:true, pointRadius:3, order:1 },
+    ]},
+    options: { responsive:true, maintainAspectRatio:false, interaction:{ mode:'index', intersect:false },
+      plugins:{ legend:{ position:'bottom', labels:{ usePointStyle:true, boxWidth:8, font:fonte } }, datalabels:{ display:false } },
+      scales:{ x:{ stacked:true, ticks:{ font:fonte } }, y:{ stacked:true, title:{ display:true, text:'kg', font:fonte }, ticks:{ font:fonte } },
+               y2:{ position:'right', grid:{ drawOnChartArea:false }, title:{ display:true, text:'% do produzido', font:fonte }, ticks:{ font:fonte, callback:v => v + '%' }, beginAtZero:true } } }
+  }));
+  const par = document.getElementById('qChartPareto');
+  if (par) QUAL_CHARTS.push(new Chart(par, {
+    data: { labels: q.pareto.map(x => x.motivo), datasets: [
+      ...['refugo','retrabalho','condicional'].map(c => ({ ...ds(c), data: q.pareto.map(x => x[c] || 0) })),
+      { type:'line', label:'% acumulado', data: q.pareto.map(x => +x.acumulado.toFixed(1)), borderColor:'#1D1D1F', backgroundColor:'#1D1D1F', yAxisID:'y2', tension:0, pointRadius:3, order:1 },
+    ]},
+    options: { responsive:true, maintainAspectRatio:false, interaction:{ mode:'index', intersect:false },
+      plugins:{ legend:{ position:'bottom', labels:{ usePointStyle:true, boxWidth:8, font:fonte } }, datalabels:{ display:false } },
+      scales:{ x:{ stacked:true, ticks:{ font:fonte, maxRotation:35, minRotation:0 } }, y:{ stacked:true, title:{ display:true, text:'kg', font:fonte }, ticks:{ font:fonte } },
+               y2:{ position:'right', min:0, max:100, grid:{ drawOnChartArea:false }, ticks:{ font:fonte, callback:v => v + '%' } } } }
+  }));
+}
+
 // Virada do dia produtivo às 07h00: zera o "hoje", recarrega e refaz a aba
 async function verificarViradaProducao(){
   const atual = diaProdutivoISO();
@@ -5021,6 +5434,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     if (view==='tv') renderTvScreens();
     if (view==='parametros'){ renderParametros(); renderParamsQuimicos(); }
     if (view==='producao') renderProducao();
+    if (view==='qualidade') renderQualidade();
   });
 });
 
