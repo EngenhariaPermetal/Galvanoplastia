@@ -708,6 +708,30 @@ main:has(#view-qualidade.active){ max-width:1800px; }
   .view:not(#view-qualidade){ display:none !important; }
   .q-chart{ height:240px; }
 }
+
+/* ---------- gestor da qualidade ---------- */
+.gnq-box{ max-width:1180px !important; max-height:90vh; overflow:auto; }
+.gnq-login{ max-width:360px; margin:0 auto; }
+.gnq-topo{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:10px; }
+.gnq-topo h3{ margin:0; }
+.gnq-quem{ font-weight:500; color:var(--ink-soft); font-size:14px; }
+.gnq-filtros{ display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:10px; }
+.gnq-filtros label{ display:flex; flex-direction:column; gap:3px; font-size:12px; color:var(--ink-soft); }
+.gnq-filtros input, .gnq-filtros select{ width:150px; margin:0 !important; }
+.gnq-lista{ max-height:55vh; }
+.gnq-acoes{ white-space:nowrap; }
+.gnq-acoes .btn{ margin-right:6px; }
+.btn.gnq-excluir{ color:#D70015; }
+.btn.gnq-excluir-forte{ background:#FF3B30; border-color:#FF3B30; color:#fff; }
+.gnq-editado{ font-size:10.5px; font-weight:600; color:#6E6E73; background:rgba(118,118,128,.12); padding:1px 6px; border-radius:6px; white-space:nowrap; cursor:help; }
+.gnq-aviso{ font-size:13px; color:#248A3D; background:#E8F7EC; padding:8px 12px; border-radius:8px; margin-bottom:10px; }
+.gnq-form{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px 14px; }
+.gnq-form label{ display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:500; color:var(--ink-soft); }
+.gnq-form .param-input{ width:100% !important; margin:0 !important; }
+.gnq-form .gnq-largo{ grid-column:1 / -1; }
+.gnq-form .param-input:disabled{ opacity:.6; }
+.gnq-just textarea{ background:#FFF8E6 !important; }
+.btn.gnq-abrir{ font-size:12px; }
 @media (prefers-reduced-motion: reduce){ *{ animation:none !important; } }
 </style>
 </head>
@@ -1012,6 +1036,11 @@ main:has(#view-qualidade.active){ max-width:1800px; }
   </div>
 </div>
 
+<!-- Modal: gestor da qualidade — corrigir/excluir apontamentos (auditado) -->
+<div class="modal-overlay" id="gestorNqOverlay" style="z-index:640;">
+  <div class="modal-box gnq-box"><div id="gestorNqCorpo"></div></div>
+</div>
+
 <!-- Modal: cofre de 3 senhas pra liberar a aba Parâmetros -->
 <div class="modal-overlay" id="paramGateOverlay">
   <div class="modal-box" style="max-width:440px;">
@@ -1269,6 +1298,12 @@ function configurarRealtime(){
     .subscribe();
 
   sb.channel('realtime-refugo')
+    .on('postgres_changes', { event:'UPDATE', schema:'public', table:'apontamentos_refugo' }, payload => {
+      if (payload.new) aplicarMudancaNQ({ tipo:'UPDATE', registro:payload.new });
+    })
+    .on('postgres_changes', { event:'DELETE', schema:'public', table:'apontamentos_refugo' }, payload => {
+      if (payload.old && payload.old.id != null) aplicarMudancaNQ({ tipo:'DELETE', id:payload.old.id });
+    })
     .on('postgres_changes', { event:'INSERT', schema:'public', table:'apontamentos_refugo' }, payload => {
       const r = payload.new;
       if (!r || REFUGO_RECENTES.some(x=>x.id===r.id)) return; // já veio da própria tela — não duplica
@@ -3659,7 +3694,7 @@ function renderRefugo(){
   const recentes = REFUGO_RECENTES.slice(0, 15);
   const linhasTabela = recentes.length ? recentes.map(r=>`
       <tr>
-        <td><span class="nq-tag" style="background:${catNQ(catDe(r)).fundo}; color:${catNQ(catDe(r)).texto};"><i style="background:${catNQ(catDe(r)).cor}"></i>${catNQ(catDe(r)).nome}</span></td>
+        <td><span class="nq-tag" style="background:${catNQ(catDe(r)).fundo}; color:${catNQ(catDe(r)).texto};"><i style="background:${catNQ(catDe(r)).cor}"></i>${catNQ(catDe(r)).nome}</span>${r.editado_em ? ` <span class="gnq-editado" title="Corrigido por ${escHtml(r.editado_por||'')} em ${new Date(r.editado_em).toLocaleString('pt-BR')}">✎ editado</span>` : ''}</td>
         <td class="mono">${fmtDataCurtaBR(String(r.data).slice(0,10))}${r.turno ? ' · T'+r.turno : ''}</td>
         <td>${escHtml(nomeLinhaId(r.linha_id))}</td>
         <td>${escHtml(r.produto)}</td>
@@ -3716,7 +3751,10 @@ function renderRefugo(){
         <div class="quimico-save-msg" id="refugoMsg"></div>
       </div>
       <div class="card quimico-card">
-        <h3 class="param-card-title" style="margin:0 0 10px;">Últimos apontamentos de não qualidade</h3>
+        <div class="refugo-form-topo" style="margin-bottom:10px;">
+          <h3 class="param-card-title" style="margin:0;">Últimos apontamentos de não qualidade</h3>
+          <button type="button" class="btn small gnq-abrir" data-gnq-abrir>✎ Corrigir registros (gestor)</button>
+        </div>
         <div class="apont-scroll">
           <table class="data-table param-table apont-table">
             <thead><tr><th>Tipo</th><th>Produzido</th><th>Linha</th><th>Produto</th><th style="text-align:right;">Peso</th><th>Motivo</th><th>Observação</th><th>Líder</th><th>Inspetor</th></tr></thead>
@@ -3738,6 +3776,7 @@ function renderRefugo(){
     });
   });
   wrap.querySelector('[data-refugo-obs]').addEventListener('input', e=>{ f.obs = e.target.value; }); // sem re-render enquanto digita
+  wrap.querySelector('[data-gnq-abrir]').addEventListener('click', abrirGestorQualidade);
   wrap.querySelectorAll('[data-nq-cat]').forEach(b=>b.addEventListener('click', ()=>{ f.categoria = b.dataset.nqCat; renderRefugo(); }));
   wrap.querySelector('[data-refugo-registrar]').addEventListener('click', registrarRefugoClique);
   atualizarRefugoOntem();
@@ -4543,6 +4582,204 @@ async function renderQualidade(){
       scales:{ x:{ stacked:true, ticks:{ font:fonte, maxRotation:35, minRotation:0 } }, y:{ stacked:true, title:{ display:true, text:'kg', font:fonte }, ticks:{ font:fonte } },
                y2:{ position:'right', min:0, max:100, grid:{ drawOnChartArea:false }, ticks:{ font:fonte, callback:v => v + '%' } } } }
   }));
+}
+
+// =========================================================================
+// GESTOR DA QUALIDADE — corrigir/excluir apontamentos de não qualidade
+// Login e senha conferidos no banco; toda correção exige justificativa e é
+// auditada (auditoria_nq). A senha só fica na memória enquanto a tela está aberta.
+// =========================================================================
+let GESTOR_SESSAO = null;           // { login, senha } — limpa ao fechar
+let GESTOR_FILTRO = null;           // { de, ate, linha, categoria }
+let GESTOR_LISTA = [];
+let GESTOR_EDITANDO = null;         // registro em edição (ou null = lista)
+
+function abrirGestorQualidade(){
+  GESTOR_SESSAO = null; GESTOR_EDITANDO = null;
+  GESTOR_FILTRO = { de: deslocarDiaISO(PRODUCAO_DIA_ATUAL, -30), ate: PRODUCAO_DIA_ATUAL, linha:'', categoria:'' };
+  document.getElementById('gestorNqOverlay').style.display = 'flex';
+  renderGestorLogin();
+}
+function fecharGestorQualidade(){
+  GESTOR_SESSAO = null; GESTOR_LISTA = []; GESTOR_EDITANDO = null;   // esquece a senha
+  document.getElementById('gestorNqOverlay').style.display = 'none';
+  document.getElementById('gestorNqCorpo').innerHTML = '';
+}
+
+function renderGestorLogin(erro){
+  const c = document.getElementById('gestorNqCorpo');
+  c.innerHTML = `
+    <div class="gnq-login">
+      <h3>Corrigir registros de qualidade</h3>
+      <p class="modal-desc">Acesso restrito ao gestor da qualidade. Toda correção pede justificativa e fica registrada (antes, depois, quem e quando).</p>
+      <input type="text" id="gnqLogin" placeholder="Login" autocomplete="off">
+      <input type="password" id="gnqSenha" placeholder="Senha" autocomplete="off">
+      <div class="modal-error" id="gnqErro">${erro ? escHtml(erro) : ''}</div>
+      <div class="modal-actions">
+        <button class="btn" data-gnq-fechar>Cancelar</button>
+        <button class="btn primary" id="gnqEntrar">Entrar</button>
+      </div>
+    </div>`;
+  const entrar = async ()=>{
+    const login = document.getElementById('gnqLogin').value.trim(), senha = document.getElementById('gnqSenha').value;
+    const err = document.getElementById('gnqErro');
+    if (!login || !senha){ err.textContent = 'Digite login e senha.'; return; }
+    if (!sb){ err.textContent = 'Sem conexão com o banco.'; return; }
+    err.textContent = 'Verificando…';
+    const { data, error } = await sb.rpc('validar_gestor_qualidade', { p_login: login, p_senha: senha });
+    if (error){ err.textContent = 'Falha: ' + error.message; return; }
+    if (!data || !data.ok){ err.textContent = (data && data.erro) || 'Login ou senha inválidos.'; document.getElementById('gnqSenha').value=''; return; }
+    GESTOR_SESSAO = { login: data.login, senha };
+    carregarListaGestor();
+  };
+  document.getElementById('gnqEntrar').addEventListener('click', entrar);
+  ['gnqLogin','gnqSenha'].forEach(id => document.getElementById(id).addEventListener('keydown', e=>{ if (e.key==='Enter') entrar(); }));
+  c.querySelector('[data-gnq-fechar]').addEventListener('click', fecharGestorQualidade);
+  setTimeout(()=>document.getElementById('gnqLogin').focus(), 50);
+}
+
+async function carregarListaGestor(){
+  const f = GESTOR_FILTRO;
+  let q = sb.from('apontamentos_refugo').select('*, colaboradores(nome)')
+    .gte('data', f.de).lte('data', f.ate).order('data', { ascending:false }).order('id', { ascending:false }).limit(500);
+  if (f.linha) q = q.eq('linha_id', f.linha);
+  if (f.categoria) q = q.eq('categoria', f.categoria);
+  const { data, error } = await q;
+  GESTOR_LISTA = error ? [] : (data || []);
+  GESTOR_LISTA.forEach(r=>{ if (r.colaboradores && r.colaboradores.nome) NOME_POR_RE[r.lider_re] = r.colaboradores.nome; });
+  GESTOR_EDITANDO = null;
+  renderGestorLista(error ? 'Falha ao carregar: ' + error.message : '');
+}
+
+function renderGestorLista(aviso){
+  const c = document.getElementById('gestorNqCorpo'), f = GESTOR_FILTRO;
+  const linhas = GESTOR_LISTA.map(r => {
+    const cat = catNQ(catDe(r));
+    return `<tr>
+      <td class="gnq-acoes"><button class="btn small" data-gnq-editar="${r.id}">Editar</button><button class="btn small gnq-excluir" data-gnq-excluir="${r.id}">Excluir</button></td>
+      <td><span class="nq-tag" style="background:${cat.fundo}; color:${cat.texto};"><i style="background:${cat.cor}"></i>${cat.nome}</span>${r.editado_em ? ' <span class="gnq-editado" title="Editado por '+escHtml(r.editado_por||'')+' em '+new Date(r.editado_em).toLocaleString('pt-BR')+'">✎</span>' : ''}</td>
+      <td class="mono">${fmtDataCurtaBR(String(r.data).slice(0,10))}</td>
+      <td>${escHtml(nomeLinhaId(r.linha_id))}</td><td>${escHtml(r.produto)}</td>
+      <td class="mono apont-num"><strong>${fmtKg(r.peso_kg)}</strong></td>
+      <td>${escHtml(r.motivo)}</td>
+      <td class="apont-obs" title="${escHtml(r.observacao||'')}">${escHtml(r.observacao||'')}</td>
+      <td>${escHtml(nomeLider(r.lider_re))}</td><td style="color:var(--ink-soft);">${escHtml(r.inspetor_login||'')}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="10" style="text-align:center; color:var(--ink-faint); padding:20px;">Nenhum apontamento nesse filtro.</td></tr>`;
+  c.innerHTML = `
+    <div class="gnq-topo">
+      <h3>Corrigir registros de qualidade <span class="gnq-quem">· ${escHtml(GESTOR_SESSAO.login)}</span></h3>
+      <div><button type="button" class="refugo-link" data-gnq-senha>Trocar minha senha</button>
+      <button class="btn small" data-gnq-fechar style="margin-left:10px;">Fechar</button></div>
+    </div>
+    <div class="gnq-filtros">
+      <label>De <input type="date" class="param-input" data-gnq-f="de" value="${f.de}"></label>
+      <label>Até <input type="date" class="param-input" data-gnq-f="ate" value="${f.ate}"></label>
+      <label>Linha <select class="param-input" data-gnq-f="linha"><option value="">Todas</option>${LINHAS.map(l=>`<option value="${l.id}" ${l.id===f.linha?'selected':''}>${l.nome}</option>`).join('')}</select></label>
+      <label>Tipo <select class="param-input" data-gnq-f="categoria"><option value="">Todos</option>${CATEGORIAS_NQ.map(x=>`<option value="${x.id}" ${x.id===f.categoria?'selected':''}>${x.nome}</option>`).join('')}</select></label>
+      <span class="hint">${GESTOR_LISTA.length} apontamento${GESTOR_LISTA.length===1?'':'s'}</span>
+    </div>
+    ${aviso ? `<div class="gnq-aviso">${escHtml(aviso)}</div>` : ''}
+    <div class="apont-scroll gnq-lista"><table class="data-table param-table apont-table">
+      <thead><tr><th></th><th>Tipo</th><th>Produzido</th><th>Linha</th><th>Produto</th><th style="text-align:right;">Peso</th><th>Motivo</th><th>Observação</th><th>Líder</th><th>Inspetor</th></tr></thead>
+      <tbody>${linhas}</tbody></table></div>`;
+  c.querySelectorAll('[data-gnq-fechar]').forEach(b=>b.addEventListener('click', fecharGestorQualidade));
+  c.querySelector('[data-gnq-senha]').addEventListener('click', trocarSenhaGestor);
+  c.querySelectorAll('[data-gnq-f]').forEach(el=>el.addEventListener('change', ()=>{ GESTOR_FILTRO[el.dataset.gnqF] = el.value; carregarListaGestor(); }));
+  c.querySelectorAll('[data-gnq-editar]').forEach(b=>b.addEventListener('click', ()=>{ GESTOR_EDITANDO = { ...GESTOR_LISTA.find(r=>r.id===Number(b.dataset.gnqEditar)) }; renderGestorEdicao(); }));
+  c.querySelectorAll('[data-gnq-excluir]').forEach(b=>b.addEventListener('click', ()=>{ GESTOR_EDITANDO = { ...GESTOR_LISTA.find(r=>r.id===Number(b.dataset.gnqExcluir)), _excluir:true }; renderGestorEdicao(); }));
+}
+
+function renderGestorEdicao(erro){
+  const c = document.getElementById('gestorNqCorpo'), r = GESTOR_EDITANDO, excluir = !!r._excluir;
+  const produtos = [...new Set([...produtosDaLinha(r.linha_id), r.produto])];
+  const motivos = [...new Set([...MOTIVOS_REFUGO.map(m=>m.nome), r.motivo])];
+  const lideres = [...LIDERES]; if (r.lider_re && !lideres.some(l=>l.re===r.lider_re)) lideres.push({ re:r.lider_re, nome:NOME_POR_RE[r.lider_re]||'' });
+  const dis = excluir ? 'disabled' : '';
+  c.innerHTML = `
+    <div class="gnq-topo"><h3>${excluir ? 'Excluir' : 'Editar'} apontamento nº ${r.id}</h3>
+      <button class="btn small" data-gnq-voltar>← Voltar à lista</button></div>
+    <p class="modal-desc">Registrado por ${escHtml(r.inspetor_login||'—')} em ${new Date(r.criado_em).toLocaleString('pt-BR')}${r.editado_em ? ` · última correção por ${escHtml(r.editado_por||'')} em ${new Date(r.editado_em).toLocaleString('pt-BR')}` : ''}.</p>
+    <div class="gnq-form">
+      <label>Tipo <select class="param-input" data-gnq-c="categoria" ${dis}>${CATEGORIAS_NQ.map(x=>`<option value="${x.id}" ${x.id===catDe(r)?'selected':''}>${x.nome}</option>`).join('')}</select></label>
+      <label>Dia produtivo (produzido em) <input type="date" class="param-input" data-gnq-c="data" value="${String(r.data).slice(0,10)}" max="${PRODUCAO_DIA_ATUAL}" ${dis}></label>
+      <label>Linha <select class="param-input" data-gnq-c="linha_id" ${dis}>${LINHAS.map(l=>`<option value="${l.id}" ${l.id===r.linha_id?'selected':''}>${l.nome}</option>`).join('')}</select></label>
+      <label>Produto (taxa) <select class="param-input" data-gnq-c="produto" ${dis}>${produtos.map(p=>`<option value="${escHtml(p)}" ${p===r.produto?'selected':''}>${escHtml(p)}</option>`).join('')}</select></label>
+      <label>Peso (kg) <input type="number" min="0" step="0.5" class="param-input" data-gnq-c="peso_kg" value="${Number(r.peso_kg)}" ${dis}></label>
+      <label>Motivo <select class="param-input" data-gnq-c="motivo" ${dis}>${motivos.map(m=>`<option value="${escHtml(m)}" ${m===r.motivo?'selected':''}>${escHtml(m)}</option>`).join('')}</select></label>
+      <label class="gnq-largo">Líder responsável <select class="param-input" data-gnq-c="lider_re" ${dis}>${lideres.map(l=>`<option value="${escHtml(l.re)}" ${l.re===r.lider_re?'selected':''}>${escHtml(l.re)}${l.nome?' · '+escHtml(l.nome):''}</option>`).join('')}</select></label>
+      <label class="gnq-largo">Observação <textarea class="param-input refugo-obs" data-gnq-c="observacao" maxlength="500" rows="2" ${dis}>${escHtml(r.observacao||'')}</textarea></label>
+      <label class="gnq-largo gnq-just"><span>Justificativa da ${excluir ? 'exclusão' : 'correção'} <span class="hint">(obrigatória — fica registrada)</span></span>
+        <textarea class="param-input refugo-obs" id="gnqJust" maxlength="500" rows="2" placeholder="${excluir ? 'ex: lançamento duplicado do apontamento nº …' : 'ex: era aprovação condicional, conferido com a inspetora'}"></textarea></label>
+    </div>
+    <div class="modal-error" id="gnqErro">${erro ? escHtml(erro) : ''}</div>
+    <div class="modal-actions">
+      <button class="btn" data-gnq-voltar>Cancelar</button>
+      <button class="btn ${excluir ? 'gnq-excluir-forte' : 'primary'}" id="gnqSalvar">${excluir ? 'Excluir definitivamente' : 'Salvar correção'}</button>
+    </div>`;
+  c.querySelectorAll('[data-gnq-voltar]').forEach(b=>b.addEventListener('click', ()=>{ GESTOR_EDITANDO = null; renderGestorLista(); }));
+  c.querySelector('[data-gnq-c="linha_id"]') && c.querySelector('[data-gnq-c="linha_id"]').addEventListener('change', e=>{
+    GESTOR_EDITANDO = { ...coletarEdicaoGestor(), _excluir:excluir, id:r.id, criado_em:r.criado_em, inspetor_login:r.inspetor_login, editado_em:r.editado_em, editado_por:r.editado_por };
+    const ps = produtosDaLinha(e.target.value); if (!ps.includes(GESTOR_EDITANDO.produto)) GESTOR_EDITANDO.produto = ps[0] || GESTOR_EDITANDO.produto;
+    renderGestorEdicao();
+  });
+  document.getElementById('gnqSalvar').addEventListener('click', salvarEdicaoGestor);
+  document.getElementById('gnqJust').addEventListener('input', ()=>{ document.getElementById('gnqErro').textContent = ''; });
+}
+function coletarEdicaoGestor(){
+  const v = k => { const el = document.querySelector(`[data-gnq-c="${k}"]`); return el ? el.value : null; };
+  return { categoria:v('categoria'), data:v('data'), linha_id:v('linha_id'), produto:v('produto'),
+           peso_kg: parseFloat(String(v('peso_kg')).replace(',', '.')), motivo:v('motivo'), lider_re:v('lider_re'), observacao:v('observacao') };
+}
+async function salvarEdicaoGestor(){
+  const r = GESTOR_EDITANDO, excluir = !!r._excluir;
+  const just = document.getElementById('gnqJust').value.trim();
+  const err = document.getElementById('gnqErro');
+  if (just.length < 5){ err.textContent = 'Escreva a justificativa (mínimo 5 caracteres).'; return; }
+  const btn = document.getElementById('gnqSalvar'); btn.disabled = true; err.textContent = 'Salvando…';
+  let res;
+  if (excluir){
+    res = await sb.rpc('excluir_apontamento_nq', { p_login:GESTOR_SESSAO.login, p_senha:GESTOR_SESSAO.senha, p_id:r.id, p_justificativa:just });
+  } else {
+    const dados = coletarEdicaoGestor();
+    if (!dados.peso_kg || dados.peso_kg <= 0){ err.textContent = 'Peso precisa ser maior que zero.'; btn.disabled = false; return; }
+    res = await sb.rpc('editar_apontamento_nq', { p_login:GESTOR_SESSAO.login, p_senha:GESTOR_SESSAO.senha, p_id:r.id, p_dados:dados, p_justificativa:just });
+  }
+  btn.disabled = false;
+  if (res.error){ err.textContent = 'Falha: ' + res.error.message; return; }
+  if (!res.data || !res.data.ok){ err.textContent = (res.data && res.data.erro) || 'Não foi possível salvar.'; return; }
+  aplicarMudancaNQ(excluir ? { tipo:'DELETE', id:r.id } : { tipo:'UPDATE', registro:res.data.registro }); // atualiza a tela na hora
+  await carregarListaGestor();
+  renderGestorLista(excluir ? `Apontamento nº ${r.id} excluído ✓` : `Apontamento nº ${r.id} corrigido ✓`);
+}
+async function trocarSenhaGestor(){
+  const c = document.getElementById('gestorNqCorpo');
+  const atualHtml = c.innerHTML;
+  c.innerHTML = `<div class="gnq-login"><h3>Trocar minha senha</h3>
+    <input type="password" id="gnqNova" placeholder="Senha nova (mín. 8 caracteres)" autocomplete="new-password">
+    <input type="password" id="gnqNova2" placeholder="Repita a senha nova" autocomplete="new-password">
+    <div class="modal-error" id="gnqErro"></div>
+    <div class="modal-actions"><button class="btn" id="gnqVoltar">Cancelar</button><button class="btn primary" id="gnqTrocar">Trocar</button></div></div>`;
+  document.getElementById('gnqVoltar').addEventListener('click', ()=>renderGestorLista());
+  document.getElementById('gnqTrocar').addEventListener('click', async ()=>{
+    const n1 = document.getElementById('gnqNova').value, n2 = document.getElementById('gnqNova2').value, err = document.getElementById('gnqErro');
+    if (n1.length < 8){ err.textContent = 'A senha nova precisa ter pelo menos 8 caracteres.'; return; }
+    if (n1 !== n2){ err.textContent = 'As duas senhas não são iguais.'; return; }
+    const { data, error } = await sb.rpc('alterar_senha_gestor', { p_login:GESTOR_SESSAO.login, p_senha_atual:GESTOR_SESSAO.senha, p_senha_nova:n1 });
+    if (error || !data || !data.ok){ err.textContent = (data && data.erro) || (error && error.message) || 'Falha.'; return; }
+    GESTOR_SESSAO.senha = n1;
+    renderGestorLista('Senha alterada ✓');
+  });
+}
+
+// mudança vinda da correção (desta tela ou de outra, via Realtime): atualiza listas, cards e indicadores
+function aplicarMudancaNQ(m){
+  if (m.tipo === 'DELETE') REFUGO_RECENTES = REFUGO_RECENTES.filter(x => x.id !== m.id);
+  else if (m.tipo === 'UPDATE'){ const i = REFUGO_RECENTES.findIndex(x => x.id === m.registro.id); if (i >= 0) REFUGO_RECENTES[i] = { ...REFUGO_RECENTES[i], ...m.registro }; }
+  REFUGO_CACHE = {};
+  QUAL_INICIO = undefined;
+  if (document.getElementById('view-producao').classList.contains('active')){ renderRefugo(); renderRankingRefugo(); renderRankingLideres(); }
+  agendarRenderQualidade();
 }
 
 // Virada do dia produtivo às 07h00: zera o "hoje", recarrega e refaz a aba
