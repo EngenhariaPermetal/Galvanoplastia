@@ -631,6 +631,44 @@ textarea.refugo-obs{ width:100%; height:auto; min-height:52px; resize:vertical; 
 .mapa-total strong{ font-size:22px; color:#D70015; margin-left:6px; letter-spacing:-.02em; }
 .mapa-bolinha{ display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:7px; vertical-align:middle; }
 .mapa-tabela td:first-child{ white-space:normal; }
+/* ---------- não qualidade: 3 categorias ---------- */
+.nq-seg{ display:flex; gap:4px; background:rgba(118,118,128,.12); padding:3px; border-radius:10px; margin:0 0 12px; flex-wrap:wrap; }
+.nq-seg button{ flex:1 1 auto; display:inline-flex; align-items:center; justify-content:center; gap:6px; border:none; background:none; border-radius:8px;
+  padding:7px 10px; font-size:12.5px; font-weight:500; color:var(--ink); cursor:pointer; white-space:nowrap; }
+.nq-seg button i{ width:9px; height:9px; border-radius:50%; background:var(--nq); display:inline-block; }
+.nq-seg button.ativo{ background:var(--nq-fundo); color:var(--nq-texto); font-weight:700; box-shadow:0 0 0 1.5px var(--nq) inset; }
+.nq-seg-analise{ display:inline-flex; margin-bottom:12px; }
+.nq-seg-analise button{ flex:0 0 auto; }
+.btn.refugo-btn.nq-btn-condicional{ background:#FFCC00; border-color:#FFCC00; color:#3D2E00; }
+.btn.refugo-btn.nq-btn-condicional:hover{ background:#E6B800; border-color:#E6B800; }
+.btn.refugo-btn.nq-btn-retrabalho{ background:#FF9500; border-color:#FF9500; color:#fff; }
+.btn.refugo-btn.nq-btn-retrabalho:hover{ background:#E08600; border-color:#E08600; }
+.nq-tag{ display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; padding:2px 7px; border-radius:6px; white-space:nowrap; }
+.nq-tag i{ width:7px; height:7px; border-radius:50%; display:inline-block; }
+/* linhas dos cards (azul e cinza) */
+.nq-titulo{ font-size:11.5px; font-weight:600; color:var(--ink-soft); margin-top:10px; padding-top:8px; border-top:1px solid rgba(60,60,67,.14); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.nq-bloco{ display:flex; flex-direction:column; gap:3px; margin-top:4px; }
+.nq-bloco.nq-azul{ margin-top:8px; padding-top:8px; border-top:1px solid rgba(0,96,223,.15); }
+.nq-linha{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; font-size:12px; white-space:nowrap; min-width:0; }
+.nq-linha .rot{ display:inline-flex; align-items:center; gap:6px; color:var(--ink-soft); font-weight:500; flex:0 0 auto; }
+.nq-linha .rot i{ width:8px; height:8px; border-radius:50%; display:inline-block; }
+.nq-azul .nq-linha .rot{ color:#3A6FC4; }
+.nq-linha .val{ font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; font-variant-numeric:tabular-nums; }
+.nq-linha.zero .val{ color:#248A3D; font-weight:600; }
+.nq-linha.nq-refugo.tem .val{ color:#D70015; }
+.nq-linha.nq-condicional.tem .val{ color:#8A6500; }
+.nq-linha.nq-retrabalho.tem .val{ color:#B25000; }
+/* ranking de produção: segmentos de condicional/retrabalho */
+.ranking-barra-nq{ height:100%; }
+.ranking-nq-txt{ font-weight:600; }
+.ranking-nq-txt.nq-refugo{ color:#D70015; } .ranking-nq-txt.nq-retrabalho{ color:#B25000; } .ranking-nq-txt.nq-condicional{ color:#8A6500; }
+/* ranking por líder pinta na cor da categoria escolhida */
+.nq-rank-condicional .refugo-item .ranking-valor strong{ color:#8A6500; }
+.nq-rank-condicional .refugo-item .ranking-barra > div{ background:#FFE680; }
+.nq-rank-condicional .refugo-item.primeiro .ranking-barra > div{ background:#FFCC00; }
+.nq-rank-retrabalho .refugo-item .ranking-valor strong{ color:#B25000; }
+.nq-rank-retrabalho .refugo-item .ranking-barra > div{ background:#FFC680; }
+.nq-rank-retrabalho .refugo-item.primeiro .ranking-barra > div{ background:#FF9500; }
 @media (prefers-reduced-motion: reduce){ *{ animation:none !important; } }
 </style>
 </head>
@@ -748,11 +786,11 @@ textarea.refugo-obs{ width:100%; height:auto; min-height:52px; resize:vertical; 
     <div id="producaoWrap" class="quimicos-grid"></div>
     <h2 class="section-title" style="margin-top:28px;">Ranking de líderes · mensal e dia anterior</h2>
     <div id="producaoRankingWrap"></div>
-    <h2 class="section-title" style="margin-top:28px;">Não qualidade · refugo apontado pelos inspetores</h2>
+    <h2 class="section-title" style="margin-top:28px;">Não qualidade · apontada pelos inspetores <span style="font-size:13px; font-weight:500; color:var(--ink-soft);">(refugo · aprovação condicional · retrabalho)</span></h2>
     <div id="refugoWrap"></div>
-    <h2 class="section-title" style="margin-top:28px;">Ranking de refugo · por líder <span style="font-size:13px; font-weight:500; color:var(--ink-soft);">(usa os filtros de produto e mês do ranking acima)</span></h2>
+    <h2 class="section-title" style="margin-top:28px;">Ranking de não qualidade · por líder <span style="font-size:13px; font-weight:500; color:var(--ink-soft);">(usa os filtros de produto e mês do ranking acima)</span></h2>
     <div id="refugoRankingWrap"></div>
-    <h2 class="section-title" style="margin-top:28px;">Mapa de refugo · onde está a maior perda <span style="font-size:13px; font-weight:500; color:var(--ink-soft);">(tamanho = kg refugados)</span></h2>
+    <h2 class="section-title" style="margin-top:28px;">Mapa de não qualidade · onde está a maior perda <span style="font-size:13px; font-weight:500; color:var(--ink-soft);">(tamanho = kg · mesma categoria escolhida no ranking acima)</span></h2>
     <div id="mapaRefugoWrap"></div>
     <h2 class="section-title" style="margin-top:28px;">Histórico de produção · últimos 10 dias</h2>
     <div id="producaoGraficosWrap" class="quimicos-grid"></div>
@@ -3209,11 +3247,34 @@ function textoOntem(linhaId, produto){
 // Refugo do DIA ANTERIOR no card azul: mesma linha, mesmo produto, mesmo período
 // (o "dia produtivo" do refugo é o dia em que o material foi produzido, informado
 // pelo inspetor — então refugo achado hoje de material de ontem entra aqui)
-function textoRefugoOntem(refugos, linhaId, produto, produzidoKg, curto){
-  const kg = (refugos || []).filter(r => r.linha_id === linhaId && r.produto === produto).reduce((s,r)=>s+Number(r.peso_kg), 0);
+// ---- Não qualidade: 3 categorias apontadas pelos inspetores ----
+const CATEGORIAS_NQ = [
+  { id:'refugo',      nome:'Refugo',                verbo:'Refugou',            cor:'#FF3B30', texto:'#D70015', fundo:'#FFE9E7', btn:'Registrar refugo',
+    nenhum:'Nenhum refugo', registrado:'Refugo registrado', apontado:'apontado' },
+  { id:'condicional', nome:'Aprovação condicional', verbo:'Aprov. condicional', cor:'#FFCC00', texto:'#8A6500', fundo:'#FFF7D1', btn:'Registrar aprovação condicional',
+    nenhum:'Nenhuma aprovação condicional', registrado:'Aprovação condicional registrada', apontado:'apontada' },
+  { id:'retrabalho',  nome:'Retrabalho',            verbo:'Retrabalho',         cor:'#FF9500', texto:'#B25000', fundo:'#FFF0DB', btn:'Registrar retrabalho',
+    nenhum:'Nenhum retrabalho', registrado:'Retrabalho registrado', apontado:'apontado' },
+];
+function catNQ(id){ return CATEGORIAS_NQ.find(c => c.id === id) || CATEGORIAS_NQ[0]; }
+function catDe(r){ return r.categoria || 'refugo'; } // apontamentos antigos (sem categoria) = refugo
+
+function textoRefugoOntem(refugos, linhaId, produto, produzidoKg, curto, categoria){
+  categoria = categoria || 'refugo';
+  const kg = (refugos || []).filter(r => r.linha_id === linhaId && r.produto === produto && catDe(r) === categoria).reduce((s,r)=>s+Number(r.peso_kg), 0);
   if (!kg) return { kg:0, txt: curto ? 'Nenhum' : 'Sem refugo apontado', classe:'zero' };
   const pct = produzidoKg ? ` · ${(kg/produzidoKg*100).toLocaleString('pt-BR',{maximumFractionDigits:1})}%${curto ? '' : ' do produzido'}` : '';
   return { kg, txt:`${fmtKg(kg)}${pct}`, classe:'tem' };
+}
+// 3 linhas (refugo · aprovação condicional · retrabalho) para um card; % sobre o produzido da taxa
+function htmlLinhasNQ(refugos, linhaId, produto, produzido, quando){
+  if (!produto) return CATEGORIAS_NQ.map(c=>`<div class="nq-linha zero"><span class="rot"><i style="background:${c.cor}"></i>${c.verbo}</span><span class="val">—</span></div>`).join('');
+  return CATEGORIAS_NQ.map(c=>{
+    const r = textoRefugoOntem(refugos, linhaId, produto, produzido, true, c.id);
+    const dica = r.kg ? `${c.nome} de ${quando} de ${produto}: ${fmtKg(r.kg)}${produzido ? ` — ${(r.kg/produzido*100).toLocaleString('pt-BR',{maximumFractionDigits:1})}% de ${fmtKg(produzido)} produzidos` : ''}`
+                      : `${c.nenhum} de ${produto} ${c.apontado} ${quando === 'hoje' ? 'hoje' : 'no dia anterior'}`;
+    return `<div class="nq-linha nq-${c.id} ${r.classe}" title="${escHtml(dica)}"><span class="rot"><i style="background:${c.cor}"></i>${c.verbo}</span><span class="val">${escHtml(r.txt)}</span></div>`;
+  }).join('');
 }
 function atualizarRefugoOntem(){
   const anterior = diaProdutivoAnteriorISO();
@@ -3222,11 +3283,8 @@ function atualizarRefugoOntem(){
       const el = document.querySelector(`[data-refugo-ontem="${linha.id}"]`);
       if (!el) return;
       const produto = produtoSelecionado(linha.id);
-      if (!produto){ el.querySelector('.val').textContent = '—'; return; }
-      const produzido = totalOntemDoProduto(PRODUCAO_REGISTROS_10D, linha.id, produto) || 0;
-      const r = textoRefugoOntem(refugos, linha.id, produto, produzido);
-      el.className = 'producao-ontem-refugo ' + r.classe;
-      el.querySelector('.val').textContent = r.txt;
+      const produzido = produto ? (totalOntemDoProduto(PRODUCAO_REGISTROS_10D, linha.id, produto) || 0) : 0;
+      el.innerHTML = htmlLinhasNQ(refugos, linha.id, produto, produzido, 'ontem');
     });
   });
   // HOJE (dia produtivo atual, ainda em andamento): mesma taxa do card, % sobre o produzido dela hoje
@@ -3235,13 +3293,10 @@ function atualizarRefugoOntem(){
       const el = document.querySelector(`[data-refugo-hoje="${linha.id}"]`);
       if (!el) return;
       const produto = produtoSelecionado(linha.id);
-      el.querySelector('[data-refugo-hoje-produto]').textContent = produto || '—';
-      if (!produto){ el.querySelector('.val').textContent = '—'; return; }
-      const produzido = (PRODUCAO_HOJE[linha.id] || []).filter(r => r.produto === produto).reduce((s,r)=>s+Number(r.peso_kg), 0);
-      const r = textoRefugoOntem(refugos, linha.id, produto, produzido, true);
-      el.className = 'producao-hoje-refugo ' + r.classe;
-      el.title = r.kg ? `Refugo de hoje de ${produto}: ${fmtKg(r.kg)}${produzido ? ` — ${(r.kg/produzido*100).toLocaleString('pt-BR',{maximumFractionDigits:1})}% de ${fmtKg(produzido)} produzidos hoje` : ''}` : `Nenhum refugo de ${produto} apontado hoje`;
-      el.querySelector('.val').textContent = r.txt;
+      const tit = el.parentElement.querySelector('[data-refugo-hoje-produto]');
+      if (tit) tit.textContent = produto || '—';
+      const produzido = produto ? (PRODUCAO_HOJE[linha.id] || []).filter(r => r.produto === produto).reduce((s,r)=>s+Number(r.peso_kg), 0) : 0;
+      el.innerHTML = htmlLinhasNQ(refugos, linha.id, produto, produzido, 'hoje');
     });
   });
 }
@@ -3282,27 +3337,35 @@ function htmlHojeLinha(linhaId){
       </div>
       ${porRE ? `<div class="producao-hoje-res">${porRE}</div>` : ''}
       <div class="refugo-espaco"></div>
-      <div class="producao-hoje-refugo" data-refugo-hoje="${linhaId}"><span class="rot">Refugou · <span data-refugo-hoje-produto>${escHtml(produtoSelecionado(linhaId) || '—')}</span></span><span class="val">…</span></div>
+      <div class="nq-titulo">Não qualidade · <span data-refugo-hoje-produto>${escHtml(produtoSelecionado(linhaId) || '—')}</span></div>
+      <div class="nq-bloco" data-refugo-hoje="${linhaId}"></div>
     </div>`;
 }
 
 // kg refugado por líder no período (mesmo filtro de produto)
-function refugoPorLider(refugos, produto){
+// kg de não qualidade por líder, separado por categoria (mesmo filtro de produto)
+function nqPorLider(refugos, produto){
   const m = {};
-  (refugos || []).filter(r => r.lider_re && (!produto || r.produto === produto))
-    .forEach(r => { m[r.lider_re] = (m[r.lider_re] || 0) + Number(r.peso_kg); });
+  (refugos || []).filter(r => r.lider_re && (!produto || r.produto === produto)).forEach(r => {
+    const x = m[r.lider_re] || (m[r.lider_re] = { refugo:0, condicional:0, retrabalho:0 });
+    x[catDe(r)] = (x[catDe(r)] || 0) + Number(r.peso_kg);
+  });
   return m;
 }
-// barra do ranking: comprimento = produção bruta; a ponta vermelha "empurra de volta" o que foi refugado
-function partesBarraRanking(kg, lider, refugoKg){
+// barra do ranking: comprimento = produção bruta; da ponta para trás, a não qualidade
+// "empurra de volta" a parte boa: refugo (vermelho), retrabalho (laranja), condicional (amarelo)
+function partesBarraNQ(kg, lider, nq){
+  nq = nq || {};
   const total = lider ? kg / lider * 100 : 0;
-  const ref = Math.min(refugoKg || 0, kg);          // refugo nunca passa do que foi produzido
-  const pctRef = kg ? ref / kg * 100 : 0;
-  return { total, boa: 100 - pctRef, refugo: pctRef };
+  let resta = kg; const parte = {};
+  for (const c of ['refugo', 'retrabalho', 'condicional']){          // nunca passa do que foi produzido
+    const v = Math.min(nq[c] || 0, resta); resta -= v; parte[c] = kg ? v / kg * 100 : 0;
+  }
+  return { total, boa: kg ? resta / kg * 100 : 0, ...parte };
 }
 function htmlRankingCard(titulo, periodo, registros, emAndamento, refugos){
   const ranking = rankingPorRE(registros, RANKING_PRODUTO);
-  const refPorRE = refugos ? refugoPorLider(refugos, RANKING_PRODUTO) : {};
+  const nqPorRE = refugos ? nqPorLider(refugos, RANKING_PRODUTO) : {};
   if (!ranking.length){
     return `<div class="card ranking-card"><div class="ranking-card-titulo">${titulo}</div><div class="ranking-card-periodo">${periodo}</div>
       <div class="relatorio-vazio">Nenhum apontamento${RANKING_PRODUTO ? ' de '+RANKING_PRODUTO : ''} nesse período.</div></div>`;
@@ -3312,9 +3375,16 @@ function htmlRankingCard(titulo, periodo, registros, emAndamento, refugos){
   const itens = ranking.map((x,i)=>{
     const linhas = [...x.linhas].map(id => (LINHAS.find(l=>l.id===id)||{}).nome || id).join(', ');
     const atras = i>0 ? ` · ${fmtT(lider - x.kg)} atrás do 1º` : '';
-    const refKg = refPorRE[x.re] || 0;
-    const b = partesBarraRanking(x.kg, lider, refKg);
-    const txtRef = refKg ? ` · <span class="ranking-refugo-txt">refugo ${fmtT(refKg)} (${(refKg/x.kg*100).toLocaleString('pt-BR',{maximumFractionDigits:1})}%)</span>` : '';
+    const nq = nqPorRE[x.re] || {};
+    const b = partesBarraNQ(x.kg, lider, nq);
+    const pctTxt = v => (v/x.kg*100).toLocaleString('pt-BR',{maximumFractionDigits:1});
+    const rotulos = { refugo:'refugo', retrabalho:'retrabalho', condicional:'aprov. cond.' };
+    const txtRef = ['refugo','retrabalho','condicional'].filter(c => nq[c])
+      .map(c => ` · <span class="ranking-nq-txt nq-${c}">${rotulos[c]} ${fmtT(nq[c])} (${pctTxt(nq[c])}%)</span>`).join('');
+    const nqTotal = (nq.refugo||0) + (nq.retrabalho||0) + (nq.condicional||0);
+    const dicaBarra = nqTotal
+      ? `Produziu ${fmtKg(x.kg)} · refugo ${fmtKg(nq.refugo||0)} · retrabalho ${fmtKg(nq.retrabalho||0)} · aprov. condicional ${fmtKg(nq.condicional||0)} · boa ${fmtKg(Math.max(0, x.kg-nqTotal))}`
+      : `Produziu ${fmtKg(x.kg)}`;
     return `
       <div class="ranking-item ${i===0?'primeiro':''}">
         <div class="ranking-pos">${medalhas[i] || (i+1)+'º'}</div>
@@ -3323,8 +3393,8 @@ function htmlRankingCard(titulo, periodo, registros, emAndamento, refugos){
           <div class="ranking-detalhe">${x.n} apontamento${x.n===1?'':'s'} · ${linhas}${atras}${txtRef}</div>
         </div>
         <div class="ranking-valor"><strong>${fmtT(x.kg)}</strong><div>${fmtKg(x.kg)}</div></div>
-        <div class="ranking-barra"><div class="ranking-barra-prod" style="width:${b.total}%;" title="${refKg ? `Produziu ${fmtKg(x.kg)} · refugou ${fmtKg(refKg)} · boa ${fmtKg(x.kg-refKg)}` : `Produziu ${fmtKg(x.kg)}`}">
-          <div class="ranking-barra-boa" style="width:${b.boa}%;"></div>${b.refugo ? `<div class="ranking-barra-refugo" style="width:${b.refugo}%;"></div>` : ''}
+        <div class="ranking-barra"><div class="ranking-barra-prod" style="width:${b.total}%;" title="${dicaBarra}">
+          <div class="ranking-barra-boa" style="width:${b.boa}%;"></div>${b.condicional ? `<div class="ranking-barra-nq" style="width:${b.condicional}%; background:${catNQ('condicional').cor};"></div>` : ''}${b.retrabalho ? `<div class="ranking-barra-nq" style="width:${b.retrabalho}%; background:${catNQ('retrabalho').cor};"></div>` : ''}${b.refugo ? `<div class="ranking-barra-refugo" style="width:${b.refugo}%;"></div>` : ''}
         </div></div>
       </div>`;
   }).join('');
@@ -3464,7 +3534,7 @@ const REFUGO_RECENTES_MAX = 30;
 let MOTIVOS_REFUGO = [];      // [{id, nome, ativo, ordem}]
 let REFUGO_RECENTES = [];     // últimos apontamentos (mais novo primeiro)
 let REFUGO_CACHE = {};        // chave de período → registros
-let REFUGO_FORM = { dia:null, linha:null, produto:null, peso:'', motivo:null, lider:null, liderManual:false, obs:'' };
+let REFUGO_FORM = { categoria:'refugo', dia:null, linha:null, produto:null, peso:'', motivo:null, lider:null, liderManual:false, obs:'' };
 // exemplo do campo de observação muda conforme o motivo (o texto é livre)
 const EXEMPLO_OBS_REFUGO = {
   'Camada baixa': 'ex: camada média 6,8 µm (especificação 10 µm), tambor 3',
@@ -3541,6 +3611,7 @@ function renderRefugo(){
   const recentes = REFUGO_RECENTES.slice(0, 15);
   const linhasTabela = recentes.length ? recentes.map(r=>`
       <tr>
+        <td><span class="nq-tag" style="background:${catNQ(catDe(r)).fundo}; color:${catNQ(catDe(r)).texto};"><i style="background:${catNQ(catDe(r)).cor}"></i>${catNQ(catDe(r)).nome}</span></td>
         <td class="mono">${fmtDataCurtaBR(String(r.data).slice(0,10))}${r.turno ? ' · T'+r.turno : ''}</td>
         <td>${escHtml(nomeLinhaId(r.linha_id))}</td>
         <td>${escHtml(r.produto)}</td>
@@ -3550,14 +3621,17 @@ function renderRefugo(){
         <td>${escHtml(nomeLider(r.lider_re))}</td>
         <td style="color:var(--ink-soft);">${escHtml(r.inspetor_login)}</td>
       </tr>`).join('')
-    : `<tr><td colspan="8" style="text-align:center; color:var(--ink-faint);">Nenhum refugo apontado ainda.</td></tr>`;
+    : `<tr><td colspan="9" style="text-align:center; color:var(--ink-faint);">Nenhum apontamento ainda.</td></tr>`;
 
   wrap.innerHTML = `
     <div class="refugo-grid">
       <div class="card quimico-card refugo-form-card">
         <div class="refugo-form-topo">
-          <h3 class="param-card-title" style="margin:0;">Apontar refugo</h3>
+          <h3 class="param-card-title" style="margin:0;">Apontar não qualidade</h3>
           <button type="button" class="refugo-link" data-refugo-trocar-senha>Trocar minha senha</button>
+        </div>
+        <div class="nq-seg" role="tablist">
+          ${CATEGORIAS_NQ.map(c=>`<button type="button" class="${c.id===f.categoria?'ativo':''}" data-nq-cat="${c.id}" style="--nq:${c.cor}; --nq-fundo:${c.fundo}; --nq-texto:${c.texto};"><i></i>${c.nome}</button>`).join('')}
         </div>
         <div class="refugo-form">
           <label>Dia produtivo (quando foi produzido)
@@ -3571,7 +3645,7 @@ function renderRefugo(){
               ? `<select class="param-input" data-refugo="produto">${produtos.map(p=>`<option value="${escHtml(p)}" ${p===f.produto?'selected':''}>${escHtml(p)}</option>`).join('')}</select>`
               : `<span class="hint">Nenhum produto cadastrado nessa linha</span>`}
           </label>
-          <label>Peso refugado (kg)
+          <label>Peso (kg)
             <input type="number" min="0" step="0.5" class="param-input" data-refugo="peso" placeholder="ex: 350" value="${escHtml(f.peso)}">
           </label>
           <label class="refugo-lider">Líder responsável pela produção
@@ -3590,14 +3664,14 @@ function renderRefugo(){
           <textarea class="param-input refugo-obs" data-refugo-obs maxlength="500" rows="2" placeholder="${escHtml(exemploObsRefugo(f.motivo))}">${escHtml(f.obs)}</textarea>
         </label>
         <div class="refugo-previsao" data-refugo-previsao>${previsao}</div>
-        <button class="btn refugo-btn" data-refugo-registrar style="width:100%;">Registrar refugo</button>
+        <button class="btn refugo-btn nq-btn-${f.categoria}" data-refugo-registrar style="width:100%;">${catNQ(f.categoria).btn}</button>
         <div class="quimico-save-msg" id="refugoMsg"></div>
       </div>
       <div class="card quimico-card">
-        <h3 class="param-card-title" style="margin:0 0 10px;">Últimos refugos apontados</h3>
+        <h3 class="param-card-title" style="margin:0 0 10px;">Últimos apontamentos de não qualidade</h3>
         <div class="apont-scroll">
           <table class="data-table param-table apont-table">
-            <thead><tr><th>Produzido</th><th>Linha</th><th>Produto</th><th style="text-align:right;">Peso</th><th>Motivo</th><th>Observação</th><th>Líder</th><th>Inspetor</th></tr></thead>
+            <thead><tr><th>Tipo</th><th>Produzido</th><th>Linha</th><th>Produto</th><th style="text-align:right;">Peso</th><th>Motivo</th><th>Observação</th><th>Líder</th><th>Inspetor</th></tr></thead>
             <tbody>${linhasTabela}</tbody>
           </table>
         </div>
@@ -3616,6 +3690,7 @@ function renderRefugo(){
     });
   });
   wrap.querySelector('[data-refugo-obs]').addEventListener('input', e=>{ f.obs = e.target.value; }); // sem re-render enquanto digita
+  wrap.querySelectorAll('[data-nq-cat]').forEach(b=>b.addEventListener('click', ()=>{ f.categoria = b.dataset.nqCat; renderRefugo(); }));
   wrap.querySelector('[data-refugo-registrar]').addEventListener('click', registrarRefugoClique);
   atualizarRefugoOntem();
   wrap.querySelector('[data-refugo-trocar-senha]').addEventListener('click', trocarSenhaInspetor);
@@ -3627,21 +3702,23 @@ async function registrarRefugoClique(){
   msg.style.color = 'var(--crit)';
   const peso = parseFloat(String(f.peso).replace(',', '.'));
   if (!f.produto){ msg.textContent = 'Escolha o produto.'; return; }
-  if (!peso || peso <= 0){ msg.textContent = 'Informe o peso refugado em kg.'; return; }
+  if (!peso || peso <= 0){ msg.textContent = 'Informe o peso em kg.'; return; }
   if (!f.motivo){ msg.textContent = 'Escolha o motivo.'; return; }
   if (!f.lider){ msg.textContent = 'Escolha o líder responsável pela produção.'; return; }
   if (!sb){ msg.textContent = 'Sem conexão com o banco — não é possível registrar.'; return; }
   msg.textContent = '';
 
   const obs = String(f.obs || '').trim().slice(0, 500);
-  const resumo = `${fmtKg(peso)} de ${f.produto} · ${nomeLinhaId(f.linha)} · produzido em ${fmtDataCurtaBR(f.dia)} · ${f.motivo}${obs ? ' (' + (obs.length > 60 ? obs.slice(0,60) + '…' : obs) + ')' : ''} · líder ${nomeLider(f.lider)}`;
+  const cat = catNQ(f.categoria);
+  const resumo = `${cat.nome.toUpperCase()} · ${fmtKg(peso)} de ${f.produto} · ${nomeLinhaId(f.linha)} · produzido em ${fmtDataCurtaBR(f.dia)} · ${f.motivo}${obs ? ' (' + (obs.length > 60 ? obs.slice(0,60) + '…' : obs) + ')' : ''} · líder ${nomeLider(f.lider)}`;
   const res = await pedirLoginInspetor({
-    titulo: 'Confirmar refugo',
+    titulo: `Confirmar ${cat.nome.toLowerCase()}`,
     descricao: resumo,
     aoConfirmar: async (login, senha)=>{
       const { data, error } = await sb.rpc('registrar_refugo', {
         p_login: login, p_senha: senha, p_data: f.dia, p_linha_id: f.linha,
         p_produto: f.produto, p_peso_kg: peso, p_motivo: f.motivo, p_lider_re: f.lider, p_observacao: obs || null,
+        p_categoria: cat.id,
       });
       if (error) return { ok:false, erro:'Falha ao registrar: ' + error.message };
       return data;
@@ -3651,7 +3728,7 @@ async function registrarRefugoClique(){
   if (res.lider_re && res.lider_nome) NOME_POR_RE[res.lider_re] = res.lider_nome;
   if (!REFUGO_RECENTES.some(x=>x.id===res.id)){ // o Realtime pode ter chegado antes da resposta
     REFUGO_RECENTES.unshift({ id:res.id, criado_em:new Date().toISOString(), data:f.dia, turno:null, linha_id:f.linha,
-      produto:f.produto, peso_kg:peso, motivo:f.motivo, observacao: obs || null, inspetor_login:res.inspetor_login || res._login, lider_re:res.lider_re });
+      produto:f.produto, peso_kg:peso, motivo:f.motivo, observacao: obs || null, categoria: cat.id, inspetor_login:res.inspetor_login || res._login, lider_re:res.lider_re });
     REFUGO_RECENTES = REFUGO_RECENTES.slice(0, REFUGO_RECENTES_MAX);
   }
   REFUGO_CACHE = {};
@@ -3660,7 +3737,7 @@ async function registrarRefugoClique(){
   renderRankingRefugo();
   const m2 = document.getElementById('refugoMsg');
   m2.style.color = 'var(--ok)';
-  m2.textContent = `Registrado ✓ — atribuído a ${nomeLider(res.lider_re)}.`;
+  m2.textContent = `${cat.registrado} ✓ — atribuído a ${nomeLider(res.lider_re)}.`;
 }
 
 async function trocarSenhaInspetor(){
@@ -3763,9 +3840,10 @@ async function buscarRefugoIntervalo(deISO, ateExclusivoISO){
 }
 
 // junta refugo e produção do período por líder
-function rankingRefugoPorLider(refugos, producao, produto){
+function rankingRefugoPorLider(refugos, producao, produto, categoria){
+  categoria = categoria || 'refugo';
   const m = {};
-  (refugos || []).filter(r => !produto || r.produto === produto).forEach(r=>{
+  (refugos || []).filter(r => (!produto || r.produto === produto) && catDe(r) === categoria).forEach(r=>{
     const re = r.lider_re || '—';
     const x = m[re] || (m[re] = { re, kg:0, n:0, motivos:{} });
     x.kg += Number(r.peso_kg); x.n += 1;
@@ -3785,7 +3863,7 @@ function rankingRefugoPorLider(refugos, producao, produto){
 function htmlRefugoCard(titulo, periodo, ranking){
   if (!ranking.length){
     return `<div class="card ranking-card"><div class="ranking-card-titulo">${titulo}</div><div class="ranking-card-periodo">${periodo}</div>
-      <div class="relatorio-vazio">Nenhum refugo${RANKING_PRODUTO ? ' de '+escHtml(RANKING_PRODUTO) : ''} nesse período.</div></div>`;
+      <div class="relatorio-vazio">${catNQ(NQ_CAT_ANALISE).nenhum}${RANKING_PRODUTO ? ' de '+escHtml(RANKING_PRODUTO) : ''} nesse período.</div></div>`;
   }
   const maior = Math.max(...ranking.map(x=>x.kg));
   const total = ranking.reduce((s,x)=>s+x.kg, 0);
@@ -3808,13 +3886,24 @@ function htmlRefugoCard(titulo, periodo, ranking){
 }
 
 // ---------- mapa de refugo (treemap) — motivo → produto (ou linha, se filtrar produto) ----------
-let MAPA_REFUGO_PERIODO = 'mes'; // 'mes' (mês fechado do filtro) | 'vig' (mês vigente) | 'dia' (dia anterior)
+let MAPA_REFUGO_PERIODO = 'vig'; // 'vig' (mês vigente, até agora — padrão) | 'mes' (mês fechado do filtro) | 'dia' (dia anterior)
 let _mapaRefugoToken = 0;
 // cores pela ORDEM DE TAMANHO no gráfico (maior = vermelho), em sequência bem contrastante
 // para blocos vizinhos nunca ficarem parecidos; a tabela ao lado repete a cor de cada motivo
 const MOTIVO_CORES = ['#FF3B30','#007AFF','#FF9500','#AF52DE','#34C759','#5856D6','#30B0C7','#A2845E','#FF2D55','#8E8E93'];
 let _coresMotivo = {};
 function corDoMotivo(nome){ return _coresMotivo[nome] || '#8E8E93'; }
+// o mapa usa tons da COR DA CATEGORIA (vermelhos = refugo, laranjas = retrabalho,
+// amarelos = aprovação condicional), do maior motivo para o menor
+const PALETAS_NQ = {
+  refugo:      ['#D70015','#FF3B30','#B3261E','#E8505B','#9C1C1C','#F26B6B','#7F1414','#C94A4A'],
+  retrabalho:  ['#C25E00','#FF9500','#A34D00','#E67E22','#8A4100','#F2A03D','#6E3400','#D9822B'],
+  condicional: ['#E6B800','#FFCC00','#D4A900','#F2C94C','#C9A227','#FFD95A','#B8962E','#E0B000'],
+};
+function atribuirCoresMotivo(grupos){
+  const pal = PALETAS_NQ[NQ_CAT_ANALISE] || PALETAS_NQ.refugo;
+  _coresMotivo = {}; grupos.forEach((g,i)=>{ _coresMotivo[g.nome] = pal[i % pal.length]; });
+}
 
 // treemap "squarified": retângulos o mais quadrados possível, área proporcional ao valor
 function squarify(itens, x, y, w, h){
@@ -3840,9 +3929,10 @@ function squarify(itens, x, y, w, h){
   return out;
 }
 
-function agruparRefugo(refugos, produto){
+function agruparRefugo(refugos, produto, categoria){
+  categoria = categoria || 'refugo';
   const porMotivo = {};
-  (refugos || []).filter(r => !produto || r.produto === produto).forEach(r=>{
+  (refugos || []).filter(r => (!produto || r.produto === produto) && catDe(r) === categoria).forEach(r=>{
     const m = porMotivo[r.motivo] || (porMotivo[r.motivo] = { nome:r.motivo, valor:0, filhos:{} });
     m.valor += Number(r.peso_kg);
     const chave = produto ? nomeLinhaId(r.linha_id) : r.produto; // filtrou produto → abre por linha
@@ -3853,32 +3943,34 @@ function agruparRefugo(refugos, produto){
 }
 
 function svgTreemapRefugo(grupos){
-  _coresMotivo = {}; grupos.forEach((g,i)=>{ _coresMotivo[g.nome] = MOTIVO_CORES[i % MOTIVO_CORES.length]; });
+  atribuirCoresMotivo(grupos);
+  const txtFilho = NQ_CAT_ANALISE === 'condicional' ? '#3D2E00' : '#fff';   // amarelo pede texto escuro
+  const txtCab = NQ_CAT_ANALISE === 'condicional' ? '#6B4F00' : null;
   const W = 1000, H = 440, CAB = 22, total = grupos.reduce((s,g)=>s+g.valor,0);
   const pct = v => `${(v/total*100).toLocaleString('pt-BR',{maximumFractionDigits:1})}%`;
   let svg = `<svg class="mapa-refugo-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Mapa de refugo por motivo">`;
   squarify(grupos, 0, 0, W, H).forEach(g=>{
     const cor = corDoMotivo(g.nome), pad = 2;
     const gx = g.x+pad, gy = g.y+pad, gw = Math.max(0, g.w-pad*2), gh = Math.max(0, g.h-pad*2);
-    svg += `<g><title>${escHtml(g.nome)} · ${fmtKg(g.valor)} · ${pct(g.valor)} do refugo</title>`;
+    svg += `<g><title>${escHtml(g.nome)} · ${fmtKg(g.valor)} · ${pct(g.valor)} do total de ${catNQ(NQ_CAT_ANALISE).nome.toLowerCase()}</title>`;
     svg += `<rect x="${gx}" y="${gy}" width="${gw}" height="${gh}" rx="8" fill="${cor}" fill-opacity=".16"></rect>`;
     const temCab = gh > CAB + 16 && gw > 60;
     if (temCab){
       const maxCh = Math.floor((gw - 16) / 7.6);
       let rot = `${g.nome} · ${fmtT(g.valor)} · ${pct(g.valor)}`;
       if (rot.length > maxCh) rot = g.nome.length > maxCh ? g.nome.slice(0, Math.max(3,maxCh-1)) + '…' : g.nome;
-      svg += `<text class="mapa-motivo" x="${gx+8}" y="${gy+15}" fill="${cor}">${escHtml(rot)}</text>`;
+      svg += `<text class="mapa-motivo" x="${gx+8}" y="${gy+15}" fill="${txtCab || cor}">${escHtml(rot)}</text>`;
     }
     const top = temCab ? CAB : 0;
     squarify(g.filhos, gx+3, gy+top+2, gw-6, gh-top-5).forEach((f,i)=>{
       const op = Math.max(.45, .9 - i*.12);
-      svg += `<g><title>${escHtml(g.nome)} → ${escHtml(f.nome)} · ${fmtKg(f.valor)} (${pct(f.valor)} do refugo)</title>`;
+      svg += `<g><title>${escHtml(g.nome)} → ${escHtml(f.nome)} · ${fmtKg(f.valor)} (${pct(f.valor)} do total de ${catNQ(NQ_CAT_ANALISE).nome.toLowerCase()})</title>`;
       svg += `<rect x="${f.x+1}" y="${f.y+1}" width="${Math.max(0,f.w-2)}" height="${Math.max(0,f.h-2)}" rx="6" fill="${cor}" fill-opacity="${op}"></rect>`;
       if (f.w > 64 && f.h > 34){
         const maxCh = Math.floor((f.w - 14) / 7.4);
         const nome = f.nome.length > maxCh ? f.nome.slice(0, Math.max(2,maxCh-1)) + '…' : f.nome;
-        svg += `<text class="mapa-filho" x="${f.x+8}" y="${f.y+18}">${escHtml(nome)}</text>`;
-        svg += `<text class="mapa-filho-kg" x="${f.x+8}" y="${f.y+33}">${fmtKg(f.valor)}</text>`;
+        svg += `<text class="mapa-filho" x="${f.x+8}" y="${f.y+18}" style="fill:${txtFilho}">${escHtml(nome)}</text>`;
+        svg += `<text class="mapa-filho-kg" x="${f.x+8}" y="${f.y+33}" style="fill:${txtFilho}; opacity:.9">${fmtKg(f.valor)}</text>`;
       }
       svg += `</g>`;
     });
@@ -3895,11 +3987,12 @@ function renderMapaRefugo(){
   const mesSel = RANKING_MES_SELECIONADO && RANKING_MES_SELECIONADO < mesVigente ? RANKING_MES_SELECIONADO : deslocarMes(mesVigente, -1);
   const anterior = diaProdutivoAnteriorISO();
   const periodos = {
+    vig: { rot:`Mês vigente · ${nomeMes(mesVigente)} (até agora)`, de: mesVigente+'-01', ate: deslocarDiaISO(PRODUCAO_DIA_ATUAL, 1) },
     mes: { rot:`Mês fechado · ${nomeMes(mesSel)}`, de: mesSel+'-01', ate: deslocarMes(mesSel,1)+'-01' },
-    vig: { rot:`Mês vigente · ${nomeMes(mesVigente)}`, de: mesVigente+'-01', ate: PRODUCAO_DIA_ATUAL },
     dia: { rot:`Dia anterior · ${fmtDataCurtaBR(anterior)}`, de: anterior, ate: PRODUCAO_DIA_ATUAL },
   };
-  const p = periodos[MAPA_REFUGO_PERIODO] || periodos.mes;
+  const p = periodos[MAPA_REFUGO_PERIODO] || periodos.vig;
+  const catMapa = catNQ(NQ_CAT_ANALISE);
   const abertura = RANKING_PRODUTO ? `${escHtml(RANKING_PRODUTO)} · blocos por linha` : 'todos os produtos · blocos por produto';
   wrap.innerHTML = `
     <div class="card mapa-refugo-card">
@@ -3916,9 +4009,9 @@ function renderMapaRefugo(){
   buscarRefugoIntervalo(p.de, p.ate).then(refugos=>{
     if (token !== _mapaRefugoToken) return;
     const corpo = wrap.querySelector('.mapa-refugo-corpo');
-    const grupos = agruparRefugo(refugos, RANKING_PRODUTO);
-    if (!grupos.length){ corpo.innerHTML = `<div class="relatorio-vazio">Nenhum refugo${RANKING_PRODUTO ? ' de '+escHtml(RANKING_PRODUTO) : ''} nesse período.</div>`; return; }
-    _coresMotivo = {}; grupos.forEach((g,i)=>{ _coresMotivo[g.nome] = MOTIVO_CORES[i % MOTIVO_CORES.length]; }); // antes da tabela
+    const grupos = agruparRefugo(refugos, RANKING_PRODUTO, catMapa.id);
+    if (!grupos.length){ corpo.innerHTML = `<div class="relatorio-vazio">${catMapa.nenhum}${RANKING_PRODUTO ? ' de '+escHtml(RANKING_PRODUTO) : ''} nesse período.</div>`; return; }
+    atribuirCoresMotivo(grupos); // antes da tabela
     const total = grupos.reduce((s,g)=>s+g.valor,0);
     let acum = 0;
     const lista = grupos.map(g=>{
@@ -3932,7 +4025,7 @@ function renderMapaRefugo(){
       <div class="mapa-refugo-grid">
         <div class="mapa-refugo-arvore">${svgTreemapRefugo(grupos)}</div>
         <div>
-          <div class="mapa-total">Total refugado <strong>${fmtT(total)}</strong></div>
+          <div class="mapa-total">Total · ${escHtml(catMapa.nome.toLowerCase())} <strong style="color:${catMapa.texto};">${fmtT(total)}</strong></div>
           <table class="data-table param-table apont-table mapa-tabela">
             <thead><tr><th>Motivo</th><th style="text-align:right;">Peso</th><th style="text-align:right;">%</th><th style="text-align:right;" title="Percentual acumulado (Pareto)">Acum.</th></tr></thead>
             <tbody>${lista}</tbody>
@@ -3942,10 +4035,18 @@ function renderMapaRefugo(){
   });
 }
 
+let NQ_CAT_ANALISE = 'refugo'; // categoria mostrada no ranking por líder e no mapa
+function htmlSeletorCatNQ(){
+  return `<div class="nq-seg nq-seg-analise" role="tablist">${CATEGORIAS_NQ.map(c=>`<button type="button" class="${c.id===NQ_CAT_ANALISE?'ativo':''}" data-nq-analise="${c.id}" style="--nq:${c.cor}; --nq-fundo:${c.fundo}; --nq-texto:${c.texto};"><i></i>${c.nome}</button>`).join('')}</div>`;
+}
+function ligarSeletorCatNQ(wrap){
+  wrap.querySelectorAll('[data-nq-analise]').forEach(b=>b.addEventListener('click', ()=>{ NQ_CAT_ANALISE = b.dataset.nqAnalise; renderRankingRefugo(); }));
+}
 function renderRankingRefugo(){
   const wrap = document.getElementById('refugoRankingWrap');
   if (!wrap) return;
-  renderMapaRefugo(); // mesmo filtro de produto/mês
+  renderMapaRefugo(); // mesmo filtro de produto/mês e mesma categoria
+  const cat = NQ_CAT_ANALISE;
   const token = ++_refugoRankToken;
   const mesVigente = mesDoDiaISO(PRODUCAO_DIA_ATUAL);
   const mesSel = RANKING_MES_SELECIONADO && RANKING_MES_SELECIONADO < mesVigente ? RANKING_MES_SELECIONADO : deslocarMes(mesVigente, -1);
@@ -3954,20 +4055,21 @@ function renderRankingRefugo(){
   const tMes = `${mesSel === deslocarMes(mesVigente,-1) ? 'Mês anterior' : 'Mês'} · ${nomeMes(mesSel)}`;
   const tVig = `Mês vigente · ${nomeMes(mesVigente)}`;
   const tDia = 'Dia anterior · fechado';
-  wrap.innerHTML = `<div class="ranking-grid">
+  wrap.innerHTML = `${htmlSeletorCatNQ()}<div class="ranking-grid nq-rank-${cat}">
       <div data-rr="mes">${carregando(tMes)}</div><div data-rr="vig">${carregando(tVig)}</div><div data-rr="dia">${carregando(tDia)}</div>
     </div>`;
+  ligarSeletorCatNQ(wrap);
   const por = (sel, html) => { if (token === _refugoRankToken){ const el = wrap.querySelector(`[data-rr="${sel}"]`); if (el) el.innerHTML = html; } };
 
   Promise.all([buscarRefugoIntervalo(mesSel+'-01', deslocarMes(mesSel,1)+'-01'), registrosDoMes(mesSel, false)])
-    .then(([ref, prod]) => por('mes', htmlRefugoCard(tMes, `produzido de 01/${mesSel.slice(5)} a ${fmtDataCurtaBR(deslocarDiaISO(deslocarMes(mesSel,1)+'-01',-1))}`, rankingRefugoPorLider(ref, prod, RANKING_PRODUTO))));
+    .then(([ref, prod]) => por('mes', htmlRefugoCard(tMes, `produzido de 01/${mesSel.slice(5)} a ${fmtDataCurtaBR(deslocarDiaISO(deslocarMes(mesSel,1)+'-01',-1))}`, rankingRefugoPorLider(ref, prod, RANKING_PRODUTO, cat))));
   Promise.all([buscarRefugoIntervalo(mesVigente+'-01', PRODUCAO_DIA_ATUAL), registrosDoMes(mesVigente, true)])
     .then(([ref, prod]) => por('vig', PRODUCAO_DIA_ATUAL.endsWith('-01')
       ? `<div class="card ranking-card"><div class="ranking-card-titulo">${tVig}</div><div class="relatorio-vazio">Primeiro dia do mês ainda em andamento.</div></div>`
-      : htmlRefugoCard(tVig, `dias fechados · 01/${mesVigente.slice(5)} a ${fmtDataCurtaBR(anterior)}`, rankingRefugoPorLider(ref, prod, RANKING_PRODUTO))));
+      : htmlRefugoCard(tVig, `dias fechados · 01/${mesVigente.slice(5)} a ${fmtDataCurtaBR(anterior)}`, rankingRefugoPorLider(ref, prod, RANKING_PRODUTO, cat))));
   buscarRefugoIntervalo(anterior, PRODUCAO_DIA_ATUAL).then(ref=>{
     const prod = (PRODUCAO_REGISTROS_10D || []).filter(r => diaDoRegistro(r) === anterior);
-    por('dia', htmlRefugoCard(tDia, `produzido em ${fmtDataCurtaBR(anterior)}`, rankingRefugoPorLider(ref, prod, RANKING_PRODUTO)));
+    por('dia', htmlRefugoCard(tDia, `produzido em ${fmtDataCurtaBR(anterior)}`, rankingRefugoPorLider(ref, prod, RANKING_PRODUTO, cat)));
   });
 }
 
@@ -4075,7 +4177,7 @@ function buildProducaoHTML(){
           </div>
           <div class="producao-ontem-numero" id="ontemTotal-${linha.id}">${produto ? textoOntem(linha.id, produto) : '—'}</div>
           <div class="producao-ontem-periodo">${fmtDataCurtaBR(diaProdutivoAnteriorISO())} ${rotuloVirada(diaProdutivoAnteriorISO())} → ${fmtDataCurtaBR(PRODUCAO_DIA_ATUAL)} ${rotuloVirada(PRODUCAO_DIA_ATUAL)} · fechado</div>
-          <div class="producao-ontem-refugo" data-refugo-ontem="${linha.id}"><span class="rot">Refugou</span><span class="val">…</span></div>
+          <div class="nq-bloco nq-azul" data-refugo-ontem="${linha.id}"></div>
         </div>
         ${htmlHojeLinha(linha.id)}
         </div>
