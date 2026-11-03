@@ -596,6 +596,7 @@ main:has(#view-producao.active){ max-width:1800px; }
 .refugo-form label{ display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:500; color:var(--ink-soft); }
 .refugo-form .param-input{ width:100%; }
 .refugo-form .refugo-lider{ grid-column:1 / -1; }
+.refugo-form .refugo-inspetor select{ font-weight:600; }
 .refugo-obs-label{ display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:500; color:var(--ink-soft); margin-top:10px; }
 .refugo-obs-label .hint{ font-weight:400; }
 textarea.refugo-obs{ width:100%; height:auto; min-height:52px; resize:vertical; text-align:left; font-family:inherit; line-height:1.35; padding:8px 10px; }
@@ -3617,7 +3618,7 @@ const REFUGO_RECENTES_MAX = 30;
 let MOTIVOS_REFUGO = [];      // [{id, nome, ativo, ordem}]
 let REFUGO_RECENTES = [];     // últimos apontamentos (mais novo primeiro)
 let REFUGO_CACHE = {};        // chave de período → registros
-let REFUGO_FORM = { categoria:'refugo', dia:null, linha:null, produto:null, peso:'', motivo:null, lider:null, liderManual:false, obs:'' };
+let REFUGO_FORM = { inspetor:null, categoria:'refugo', dia:null, linha:null, produto:null, peso:'', motivo:null, lider:null, liderManual:false, obs:'' };
 // exemplo do campo de observação muda conforme o motivo (o texto é livre)
 const EXEMPLO_OBS_REFUGO = {
   'Camada baixa': 'ex: camada média 6,8 µm (especificação 10 µm), tambor 3',
@@ -3663,6 +3664,14 @@ function diasRefugoOpcoes(){
 function renderRefugo(){
   const wrap = document.getElementById('refugoWrap');
   if (!wrap) return;
+  if (INSPETORES_ATIVOS === null && sb && !renderRefugo._carregandoInsp){
+    renderRefugo._carregandoInsp = true;
+    sb.rpc('listar_inspetores').then(({ data, error })=>{
+      INSPETORES_ATIVOS = error ? [] : (data || []).filter(i=>i.ativo).map(i=>i.login);
+      renderRefugo._carregandoInsp = false;
+      if (document.getElementById('view-producao').classList.contains('active')) renderRefugo();
+    });
+  }
   const f = REFUGO_FORM;
   const dias = diasRefugoOpcoes();
   if (!f.dia || !dias.includes(f.dia)) f.dia = PRODUCAO_DIA_ATUAL;
@@ -3711,7 +3720,6 @@ function renderRefugo(){
       <div class="card quimico-card refugo-form-card">
         <div class="refugo-form-topo">
           <h3 class="param-card-title" style="margin:0;">Apontar não qualidade</h3>
-          <button type="button" class="refugo-link" data-refugo-trocar-senha>Trocar minha senha</button>
         </div>
         <div class="nq-seg" role="tablist">
           ${CATEGORIAS_NQ.map(c=>`<button type="button" class="${c.id===f.categoria?'ativo':''}" data-nq-cat="${c.id}" style="--nq:${c.cor}; --nq-fundo:${c.fundo}; --nq-texto:${c.texto};"><i></i>${c.nome}</button>`).join('')}
@@ -3730,6 +3738,12 @@ function renderRefugo(){
           </label>
           <label>Peso (kg)
             <input type="number" min="0" step="0.5" class="param-input" data-refugo="peso" placeholder="ex: 350" value="${escHtml(f.peso)}">
+          </label>
+          <label class="refugo-lider refugo-inspetor">Inspetor (controlador) que está apontando
+            <select class="param-input" data-refugo="inspetor">
+              <option value="">${INSPETORES_ATIVOS ? 'Quem é você?' : 'Carregando inspetores…'}</option>
+              ${(INSPETORES_ATIVOS || []).map(n=>`<option value="${escHtml(n)}" ${n===f.inspetor?'selected':''}>${escHtml(n)}</option>`).join('')}
+            </select>
           </label>
           <label class="refugo-lider">Líder responsável pela produção
             <select class="param-input" data-refugo="lider">
@@ -3780,7 +3794,6 @@ function renderRefugo(){
   wrap.querySelectorAll('[data-nq-cat]').forEach(b=>b.addEventListener('click', ()=>{ f.categoria = b.dataset.nqCat; renderRefugo(); }));
   wrap.querySelector('[data-refugo-registrar]').addEventListener('click', registrarRefugoClique);
   atualizarRefugoOntem();
-  wrap.querySelector('[data-refugo-trocar-senha]').addEventListener('click', trocarSenhaInspetor);
 }
 
 async function registrarRefugoClique(){
@@ -3788,6 +3801,7 @@ async function registrarRefugoClique(){
   const msg = document.getElementById('refugoMsg');
   msg.style.color = 'var(--crit)';
   const peso = parseFloat(String(f.peso).replace(',', '.'));
+  if (!f.inspetor){ msg.textContent = 'Escolha o seu nome no campo "Inspetor (controlador)".'; return; }
   if (!f.produto){ msg.textContent = 'Escolha o produto.'; return; }
   if (!peso || peso <= 0){ msg.textContent = 'Informe o peso em kg.'; return; }
   if (!f.motivo){ msg.textContent = 'Escolha o motivo.'; return; }
@@ -3798,24 +3812,25 @@ async function registrarRefugoClique(){
   const obs = String(f.obs || '').trim().slice(0, 500);
   const cat = catNQ(f.categoria);
   const resumo = `${cat.nome.toUpperCase()} · ${fmtKg(peso)} de ${f.produto} · ${nomeLinhaId(f.linha)} · produzido em ${fmtDataCurtaBR(f.dia)} · ${f.motivo}${obs ? ' (' + (obs.length > 60 ? obs.slice(0,60) + '…' : obs) + ')' : ''} · líder ${nomeLider(f.lider)}`;
-  const res = await pedirLoginInspetor({
-    titulo: `Confirmar ${cat.nome.toLowerCase()}`,
-    descricao: resumo,
-    aoConfirmar: async (login, senha)=>{
-      const { data, error } = await sb.rpc('registrar_refugo', {
-        p_login: login, p_senha: senha, p_data: f.dia, p_linha_id: f.linha,
-        p_produto: f.produto, p_peso_kg: peso, p_motivo: f.motivo, p_lider_re: f.lider, p_observacao: obs || null,
-        p_categoria: cat.id,
-      });
-      if (error) return { ok:false, erro:'Falha ao registrar: ' + error.message };
-      return data;
-    }
+  // sem senha: o inspetor só escolhe o nome (correções ficam com o gestor da qualidade)
+  const btnReg = document.querySelector('[data-refugo-registrar]');
+  if (btnReg) btnReg.disabled = true;
+  msg.style.color = 'var(--ink-soft)'; msg.textContent = 'Registrando…';
+  const { data: res, error } = await sb.rpc('registrar_refugo', {
+    p_login: f.inspetor, p_senha: '', p_data: f.dia, p_linha_id: f.linha,
+    p_produto: f.produto, p_peso_kg: peso, p_motivo: f.motivo, p_lider_re: f.lider, p_observacao: obs || null,
+    p_categoria: cat.id,
   });
-  if (!res) return; // cancelou
+  if (btnReg) btnReg.disabled = false;
+  if (error || !res || !res.ok){
+    msg.style.color = 'var(--crit)';
+    msg.textContent = error ? 'Falha ao registrar: ' + error.message : ((res && res.erro) || 'Não foi possível registrar.');
+    return;
+  }
   if (res.lider_re && res.lider_nome) NOME_POR_RE[res.lider_re] = res.lider_nome;
   if (!REFUGO_RECENTES.some(x=>x.id===res.id)){ // o Realtime pode ter chegado antes da resposta
     REFUGO_RECENTES.unshift({ id:res.id, criado_em:new Date().toISOString(), data:f.dia, turno:null, linha_id:f.linha,
-      produto:f.produto, peso_kg:peso, motivo:f.motivo, observacao: obs || null, categoria: cat.id, inspetor_login:res.inspetor_login || res._login, lider_re:res.lider_re });
+      produto:f.produto, peso_kg:peso, motivo:f.motivo, observacao: obs || null, categoria: cat.id, inspetor_login:res.inspetor_login || f.inspetor, lider_re:res.lider_re });
     REFUGO_RECENTES = REFUGO_RECENTES.slice(0, REFUGO_RECENTES_MAX);
   }
   REFUGO_CACHE = {};
