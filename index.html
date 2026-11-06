@@ -733,6 +733,22 @@ main:has(#view-qualidade.active){ max-width:1800px; }
 .gnq-form .param-input:disabled{ opacity:.6; }
 .gnq-just textarea{ background:#FFF8E6 !important; }
 .btn.gnq-abrir{ font-size:12px; }
+
+/* ---------- insumos químicos ---------- */
+main:has(#view-insumos.active){ max-width:1800px; }
+.re-insumo-grid{ display:grid; grid-template-columns:1.6fr 1fr; gap:10px; margin-bottom:6px; }
+.re-insumo-grid label{ display:flex; flex-direction:column; gap:4px; }
+.re-insumo-grid .param-input{ width:100% !important; margin:0 !important; height:38px; }
+.re-qtd{ display:flex; align-items:center; gap:6px; } .re-qtd b{ font-size:13px; color:var(--ink-soft); text-transform:none; letter-spacing:0; }
+#reModalInsumoHint{ font-size:12px !important; line-height:1.35; color:var(--ink-soft); }
+.est-topo{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+.est-sessao{ font-size:13px; color:var(--ink-soft); }
+.est-status{ display:inline-block; font-size:11px; font-weight:700; padding:2px 8px; border-radius:6px; white-space:nowrap; }
+.est-status.ok{ background:#E8F7EC; color:#248A3D; } .est-status.warn{ background:#FFF2DE; color:#B25000; }
+.est-status.crit{ background:#FFE9E7; color:#D70015; } .est-status.neutro{ background:rgba(118,118,128,.12); color:#6E6E73; }
+.est-tipo{ font-size:11px; font-weight:700; padding:2px 7px; border-radius:6px; }
+.est-tipo.entrada{ background:#E8F7EC; color:#248A3D; } .est-tipo.consumo{ background:#FFE9E7; color:#D70015; } .est-tipo.inventario{ background:#E7F0FF; color:#0060DF; }
+td.num.neg b{ color:#D70015; } td.num.pos b{ color:#248A3D; }
 @media (prefers-reduced-motion: reduce){ *{ animation:none !important; } }
 </style>
 </head>
@@ -753,6 +769,7 @@ main:has(#view-qualidade.active){ max-width:1800px; }
     <button class="tab-btn" data-view="pendencias">Pendências</button>
     <button class="tab-btn" data-view="producao">Produção</button>
     <button class="tab-btn" data-view="qualidade">Qualidade</button>
+    <button class="tab-btn" data-view="insumos">Insumos</button>
     <button class="tab-btn" data-view="parametros">Parâmetros</button>
     <button class="tab-btn tv-btn" data-view="tv">▶ Modo TV</button>
   </div>
@@ -851,6 +868,11 @@ main:has(#view-qualidade.active){ max-width:1800px; }
     <div id="qualidadeWrap"></div>
   </div>
 
+  <div class="view" id="view-insumos">
+    <h2 class="section-title">Insumos químicos · validação e estoque <span style="font-size:13px; font-weight:500; color:var(--ink-soft);">(correções dos operadores → validação do supervisor → baixa no estoque)</span></h2>
+    <div id="insumosWrap"></div>
+  </div>
+
   <div class="view" id="view-producao">
     <h2 class="section-title">Produção diária · por linha e turno <span style="font-size:13px; font-weight:500; color:var(--ink-soft);">(dia produtivo <span id="producaoViradaTxt">07h30 → 07h30</span>)</span></h2>
     <div id="producaoWrap" class="quimicos-grid"></div>
@@ -904,6 +926,7 @@ main:has(#view-qualidade.active){ max-width:1800px; }
       monitorar aquele limite (ex: Europa não tem faixa de temperatura).
     </div>
     <div id="paramQuimicosWrap"></div>
+    <div id="paramInsumosWrap"></div>
   </div>
 
   <!-- ============ VIEW: TV ============ -->
@@ -1006,6 +1029,17 @@ main:has(#view-qualidade.active){ max-width:1800px; }
       </div>
       <div class="camada-media">Média Liga: <span id="ligaMediaValor">—</span> % &nbsp;·&nbsp; Média Camada: <span id="camadaMediaValor">—</span> µm</div>
     </div>
+    <div id="reModalInsumoWrap" style="display:none;">
+      <div class="re-insumo-grid">
+        <label class="camada-titulo">Insumo adicionado
+          <select id="reModalInsumo" class="param-input"></select>
+        </label>
+        <label class="camada-titulo">Quantidade
+          <span class="re-qtd"><input type="number" id="reModalQtd" min="0" step="0.1" placeholder="ex: 50" class="param-input"><b id="reModalUnidade">kg</b></span>
+        </label>
+      </div>
+      <div class="hint" id="reModalInsumoHint" style="margin:-2px 0 8px;">A quantidade vai para validação do supervisor antes de baixar do estoque.</div>
+    </div>
     <div id="reModalTextoWrap" style="display:none;">
       <label class="camada-titulo" for="reModalTexto">Ação tomada</label>
       <textarea id="reModalTexto" rows="3" placeholder="Ex: Adicionado 50kg de Cu"></textarea>
@@ -1040,6 +1074,11 @@ main:has(#view-qualidade.active){ max-width:1800px; }
 <!-- Modal: gestor da qualidade — corrigir/excluir apontamentos (auditado) -->
 <div class="modal-overlay" id="gestorNqOverlay" style="z-index:640;">
   <div class="modal-box gnq-box"><div id="gestorNqCorpo"></div></div>
+</div>
+
+<!-- Modal: supervisor do controle químico (login, validação, entrada, inventário) -->
+<div class="modal-overlay" id="supQuimOverlay" style="z-index:645;">
+  <div class="modal-box" style="max-width:520px;"><div id="supQuimCorpo"></div></div>
 </div>
 
 <!-- Modal: cofre de 3 senhas pra liberar a aba Parâmetros -->
@@ -1096,6 +1135,7 @@ async function carregarDadosIniciais(){
     sb.from('colaboradores').select('re,nome').eq('ativo', true).order('nome', { ascending:true }),
   ]);
   LIDERES = (colabAtivos && colabAtivos.data) || [];
+  carregarInsumos(); // lista de insumos da janela de correção
   LIDERES.forEach(c=>{ if (c.nome) NOME_POR_RE[c.re] = c.nome; });
   // não qualidade (tabelas novas — se a migration ainda não rodou, só fica vazio)
   MOTIVOS_REFUGO = (motivosRefugo && motivosRefugo.data) || [];
@@ -1296,6 +1336,16 @@ function configurarRealtime(){
         });
       }
     })
+    .subscribe();
+
+  sb.channel('realtime-insumos')
+    .on('postgres_changes', { event:'*', schema:'public', table:'insumos_quimicos' }, async () => {
+      await carregarInsumos(); agendarRenderInsumos();
+      if (document.getElementById('view-parametros').classList.contains('active')) renderParamInsumos();
+    })
+    .on('postgres_changes', { event:'INSERT', schema:'public', table:'movimentos_estoque' }, () => agendarRenderInsumos())
+    .on('postgres_changes', { event:'UPDATE', schema:'public', table:'intervencoes_quimicas' }, () => agendarRenderInsumos())
+    .on('postgres_changes', { event:'INSERT', schema:'public', table:'intervencoes_quimicas' }, () => agendarRenderInsumos())
     .subscribe();
 
   sb.channel('realtime-refugo')
@@ -1510,6 +1560,18 @@ function pedirConfirmacaoRE(descricao, opcoes){
     const campoTexto = document.getElementById('reModalTextoWrap');
     campoTexto.style.display = opcoes.pedirTexto ? 'block' : 'none';
     document.getElementById('reModalTexto').value = '';
+    document.getElementById('reModalTexto').placeholder = opcoes.pedirInsumo && INSUMOS.some(i => i.ativo !== false)
+      ? 'Opcional — detalhes da correção (ex: adicionado em 2 etapas)' : 'Ex: Adicionado 50kg de Cu';
+    // insumo + quantidade (correção química): só aparece se houver insumo cadastrado
+    const ativos = INSUMOS.filter(i => i.ativo !== false);
+    const campoInsumo = document.getElementById('reModalInsumoWrap');
+    campoInsumo.style.display = (opcoes.pedirInsumo && ativos.length) ? 'block' : 'none';
+    if (opcoes.pedirInsumo && ativos.length){
+      const sel = document.getElementById('reModalInsumo');
+      sel.innerHTML = '<option value="">Escolha o insumo…</option>' + ativos.map(i => `<option value="${i.id}" data-unidade="${i.unidade}">${escHtml(i.nome)} (${i.unidade})</option>`).join('');
+      document.getElementById('reModalQtd').value = '';
+      document.getElementById('reModalUnidade').textContent = 'kg';
+    }
     document.getElementById('reModalBox').style.maxWidth = opcoes.pedirCamada ? '600px' : opcoes.pedirTexto ? '440px' : '380px';
     if (opcoes.pedirCamada){
       document.querySelectorAll('.camada-cell, .liga-cell').forEach(i=>{ i.value=''; i.disabled=false; });
@@ -1541,16 +1603,31 @@ document.getElementById('reModalConfirm').addEventListener('click', async ()=>{
     liga = mediaLiga; ligaValores = valoresLiga;
     camadaGrid = gridCamada; ligaGrid = gridLiga;
   }
+  let insumoId = null, quantidade = null;
+  if (document.getElementById('reModalInsumoWrap').style.display !== 'none'){
+    insumoId = Number(document.getElementById('reModalInsumo').value) || null;
+    quantidade = parseFloat(String(document.getElementById('reModalQtd').value).replace(',', '.'));
+    if (!insumoId){ errEl.textContent = 'Escolha o insumo adicionado.'; return; }
+    if (!quantidade || quantidade <= 0){ errEl.textContent = 'Informe a quantidade adicionada.'; return; }
+  }
   if (pedeTexto){
     texto = document.getElementById('reModalTexto').value.trim();
+    if (!texto && insumoId){ // com insumo + quantidade a descrição pode ficar em branco
+      const ins = INSUMOS.find(i => i.id === insumoId);
+      texto = `Adicionado ${String(quantidade).replace('.', ',')} ${ins ? ins.unidade : ''} de ${ins ? ins.nome : 'insumo'}`;
+    }
     if (!texto){ errEl.textContent = 'Descreva a ação tomada.'; return; }
   }
   if (!re || re.length !== 4){ errEl.textContent = 'Digite os 4 dígitos do seu RE.'; return; }
-  if (!sb){ fecharReModal({ re, camada, camadaValores, liga, ligaValores, texto, camadaGrid, ligaGrid }); return; } // sem conexão Supabase, só segue com o RE digitado
+  if (!sb){ fecharReModal({ re, camada, camadaValores, liga, ligaValores, texto, camadaGrid, ligaGrid, insumoId, quantidade }); return; } // sem conexão Supabase, só segue com o RE digitado
   errEl.textContent = 'Verificando…';
   const { data, error } = await sb.from('colaboradores').select('re,nome').eq('re', re).eq('ativo', true).maybeSingle();
   if (error || !data){ errEl.textContent = 'RE não encontrado ou inativo.'; return; }
-  fecharReModal({ ...data, camada, camadaValores, liga, ligaValores, texto, camadaGrid, ligaGrid });
+  fecharReModal({ ...data, camada, camadaValores, liga, ligaValores, texto, camadaGrid, ligaGrid, insumoId, quantidade });
+});
+document.getElementById('reModalInsumo').addEventListener('change', e=>{
+  const op = e.target.selectedOptions[0];
+  document.getElementById('reModalUnidade').textContent = (op && op.dataset.unidade) || 'kg';
 });
 document.getElementById('reModalInput').addEventListener('keydown', e=>{ if (e.key==='Enter') document.getElementById('reModalConfirm').click(); });
 document.getElementById('reModalInput').addEventListener('input', e=>{ e.target.value = e.target.value.replace(/\D/g,'').slice(0,4); });
@@ -2595,7 +2672,7 @@ function attachQuimicoHandlers(container){
     btn.addEventListener('click', async ()=>{
       const linhaId = btn.dataset.linha, elemento = btn.dataset.elemento;
       const nomeLinha = ESCOPOS[linhaId] || linhaId;
-      const col = await pedirConfirmacaoRE(`Registrar correção de ${elemento} — ${nomeLinha}. Digite seu RE:`, { pedirTexto: true });
+      const col = await pedirConfirmacaoRE(`Registrar correção de ${elemento} — ${nomeLinha}. Digite seu RE:`, { pedirTexto: true, pedirInsumo: true });
       if (!col) return;
       const agora = new Date().toISOString();
       // captura o "porquê" automaticamente — valor e faixa vigentes agora mesmo, sem precisar digitar de novo
@@ -2607,10 +2684,11 @@ function attachQuimicoHandlers(container){
           await sb.from('intervencoes_quimicas').insert({
             linha_id: linhaId, elemento, descricao: col.texto, colaborador_re: col.re,
             valor_no_momento: valorNoMomento, faixa_min: faixaMin, faixa_max: faixaMax,
+            insumo_id: col.insumoId || null, quantidade: col.quantidade || null,   // vira "pendente" para o supervisor
           });
         } catch(e){ console.error('Falha ao gravar intervenção química:', e); }
       }
-      registrarAcaoSupabase(col.re, 'intervencao_quimica', linhaId, null, elemento, { descricao: col.texto, valor_no_momento: valorNoMomento, faixa_min: faixaMin, faixa_max: faixaMax });
+      registrarAcaoSupabase(col.re, 'intervencao_quimica', linhaId, null, elemento, { descricao: col.texto, valor_no_momento: valorNoMomento, faixa_min: faixaMin, faixa_max: faixaMax, insumo_id: col.insumoId || null, quantidade: col.quantidade || null });
       renderQuimicos();
       if (document.body.classList.contains('tv-active')) renderTvScreens();
     });
@@ -4797,6 +4875,348 @@ function aplicarMudancaNQ(m){
   agendarRenderQualidade();
 }
 
+// =========================================================================
+// ESTOQUE DE INSUMOS — cálculos (funções puras, testadas em node)
+// =========================================================================
+// insumos: [{id, nome, unidade, estoque_minimo, ativo}] · movs: [{insumo_id, tipo, quantidade, criado_em, linha_id}]
+// saldo = soma de TODOS os movimentos; consumo/média/cobertura = janela dos últimos N dias
+function calcularEstoque(insumos, movs, agora, janelaDias){
+  janelaDias = janelaDias || 30;
+  const desde = new Date(agora.getTime() - janelaDias * 86400000);
+  return (insumos || []).map(i => {
+    const m = (movs || []).filter(x => Number(x.insumo_id) === Number(i.id));
+    const saldo = m.reduce((s,x)=>s+Number(x.quantidade), 0);
+    const consumoJanela = -m.filter(x => x.tipo === 'consumo' && new Date(x.criado_em) >= desde).reduce((s,x)=>s+Number(x.quantidade), 0);
+    const mediaDia = consumoJanela / janelaDias;
+    const cobertura = mediaDia > 0 ? Math.max(0, saldo) / mediaDia : null;   // dias até acabar no ritmo atual
+    const temInventario = m.some(x => x.tipo === 'inventario');
+    const min = Number(i.estoque_minimo) || 0;
+    let status = 'ok';
+    if (!temInventario) status = 'sem_inventario';
+    else if (saldo < 0) status = 'negativo';
+    else if (min > 0 && saldo <= min) status = 'baixo';
+    else if (min > 0 && saldo <= min * 1.25) status = 'atencao';
+    return { ...i, saldo, consumoJanela, mediaDia, cobertura, status, temInventario };
+  });
+}
+// consumo validado por linha e por insumo num intervalo [de, ate)
+function consumoPorLinha(movs, de, ate){
+  const m = {};
+  (movs || []).filter(x => x.tipo === 'consumo' && new Date(x.criado_em) >= de && new Date(x.criado_em) < ate).forEach(x => {
+    const k = x.linha_id || '—';
+    m[k] = m[k] || {}; m[k][x.insumo_id] = (m[k][x.insumo_id] || 0) - Number(x.quantidade);
+  });
+  return m;
+}
+// indicadores do processo de validação
+function indicadoresValidacao(intervs){
+  const comInsumo = (intervs || []).filter(i => i.status_validacao);
+  const pend = comInsumo.filter(i => i.status_validacao === 'pendente');
+  const valid = comInsumo.filter(i => i.status_validacao === 'aprovada' || i.status_validacao === 'rejeitada');
+  const aprov = valid.filter(i => i.status_validacao === 'aprovada');
+  const corrigidas = aprov.filter(i => Number(i.quantidade_validada) !== Number(i.quantidade) || Number(i.insumo_validado_id) !== Number(i.insumo_id));
+  const horas = valid.filter(i => i.validado_em).map(i => (new Date(i.validado_em) - new Date(i.criado_em)) / 3600000);
+  return {
+    pendentes: pend.length, validadas: valid.length,
+    pctRejeitadas: valid.length ? (valid.length - aprov.length) / valid.length * 100 : null,
+    pctCorrigidas: aprov.length ? corrigidas.length / aprov.length * 100 : null,
+    horasMediaValidacao: horas.length ? horas.reduce((a,b)=>a+b,0) / horas.length : null,
+    pendenteMaisAntigaH: pend.length ? Math.max(...pend.map(i => (Date.now() - new Date(i.criado_em)) / 3600000)) : null,
+  };
+}
+
+// =========================================================================
+// ESTOQUE DE INSUMOS — tela (aba "Insumos") e cadastro em Parâmetros
+// =========================================================================
+let INSUMOS = [];                 // cadastro (insumos_quimicos)
+let SUP_QUIMICO = null;           // { login, senha } do supervisor — só na memória, some ao sair da aba
+let EST_MOVS = [], EST_INTERV = [];
+let _estToken = 0, _estTimer = null;
+const STATUS_ESTOQUE = {
+  ok:{ rot:'OK', cls:'ok' }, atencao:{ rot:'Atenção', cls:'warn' }, baixo:{ rot:'Abaixo do mínimo', cls:'crit' },
+  negativo:{ rot:'Saldo negativo', cls:'crit' }, sem_inventario:{ rot:'Sem inventário', cls:'neutro' },
+};
+const fmtQ = (v, u) => `${Number(v).toLocaleString('pt-BR', { maximumFractionDigits:1 })} ${u || ''}`.trim();
+function nomeInsumo(id){ const i = INSUMOS.find(x => Number(x.id) === Number(id)); return i ? i.nome : '—'; }
+function unidadeInsumo(id){ const i = INSUMOS.find(x => Number(x.id) === Number(id)); return i ? i.unidade : ''; }
+
+async function carregarInsumos(){
+  if (!sb) return;
+  const { data, error } = await sb.from('insumos_quimicos').select('*').order('nome', { ascending:true });
+  if (!error) INSUMOS = data || [];
+}
+function agendarRenderInsumos(){
+  const v = document.getElementById('view-insumos');
+  if (!v || !v.classList.contains('active')) return;
+  clearTimeout(_estTimer); _estTimer = setTimeout(renderInsumos, 800);
+}
+
+// ---- login do supervisor (vale enquanto a aba estiver aberta) ----
+function pedirLoginSupervisor(){
+  return new Promise(resolve=>{
+    const ov = document.getElementById('supQuimOverlay'), c = document.getElementById('supQuimCorpo');
+    c.innerHTML = `<h3>Supervisor do controle químico</h3>
+      <p class="modal-desc">Validar intervenções e movimentar o estoque exige login. Tudo fica registrado com o seu nome.</p>
+      <input type="text" id="sqLogin" placeholder="Login" autocomplete="off">
+      <input type="password" id="sqSenha" placeholder="Senha" autocomplete="off">
+      <div class="modal-error" id="sqErro"></div>
+      <div class="modal-actions"><button class="btn" id="sqCancelar">Cancelar</button><button class="btn primary" id="sqEntrar">Entrar</button></div>`;
+    ov.style.display = 'flex';
+    const fim = r => { ov.style.display = 'none'; c.innerHTML = ''; resolve(r); };
+    const entrar = async ()=>{
+      const login = document.getElementById('sqLogin').value.trim(), senha = document.getElementById('sqSenha').value, err = document.getElementById('sqErro');
+      if (!login || !senha){ err.textContent = 'Digite login e senha.'; return; }
+      if (!sb){ err.textContent = 'Sem conexão com o banco.'; return; }
+      err.textContent = 'Verificando…';
+      const { data, error } = await sb.rpc('validar_gestor_quimico', { p_login: login, p_senha: senha });
+      if (error || !data || !data.ok){ err.textContent = (data && data.erro) || (error && error.message) || 'Login ou senha inválidos.'; document.getElementById('sqSenha').value=''; return; }
+      SUP_QUIMICO = { login: data.login, senha };
+      fim(true); renderInsumos();
+    };
+    document.getElementById('sqEntrar').addEventListener('click', entrar);
+    document.getElementById('sqCancelar').addEventListener('click', ()=>fim(false));
+    ['sqLogin','sqSenha'].forEach(id => document.getElementById(id).addEventListener('keydown', e=>{ if (e.key==='Enter') entrar(); }));
+    setTimeout(()=>document.getElementById('sqLogin').focus(), 50);
+  });
+}
+async function exigirSupervisor(){ return SUP_QUIMICO ? true : await pedirLoginSupervisor(); }
+
+// ---- ações do supervisor (formulário em janela) ----
+function abrirAcaoEstoque(html, aoConfirmar){
+  const ov = document.getElementById('supQuimOverlay'), c = document.getElementById('supQuimCorpo');
+  c.innerHTML = html + `<div class="modal-error" id="sqErro"></div>
+    <div class="modal-actions"><button class="btn" id="sqCancelar">Cancelar</button><button class="btn primary" id="sqOk">Confirmar</button></div>`;
+  ov.style.display = 'flex';
+  document.getElementById('sqCancelar').addEventListener('click', ()=>{ ov.style.display='none'; c.innerHTML=''; });
+  document.getElementById('sqOk').addEventListener('click', async ()=>{
+    const err = document.getElementById('sqErro'); err.textContent = 'Salvando…';
+    const btn = document.getElementById('sqOk'); btn.disabled = true;
+    const r = await aoConfirmar(err);
+    btn.disabled = false;
+    if (r === true){ ov.style.display='none'; c.innerHTML=''; await recarregarEstoque(); }
+  });
+}
+async function chamarRpcEstoque(nome, args, err){
+  const { data, error } = await sb.rpc(nome, { p_login: SUP_QUIMICO.login, p_senha: SUP_QUIMICO.senha, ...args });
+  if (error){ err.textContent = 'Falha: ' + error.message; return false; }
+  if (!data || !data.ok){ err.textContent = (data && data.erro) || 'Não foi possível salvar.'; if (data && /senha|Login/.test(data.erro || '')) SUP_QUIMICO = null; return false; }
+  return data;
+}
+async function validarIntervencaoUI(iv, acao){
+  if (!await exigirSupervisor()) return;
+  const ativos = INSUMOS.filter(i => i.ativo !== false);
+  if (acao === 'rejeitar'){
+    abrirAcaoEstoque(`<h3>Rejeitar correção</h3>
+      <p class="modal-desc">${escHtml(nomeLinhaId(iv.linha_id))} · ${escHtml(iv.elemento)} · ${fmtQ(iv.quantidade, iv.unidade)} de ${escHtml(nomeInsumo(iv.insumo_id))} · ${escHtml(iv.descricao || '')}</p>
+      <label class="camada-titulo">Motivo da rejeição (obrigatório)</label><textarea id="sqObs" rows="2" class="param-input" style="width:100%;" placeholder="ex: não foi adicionado, apenas medido"></textarea>`,
+      async err => !!(await chamarRpcEstoque('validar_intervencao_quimica', { p_id: iv.id, p_acao:'rejeitar', p_insumo_id:null, p_quantidade:null, p_obs: document.getElementById('sqObs').value }, err)));
+    return;
+  }
+  abrirAcaoEstoque(`<h3>Validar correção</h3>
+    <p class="modal-desc">${escHtml(nomeLinhaId(iv.linha_id))} · ${escHtml(iv.elemento)} · registrada por ${escHtml(iv.colaboradores && iv.colaboradores.nome || iv.colaborador_re)} em ${new Date(iv.criado_em).toLocaleString('pt-BR')}<br>“${escHtml(iv.descricao || '')}”</p>
+    <div class="re-insumo-grid">
+      <label class="camada-titulo">Insumo<select id="sqInsumo" class="param-input">${ativos.map(i=>`<option value="${i.id}" ${Number(i.id)===Number(iv.insumo_id)?'selected':''}>${escHtml(i.nome)} (${i.unidade})</option>`).join('')}</select></label>
+      <label class="camada-titulo">Quantidade<input type="number" id="sqQtd" min="0" step="0.1" class="param-input" value="${Number(iv.quantidade)}"></label>
+    </div>
+    <label class="camada-titulo">Observação <span class="hint">(obrigatória se alterar insumo ou quantidade)</span></label>
+    <textarea id="sqObs" rows="2" class="param-input" style="width:100%;" placeholder="ex: conferido na balança — 45 kg"></textarea>
+    <div class="hint" style="margin-top:6px;">Ao aprovar, a quantidade é <b>baixada do estoque</b>.</div>`,
+    async err => !!(await chamarRpcEstoque('validar_intervencao_quimica', { p_id: iv.id, p_acao:'aprovar',
+      p_insumo_id: Number(document.getElementById('sqInsumo').value), p_quantidade: parseFloat(String(document.getElementById('sqQtd').value).replace(',', '.')),
+      p_obs: document.getElementById('sqObs').value }, err)));
+}
+async function movimentoUI(tipo, insumoId){
+  if (!await exigirSupervisor()) return;
+  const ins = INSUMOS.find(i => Number(i.id) === Number(insumoId)); if (!ins) return;
+  const entrada = tipo === 'entrada';
+  abrirAcaoEstoque(`<h3>${entrada ? 'Entrada (compra)' : 'Inventário (contagem física)'} · ${escHtml(ins.nome)}</h3>
+    <p class="modal-desc">${entrada ? 'Soma ao estoque.' : 'Informe o que foi CONTADO no estoque. O sistema lança a diferença como ajuste e o saldo passa a ser a contagem.'}</p>
+    <label class="camada-titulo">${entrada ? 'Quantidade recebida' : 'Quantidade contada'} (${ins.unidade})</label>
+    <input type="number" id="sqQtd" min="0" step="0.1" class="param-input" style="width:100%;">
+    <label class="camada-titulo">Observação ${entrada ? '<span class="hint">(ex: nº da nota fiscal)</span>' : ''}</label>
+    <textarea id="sqObs" rows="2" class="param-input" style="width:100%;"></textarea>`,
+    async err => {
+      const q = parseFloat(String(document.getElementById('sqQtd').value).replace(',', '.'));
+      if (isNaN(q)){ err.textContent = 'Informe a quantidade.'; return false; }
+      const r = await chamarRpcEstoque(entrada ? 'registrar_entrada_insumo' : 'registrar_inventario_insumo',
+        entrada ? { p_insumo_id: ins.id, p_quantidade: q, p_obs: document.getElementById('sqObs').value }
+                : { p_insumo_id: ins.id, p_contagem: q, p_obs: document.getElementById('sqObs').value }, err);
+      return !!r;
+    });
+}
+
+async function recarregarEstoque(){
+  if (!sb){ EST_MOVS = []; EST_INTERV = []; renderInsumos(true); return; }
+  const desde = new Date(Date.now() - 120 * 86400000).toISOString();
+  // saldo precisa de TODOS os movimentos; cada um é pequeno — pagina para garantir
+  const movs = []; let de = 0;
+  while (true){
+    const { data, error } = await sb.from('movimentos_estoque').select('*').order('id', { ascending:true }).range(de, de + 999);
+    if (error) break; movs.push(...(data || [])); if (!data || data.length < 1000) break; de += 1000;
+  }
+  const { data: iv } = await sb.from('intervencoes_quimicas').select('*, colaboradores(nome)')
+    .not('status_validacao', 'is', null).gte('criado_em', desde).order('criado_em', { ascending:false }).limit(500);
+  const { data: pend } = await sb.from('intervencoes_quimicas').select('*, colaboradores(nome)').eq('status_validacao', 'pendente').order('criado_em', { ascending:true });
+  EST_MOVS = movs; const vistos = new Set();
+  EST_INTERV = [...(pend || []), ...(iv || [])].filter(x => !vistos.has(x.id) && vistos.add(x.id));
+  renderInsumos(true);
+}
+
+async function renderInsumos(jaCarregado){
+  const wrap = document.getElementById('insumosWrap');
+  if (!wrap) return;
+  const token = ++_estToken;
+  if (!jaCarregado){ await carregarInsumos(); await recarregarEstoque(); return; }
+  if (token !== _estToken) return;
+  const agora = new Date();
+  const est = calcularEstoque(INSUMOS.filter(i => i.ativo !== false), EST_MOVS, agora, 30);
+  const val = indicadoresValidacao(EST_INTERV);
+  const pend = EST_INTERV.filter(i => i.status_validacao === 'pendente');
+  const hist = EST_INTERV.filter(i => i.status_validacao && i.status_validacao !== 'pendente').slice(0, 20);
+  const mesIni = new Date(agora.getFullYear(), agora.getMonth(), 1);
+  const porLinha = consumoPorLinha(EST_MOVS, mesIni, new Date(agora.getTime() + 1));
+  const consumoMes = {}; Object.values(porLinha).forEach(m => Object.entries(m).forEach(([k,v]) => { consumoMes[k] = (consumoMes[k] || 0) + v; }));
+  const somaUnid = u => Object.entries(consumoMes).filter(([k]) => unidadeInsumo(k) === u).reduce((s,[,v])=>s+v, 0);
+  const alertas = est.filter(e => e.status === 'baixo' || e.status === 'negativo').length;
+
+  const kpi = (t, v, sub, cor) => `<div class="card qk" style="--qk:${cor}"><div class="qk-titulo">${t}</div><div class="qk-valor">${v}</div><div class="qk-sub">${sub}</div></div>`;
+  const linhaPend = iv => `<tr>
+      <td class="gnq-acoes"><button class="btn small primary" data-est-aprovar="${iv.id}">Validar</button><button class="btn small gnq-excluir" data-est-rejeitar="${iv.id}">Rejeitar</button></td>
+      <td class="mono">${new Date(iv.criado_em).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</td>
+      <td>${escHtml(nomeLinhaId(iv.linha_id))}</td><td><strong>${escHtml(iv.elemento)}</strong></td>
+      <td>${escHtml(nomeInsumo(iv.insumo_id))}</td><td class="mono apont-num"><strong>${fmtQ(iv.quantidade, iv.unidade)}</strong></td>
+      <td class="apont-obs" title="${escHtml(iv.descricao||'')}">${escHtml(iv.descricao||'')}</td>
+      <td>${escHtml(iv.colaboradores && iv.colaboradores.nome || iv.colaborador_re || '')}</td></tr>`;
+  const linhaEst = e => {
+    const st = STATUS_ESTOQUE[e.status];
+    return `<tr>
+      <td><strong>${escHtml(e.nome)}</strong></td>
+      <td class="num"><strong>${e.temInventario ? fmtQ(e.saldo, e.unidade) : '—'}</strong></td>
+      <td class="num">${e.estoque_minimo ? fmtQ(e.estoque_minimo, e.unidade) : '—'}</td>
+      <td class="num">${e.consumoJanela ? fmtQ(e.consumoJanela, e.unidade) : '—'}</td>
+      <td class="num">${e.mediaDia ? fmtQ(e.mediaDia, e.unidade + '/dia') : '—'}</td>
+      <td class="num">${e.cobertura == null ? '—' : `${Math.floor(e.cobertura).toLocaleString('pt-BR')} dias`}</td>
+      <td><span class="est-status ${st.cls}">${st.rot}</span></td>
+      <td class="gnq-acoes"><button class="btn small" data-est-entrada="${e.id}">+ Entrada</button><button class="btn small" data-est-inventario="${e.id}">Inventário</button></td></tr>`;
+  };
+  const linhasPL = LINHAS.map(l => {
+    const m = porLinha[l.id] || {};
+    const itens = Object.entries(m).sort((a,b)=>b[1]-a[1]).map(([k,v]) => `${escHtml(nomeInsumo(k))}: <b>${fmtQ(v, unidadeInsumo(k))}</b>`).join(' · ');
+    return `<tr><td><strong>${l.nome}</strong></td><td>${itens || '<span class="hint">sem consumo validado no mês</span>'}</td></tr>`;
+  }).join('');
+  const linhaHist = iv => {
+    const ap = iv.status_validacao === 'aprovada';
+    const corr = ap && (Number(iv.quantidade_validada) !== Number(iv.quantidade) || Number(iv.insumo_validado_id) !== Number(iv.insumo_id));
+    return `<tr>
+      <td><span class="est-status ${ap ? (corr ? 'warn' : 'ok') : 'crit'}">${ap ? (corr ? 'Aprovada c/ correção' : 'Aprovada') : 'Rejeitada'}</span></td>
+      <td class="mono">${new Date(iv.criado_em).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</td>
+      <td>${escHtml(nomeLinhaId(iv.linha_id))} · ${escHtml(iv.elemento)}</td>
+      <td>${fmtQ(iv.quantidade, iv.unidade)} de ${escHtml(nomeInsumo(iv.insumo_id))}${corr ? ` → <b>${fmtQ(iv.quantidade_validada, unidadeInsumo(iv.insumo_validado_id))} de ${escHtml(nomeInsumo(iv.insumo_validado_id))}</b>` : ''}</td>
+      <td class="apont-obs" title="${escHtml(iv.obs_validacao||'')}">${escHtml(iv.obs_validacao||'')}</td>
+      <td>${escHtml(iv.validado_por||'')}</td></tr>`;
+  };
+  const extrato = EST_MOVS.slice(-30).reverse().map(m => `<tr>
+      <td class="mono">${new Date(m.criado_em).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</td>
+      <td><span class="est-tipo ${m.tipo}">${{ entrada:'Entrada', consumo:'Consumo', inventario:'Inventário' }[m.tipo]}</span></td>
+      <td>${escHtml(nomeInsumo(m.insumo_id))}</td>
+      <td class="num ${Number(m.quantidade) < 0 ? 'neg' : 'pos'}"><b>${Number(m.quantidade) > 0 ? '+' : ''}${fmtQ(m.quantidade, unidadeInsumo(m.insumo_id))}</b>${m.tipo==='inventario' ? `<div class="hint">contado: ${fmtQ(m.contagem, unidadeInsumo(m.insumo_id))}</div>` : ''}</td>
+      <td>${m.linha_id ? escHtml(nomeLinhaId(m.linha_id)) : ''}</td>
+      <td class="apont-obs" title="${escHtml(m.observacao||'')}">${escHtml(m.observacao||'')}</td><td>${escHtml(m.gestor_login)}</td></tr>`).join('');
+
+  wrap.innerHTML = `
+    <div class="est-topo">
+      <div class="hint">Correções do controle químico com insumo e quantidade ficam pendentes até o supervisor validar — só então baixam do estoque.</div>
+      ${SUP_QUIMICO ? `<span class="est-sessao">Supervisor: <b>${escHtml(SUP_QUIMICO.login)}</b> <button type="button" class="refugo-link" data-est-sair>Sair</button></span>`
+                    : `<button class="btn small" data-est-login>Entrar como supervisor</button>`}
+    </div>
+    ${!INSUMOS.length ? `<div class="card q-card"><div class="relatorio-vazio">Nenhum insumo cadastrado ainda. Cadastre em <b>Parâmetros → Insumos químicos</b> e depois lance o inventário inicial aqui.</div></div>` : ''}
+    <div class="q-kpis">
+      ${kpi('Pendentes de validação', val.pendentes, val.pendenteMaisAntigaH != null ? `mais antiga há ${Math.floor(val.pendenteMaisAntigaH)} h` : 'nenhuma aguardando', val.pendentes ? '#B25000' : '#248A3D')}
+      ${kpi('Insumos em alerta', alertas, 'abaixo do mínimo ou saldo negativo', alertas ? '#D70015' : '#248A3D')}
+      ${kpi('Consumo validado no mês', `${fmtQ(somaUnid('kg'), 'kg')}`, somaUnid('L') ? `+ ${fmtQ(somaUnid('L'), 'L')}` : 'todas as linhas', '#1D1D1F')}
+      ${kpi('Tempo médio até validar', val.horasMediaValidacao == null ? '—' : `${val.horasMediaValidacao.toLocaleString('pt-BR',{maximumFractionDigits:1})} h`, 'do apontamento à validação', '#0060DF')}
+      ${kpi('Aprovadas com correção', val.pctCorrigidas == null ? '—' : `${val.pctCorrigidas.toLocaleString('pt-BR',{maximumFractionDigits:0})}%`, 'quantidade/insumo ajustados pelo supervisor', '#8A6500')}
+      ${kpi('Rejeitadas', val.pctRejeitadas == null ? '—' : `${val.pctRejeitadas.toLocaleString('pt-BR',{maximumFractionDigits:0})}%`, 'das validações dos últimos 120 dias', '#6E6E73')}
+    </div>
+    <div class="card q-card"><h3 class="q-card-titulo">Pendentes de validação <span class="q-dica">(${pend.length})</span></h3>
+      ${pend.length ? `<div class="apont-scroll" style="max-height:none;"><table class="data-table param-table apont-table">
+        <thead><tr><th></th><th>Registrada</th><th>Linha</th><th>Elemento</th><th>Insumo</th><th style="text-align:right;">Quantidade</th><th>Ação tomada</th><th>Operador</th></tr></thead>
+        <tbody>${pend.map(linhaPend).join('')}</tbody></table></div>` : '<div class="relatorio-vazio">Nenhuma correção aguardando validação.</div>'}
+    </div>
+    <div class="card q-card"><h3 class="q-card-titulo">Estoque atual <span class="q-dica">(consumo e cobertura pelos últimos 30 dias de consumo validado)</span></h3>
+      ${est.length ? `<div class="apont-scroll" style="max-height:none;"><table class="data-table param-table q-tabela">
+        <thead><tr><th>Insumo</th><th class="num">Saldo</th><th class="num">Mínimo</th><th class="num">Consumo 30 d</th><th class="num">Média</th><th class="num">Cobertura</th><th>Status</th><th></th></tr></thead>
+        <tbody>${est.map(linhaEst).join('')}</tbody></table></div>` : '<div class="relatorio-vazio">Sem insumos ativos.</div>'}
+    </div>
+    <div class="q-grid2">
+      <div class="card q-card"><h3 class="q-card-titulo">Consumo validado por linha · mês vigente</h3>
+        <table class="data-table param-table q-tabela"><tbody>${linhasPL}</tbody></table></div>
+      <div class="card q-card"><h3 class="q-card-titulo">Últimas validações</h3>
+        ${hist.length ? `<div class="apont-scroll"><table class="data-table param-table apont-table">
+          <thead><tr><th>Resultado</th><th>Registrada</th><th>Onde</th><th>Apontado → validado</th><th>Observação</th><th>Por</th></tr></thead>
+          <tbody>${hist.map(linhaHist).join('')}</tbody></table></div>` : '<div class="relatorio-vazio">Nenhuma validação ainda.</div>'}
+      </div>
+    </div>
+    <div class="card q-card"><h3 class="q-card-titulo">Extrato de movimentos <span class="q-dica">(últimos 30)</span></h3>
+      ${extrato ? `<div class="apont-scroll"><table class="data-table param-table apont-table">
+        <thead><tr><th>Quando</th><th>Tipo</th><th>Insumo</th><th class="num">Quantidade</th><th>Linha</th><th>Observação</th><th>Por</th></tr></thead>
+        <tbody>${extrato}</tbody></table></div>` : '<div class="relatorio-vazio">Nenhum movimento ainda — comece pelo inventário inicial.</div>'}
+    </div>`;
+
+  const ivPorId = id => EST_INTERV.find(x => Number(x.id) === Number(id));
+  wrap.querySelectorAll('[data-est-aprovar]').forEach(b => b.addEventListener('click', ()=>validarIntervencaoUI(ivPorId(b.dataset.estAprovar), 'aprovar')));
+  wrap.querySelectorAll('[data-est-rejeitar]').forEach(b => b.addEventListener('click', ()=>validarIntervencaoUI(ivPorId(b.dataset.estRejeitar), 'rejeitar')));
+  wrap.querySelectorAll('[data-est-entrada]').forEach(b => b.addEventListener('click', ()=>movimentoUI('entrada', b.dataset.estEntrada)));
+  wrap.querySelectorAll('[data-est-inventario]').forEach(b => b.addEventListener('click', ()=>movimentoUI('inventario', b.dataset.estInventario)));
+  const bl = wrap.querySelector('[data-est-login]'); if (bl) bl.addEventListener('click', pedirLoginSupervisor);
+  const bs = wrap.querySelector('[data-est-sair]'); if (bs) bs.addEventListener('click', ()=>{ SUP_QUIMICO = null; renderInsumos(true); });
+}
+
+// ---- Parâmetros: cadastro dos insumos ----
+function renderParamInsumos(){
+  const wrap = document.getElementById('paramInsumosWrap');
+  if (!wrap) return;
+  wrap.innerHTML = `
+    <h2 class="section-title" style="margin-top:32px;">Insumos químicos <span style="font-size:13px; font-weight:500; color:var(--ink-soft);">(lista que o operador escolhe ao registrar uma correção · as quantidades entram pela aba Insumos)</span></h2>
+    <div class="card param-card">
+      <table class="data-table param-table q-tabela">
+        <thead><tr><th>Insumo</th><th>Unidade</th><th class="num">Estoque mínimo</th><th>Ativo</th></tr></thead>
+        <tbody>${INSUMOS.map(i=>`<tr>
+          <td><strong>${escHtml(i.nome)}</strong></td>
+          <td><select class="param-input" data-ins-campo="unidade" data-id="${i.id}" style="width:80px;"><option value="kg" ${i.unidade==='kg'?'selected':''}>kg</option><option value="L" ${i.unidade==='L'?'selected':''}>L</option></select></td>
+          <td class="num"><input type="number" min="0" step="1" class="param-input" data-ins-campo="estoque_minimo" data-id="${i.id}" value="${Number(i.estoque_minimo)}" style="width:100px;"></td>
+          <td><input type="checkbox" data-ins-campo="ativo" data-id="${i.id}" ${i.ativo!==false?'checked':''}></td></tr>`).join('') || '<tr><td colspan="4" class="hint">Nenhum insumo cadastrado.</td></tr>'}</tbody>
+      </table>
+      <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; align-items:center;">
+        <input type="text" class="param-input" id="novoInsumoNome" placeholder="ex: Cianeto de cobre" style="width:240px;">
+        <select class="param-input" id="novoInsumoUnid" style="width:80px;"><option value="kg">kg</option><option value="L">L</option></select>
+        <input type="number" min="0" class="param-input" id="novoInsumoMin" placeholder="mínimo" style="width:100px;">
+        <button type="button" class="btn small" id="addInsumo">+ Adicionar insumo</button>
+        <span class="hint" id="insumoMsg"></span>
+      </div>
+      <div class="hint" style="margin-top:8px;">Para tirar um insumo da lista do operador, desmarque "Ativo" (o histórico fica). O saldo não é editado aqui: inventário e compras são lançados pelo supervisor na aba Insumos.</div>
+    </div>`;
+  wrap.querySelectorAll('[data-ins-campo]').forEach(el => el.addEventListener('change', async ()=>{
+    const campo = el.dataset.insCampo, id = Number(el.dataset.id);
+    const valor = campo === 'ativo' ? el.checked : campo === 'estoque_minimo' ? Math.max(0, Number(el.value) || 0) : el.value;
+    const ins = INSUMOS.find(i => i.id === id); if (ins) ins[campo] = valor;
+    if (sb){ const { error } = await sb.from('insumos_quimicos').update({ [campo]: valor }).eq('id', id); if (error) console.error('Falha ao salvar insumo:', error); }
+  }));
+  document.getElementById('addInsumo').addEventListener('click', async ()=>{
+    const nome = document.getElementById('novoInsumoNome').value.trim(), msg = document.getElementById('insumoMsg');
+    if (!nome){ msg.textContent = 'Digite o nome do insumo.'; return; }
+    if (INSUMOS.some(i => i.nome.toLowerCase() === nome.toLowerCase())){ msg.textContent = 'Esse insumo já existe.'; return; }
+    const novo = { nome, unidade: document.getElementById('novoInsumoUnid').value, estoque_minimo: Math.max(0, Number(document.getElementById('novoInsumoMin').value) || 0) };
+    if (sb){
+      const { data, error } = await sb.from('insumos_quimicos').insert(novo).select().single();
+      if (error){ msg.textContent = 'Falha: ' + error.message; return; }
+      if (!INSUMOS.some(i => i.id === data.id)) INSUMOS.push(data);
+    } else INSUMOS.push({ id: Date.now(), ...novo, ativo:true });
+    INSUMOS.sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+    renderParamInsumos();
+  });
+}
+
 // Virada do dia produtivo às 07h00: zera o "hoje", recarrega e refaz a aba
 async function verificarViradaProducao(){
   const atual = diaProdutivoISO();
@@ -5684,9 +6104,11 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     document.getElementById('view-'+view).classList.add('active');
     document.body.classList.toggle('tv-active', view==='tv');
     if (view==='tv') renderTvScreens();
-    if (view==='parametros'){ renderParametros(); renderParamsQuimicos(); }
+    if (view==='parametros'){ renderParametros(); renderParamsQuimicos(); renderParamInsumos(); }
     if (view==='producao') renderProducao();
     if (view==='qualidade') renderQualidade();
+    if (view!=='insumos') SUP_QUIMICO = null;         // senha do supervisor só vale com a aba aberta
+    if (view==='insumos') renderInsumos();
   });
 });
 
