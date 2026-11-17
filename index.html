@@ -825,7 +825,7 @@ td.num.neg b{ color:#D70015; } td.num.pos b{ color:#248A3D; }
       <h2 class="section-title">Pendências mais urgentes</h2>
       <div class="table-scroll" style="max-height:420px; overflow-y:auto; border-radius:var(--radius); box-shadow:var(--shadow);">
         <table class="data-table" id="urgentTable" style="box-shadow:none;">
-          <thead><tr><th>Linha</th><th>Banho</th><th>Item</th><th>Limite</th><th>Última troca</th><th>Cronômetro</th><th>Status</th></tr></thead>
+          <thead><tr><th>Linha</th><th>Banho</th><th>Item</th><th>Limite</th><th>Última troca</th><th>Tempo restante</th><th>Status</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -857,7 +857,7 @@ td.num.neg b{ color:#D70015; } td.num.pos b{ color:#248A3D; }
       <span class="table-note" style="margin:0;">"Zerar cronômetro" é só front-end por enquanto — vai virar gravação no Supabase.</span>
     </div>
     <table class="data-table" id="fullTable">
-      <thead><tr><th>Linha</th><th>Banho</th><th>Item</th><th>Limite</th><th>Última troca</th><th>Cronômetro</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th>Linha</th><th>Banho</th><th>Item</th><th>Limite</th><th>Última troca</th><th>Tempo restante</th><th>Status</th><th></th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -1149,7 +1149,7 @@ async function carregarDadosIniciais(){
   PENDENCIAS = (pend.data || []).filter(r => escopoMonitorado(r.escopo)).map(r => ({
     id: r.id, escopo: r.escopo, banho: r.banho, item: r.item, tanque: r.tanque,
     tipo: r.tipo, limiteHoras: r.limite_horas, descricao: r.descricao, ultima: r.ultima_troca,
-    ativo: r.ativo !== false,
+    ativo: r.ativo !== false, pausadaAuto: r.pausada_auto === true, pausadaDesde: r.pausada_desde || null,
   }));
 
   (banho.data || []).forEach(r => {
@@ -1248,7 +1248,7 @@ function configurarRealtime(){
         const item = {
           id:r.id, escopo:r.escopo, banho:r.banho, item:r.item, tanque:r.tanque,
           tipo:r.tipo, limiteHoras:r.limite_horas, descricao:r.descricao, ultima:r.ultima_troca,
-          ativo:r.ativo !== false,
+          ativo:r.ativo !== false, pausadaAuto: r.pausada_auto === true, pausadaDesde: r.pausada_desde || null,
         };
         const idx = PENDENCIAS.findIndex(p => p.id === r.id);
         if (idx >= 0) PENDENCIAS[idx] = item; else PENDENCIAS.push(item);
@@ -2018,6 +2018,7 @@ function horasDesde(iso, agora){ agora = agora || new Date(); return (agora.getT
 function statusDe(p){
   if (!p) return 'ok'; // dado ainda não carregado (Supabase indisponível/lento) — não quebra a tela
   if (p.ativo === false) return 'off';
+  if (p.pausadaAuto) return 'off'; // os 3 banhos da linha desligados → tanque pausado
   if (p.tipo === 'evento') return 'evento';
   const agora = p.banho ? agoraDoBanho(p.escopo, p.banho) : new Date();
   const ratio = horasDesde(p.ultima, agora) / p.limiteHoras;
@@ -2039,6 +2040,25 @@ const LATAO_HORAS_AMOSTRA = [5, 7, 9];
 // Banho DESLIGADO = amostra, Granalha e Limpeza todos desativados em Parâmetros.
 // Nesse caso não há ciclo rodando: some o tempo corrido, a hora do START e a
 // saída. Ao religar, o operador dá START e começa um ciclo novo.
+// Os 3 banhos da linha desligados → pausa os tanques da linha no banco (o banco congela
+// o relógio e descongela descontando o tempo parado). Idempotente: pode chamar à vontade.
+async function sincronizarPausaTanques(){
+  if (!sb || !PENDENCIAS.length) return;
+  for (const l of LINHAS){
+    const tanques = PENDENCIAS.filter(p => p.escopo === l.id && !p.banho && p.item !== 'Verificar nível do tanque mãe');
+    if (!tanques.length) continue;
+    const todosDesligados = BANHOS.every(b => banhoDesligado(l.id, b));
+    const precisaParar = todosDesligados && tanques.some(p => !p.pausadaAuto);
+    const precisaRetomar = !todosDesligados && tanques.some(p => p.pausadaAuto);
+    if (!precisaParar && !precisaRetomar) continue;
+    const { error } = await sb.rpc('sincronizar_pausa_tanques_linha', { p_linha_id: l.id, p_parar: precisaParar });
+    if (error){ console.error('Falha ao sincronizar pausa dos tanques:', error); continue; }
+    const { data } = await sb.from('pendencias_rotina').select('id, ultima_troca, pausada_auto, pausada_desde').eq('escopo', l.id).is('banho', null);
+    (data || []).forEach(r => { const p = PENDENCIAS.find(x => x.id === r.id); if (p){ p.ultima = r.ultima_troca; p.pausadaAuto = r.pausada_auto === true; p.pausadaDesde = r.pausada_desde || null; } });
+  }
+  renderAll();
+}
+
 function banhoDesligado(linhaId, banho){
   const amostraOff = BANHO_AMOSTRA_ATIVA[linhaId] && BANHO_AMOSTRA_ATIVA[linhaId][banho] === false;
   if (!amostraOff) return false;
@@ -2088,6 +2108,36 @@ function fmtCronometroCurto(iso, agora){
   const min = totalMin % 60;
   return `${horas}h${String(min).padStart(2,'0')}`;
 }
+// ---- CRONÔMETRO REGRESSIVO (Granalha, Limpeza, tanques da linha, Tanque Mãe) ----
+// quanto FALTA para o limite; depois do limite, quanto já passou (vencido).
+// A amostra NÃO usa isto — ela tem a própria dinâmica de cálculo (fmtCronometro/fmtCronometroCurto).
+function minutosRestantes(ultimaIso, limiteHoras, agora){
+  agora = agora || new Date();
+  const decorridos = Math.floor((agora.getTime() - new Date(ultimaIso).getTime()) / 60000);
+  return Math.round(Number(limiteHoras) * 60) - Math.max(0, decorridos);
+}
+function fmtDurMin(totalMin, longo){
+  const d = Math.floor(totalMin / 1440), h = Math.floor((totalMin % 1440) / 60), m = totalMin % 60;
+  if (!longo) return `${Math.floor(totalMin / 60)}h${String(m).padStart(2,'0')}`;
+  return d > 0 ? `${d}d ${h}h ${String(m).padStart(2,'0')}min` : `${h}h ${String(m).padStart(2,'0')}min`;
+}
+// curto (pílulas):  "3h04"  ·  vencido: "−2h10"
+function fmtRegressivoCurto(ultimaIso, limiteHoras, agora){
+  const r = minutosRestantes(ultimaIso, limiteHoras, agora);
+  return r >= 0 ? fmtDurMin(r, false) : `−${fmtDurMin(-r, false)}`;
+}
+// longo (tabelas):  "faltam 1d 3h 04min"  ·  vencido: "vencido há 2h 10min"
+function fmtRegressivo(ultimaIso, limiteHoras, agora){
+  const r = minutosRestantes(ultimaIso, limiteHoras, agora);
+  return r >= 0 ? `faltam ${fmtDurMin(r, true)}` : `vencido há ${fmtDurMin(-r, true)}`;
+}
+// "agora" de cada pendência: banho em manutenção congela; tanque pausado (linha desligada) congela
+function agoraDaPendencia(p){
+  if (p.pausadaAuto && p.pausadaDesde) return new Date(p.pausadaDesde);
+  if (p.banho) return agoraDoBanho(p.escopo, p.banho);
+  return new Date();
+}
+
 function fmtHoras(hh){
   const horas = Math.floor(hh);
   const min = Math.round((hh - horas) * 60);
@@ -2277,7 +2327,7 @@ function buildPlantaSVG(){
           svg += `<g class="plant-dot" data-action="reset-pendencia" data-pid="${p.id}">`;
           svg += `<rect class="item-pill ${st}" x="${px}" y="${py}" width="${pillW}" height="${pillH}" rx="${pillH/2}"></rect>`;
           svg += `<text class="etapa-icon-sm" x="${px+18}" y="${py+pillH/2+5}" text-anchor="middle" style="font-size:15px;">${icone}</text>`;
-          svg += `<text class="etapa-icon-timer ${st}" x="${px+pillW-10}" y="${py+pillH/2+4}" text-anchor="end" style="font-size:12.5px;">${fmtCronometroCurto(p.ultima, agoraBanho)}</text>`;
+          svg += `<text class="etapa-icon-timer ${st}" x="${px+pillW-10}" y="${py+pillH/2+4}" text-anchor="end" style="font-size:12.5px;">${fmtRegressivoCurto(p.ultima, p.limiteHoras, agoraBanho)}</text>`;
           svg += `</g>`;
         }
       });
@@ -2324,8 +2374,12 @@ function buildPlantaSVG(){
           continue;
         }
         const st = statusDe(p);
-        const textoDireita = st === 'crit' && etapa.acao ? `${etapa.acao} · ${fmtCronometro(p.ultima)}` : fmtCronometro(p.ultima);
+        const regressivo = fmtRegressivo(p.ultima, p.limiteHoras, agoraDaPendencia(p));
+        const textoDireita = p.ativo === false ? 'desativado'
+          : p.pausadaAuto ? '⏸ pausado'
+          : st === 'crit' && etapa.acao ? `${etapa.acao} · ${regressivo}` : regressivo;
         svg += `<g class="plant-dot" data-action="reset-pendencia" data-pid="${p.id}">`;
+        if (p.pausadaAuto) svg += `<title>Pausado: os 3 banhos da linha estão desligados — o relógio está congelado (${regressivo}) e volta a contar quando um banho for religado.</title>`;
         svg += `<rect class="etapa-row-bg ${st==='crit'||st==='warn'?st:''}" x="${x}" y="${fy}" width="${colW}" height="${rowH}"></rect>`;
         svg += `<text class="etapa-label" x="${x+8}" y="${fy+rowH/2+4}">${label}</text>`;
         svg += `<text class="etapa-timer ${st}" x="${x+colW-8}" y="${fy+rowH/2+4}" text-anchor="end" style="${st==='crit'?'font-weight:700; font-size:10.5px;':''}">${textoDireita}</text>`;
@@ -2363,9 +2417,10 @@ function buildPlantaSVG(){
       if (pTanque){
         svg += `<g class="plant-dot" data-action="reset-tanque" data-linha="${linhaId}">`;
         svg += `<rect class="etapa-row-bg ${stTanque==='crit'||stTanque==='warn'?stTanque:''}" x="${tmX}" y="${tmTop+tmH-statusBarH}" width="${segW}" height="${statusBarH}"></rect>`;
-        svg += `<title>Nível verificado há ${fmtCronometro(pTanque.ultima)}</title>`;
-        svg += `<text class="etapa-label" x="${tmX+segW/2}" y="${tmTop+tmH-statusBarH/2-3}" text-anchor="middle" style="font-size:8px;">verificado</text>`;
-        svg += `<text class="etapa-timer ${stTanque}" x="${tmX+segW/2}" y="${tmTop+tmH-statusBarH/2+11}" text-anchor="middle" style="font-size:10.5px;">${fmtCronometroCurto(pTanque.ultima)}</text>`;
+        const restTM = minutosRestantes(pTanque.ultima, pTanque.limiteHoras);
+        svg += `<title>Nível verificado há ${fmtCronometro(pTanque.ultima)} · ${fmtRegressivo(pTanque.ultima, pTanque.limiteHoras)}</title>`;
+        svg += `<text class="etapa-label" x="${tmX+segW/2}" y="${tmTop+tmH-statusBarH/2-3}" text-anchor="middle" style="font-size:8px;">${restTM >= 0 ? 'verificar em' : 'vencido há'}</text>`;
+        svg += `<text class="etapa-timer ${stTanque}" x="${tmX+segW/2}" y="${tmTop+tmH-statusBarH/2+11}" text-anchor="middle" style="font-size:10.5px;">${fmtDurMin(Math.abs(restTM), false)}</text>`;
         svg += `</g>`;
       }
     });
@@ -5548,7 +5603,7 @@ function renderUrgentTable(){
       <td>${p.item}</td>
       <td class="mono">${p.tipo==='evento' ? p.descricao : fmtHoras(p.limiteHoras)}</td>
       <td class="mono">${fmtDataHoraBR(p.ultima)}</td>
-      <td class="mono">${fmtCronometro(p.ultima)}</td>
+      <td class="mono">${p.tipo==='evento' ? '—' : p.pausadaAuto ? 'pausado (banhos desligados)' : fmtRegressivo(p.ultima, p.limiteHoras, agoraDaPendencia(p))}</td>
       <td><span class="badge ${p.status}">${STATUS_LABEL[p.status]}</span></td>
     </tr>
   `).join('');
@@ -5589,7 +5644,7 @@ function renderFullTable(){
       <td>${p.item}</td>
       <td class="mono">${p.tipo==='evento' ? p.descricao : fmtHoras(p.limiteHoras)}</td>
       <td class="mono">${fmtDataHoraBR(p.ultima)}</td>
-      <td class="mono">${fmtCronometro(p.ultima)}</td>
+      <td class="mono">${p.tipo==='evento' ? '—' : p.pausadaAuto ? 'pausado (banhos desligados)' : fmtRegressivo(p.ultima, p.limiteHoras, agoraDaPendencia(p))}</td>
       <td><span class="badge ${p.status}">${STATUS_LABEL[p.status]}</span></td>
       <td><button class="btn small" data-registrar="${p.id}">Zerar cronômetro</button></td>
     </tr>
@@ -5769,7 +5824,7 @@ function renderParametros(){
       const p = PENDENCIAS.find(x=>x.id===id);
       if (!p) return;
       p.ativo = el.checked;
-      if (sb) sb.from('pendencias_rotina').update({ ativo: el.checked }).eq('id', id).then();
+      if (sb) sb.from('pendencias_rotina').update({ ativo: el.checked }).eq('id', id).then(()=>sincronizarPausaTanques());
       renderParametros();
       renderAll();
     });
@@ -5778,7 +5833,7 @@ function renderParametros(){
     el.addEventListener('change', ()=>{
       const linhaId = el.dataset.linha, banho = el.dataset.banho;
       BANHO_AMOSTRA_ATIVA[linhaId][banho] = el.checked;
-      if (sb) sb.from('banho_ciclos').update({ amostra_ativa: el.checked }).eq('linha_id', linhaId).eq('banho', banho).then();
+      if (sb) sb.from('banho_ciclos').update({ amostra_ativa: el.checked }).eq('linha_id', linhaId).eq('banho', banho).then(()=>sincronizarPausaTanques());
       renderParametros();
       renderAll();
     });
@@ -6141,6 +6196,7 @@ function renderAll(){
 async function iniciarApp(){
   popularFiltroLinha();
   await carregarDadosIniciais(); // busca PENDENCIAS, ciclos de banho e químico do Supabase (se conectado)
+  sincronizarPausaTanques(); // confere se alguma linha está com os 3 banhos desligados (pausa os tanques)
   renderAll();
   renderQuimicos();
   renderParametros();
